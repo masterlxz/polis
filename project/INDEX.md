@@ -1,6 +1,6 @@
 # polis: Estado do Projeto
 
-> Última atualização: 2026-10-31 (Sessão 1: criação do repositório, licença e decisões iniciais)
+> Última atualização: 2026-11-05 (Sessão 2: proteção da `main` conferida e fechada)
 
 ## Como usar este arquivo
 

@@ -2,6 +2,15 @@
 
 Mais recente no topo.
 
+### 2026-11-05 — Sessão 2 (fechamento da proteção da `main`)
+
+- **Pedido**: fechar a governança da Etapa 0 deixada em aberto na Sessão 1.
+- **Conferido** (leitura via `gh api`): `guard` verde na `main` (run do merge do PR #1, 7s); ruleset `protect-main` ativo (sem exclusão, sem force push, PR com 0 aprovações, `guard` obrigatório, `strict: false`, bypass do papel Admin só via PR); secret scanning e push protection ligados; `delete_branch_on_merge` ligado; 0 alertas do Dependabot.
+- **Alterado** (confirmado pelo dono): `dependabot_security_updates` ligado (estava desativado).
+- **Testado**: push direto na `main` (commit vazio) recusado com "Changes must be made through a pull request" e "Required status check guard is expected"; commit local descartado, nada chegou ao remoto.
+- **Não verificado**: push protection com segredo real; o bypass do Admin não foi exercitado (só se sabe que existe via PR).
+- **Fica**: P-01 (CLA ou DCO); medir as fontes (TSE, Câmara, Senado) para P-02 e P-15.
+
 ### 2026-10-31 — Sessão 1 (criação do repositório e decisões iniciais)
 
 - **Pedido**: estruturar o projeto novo a partir do PRD: repositório, GitHub, licença e o padrão do workspace.

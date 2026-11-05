@@ -2,6 +2,14 @@
 
 Mais recente no topo.
 
+### 2026-11-05 — Sessão 2, parte 3 (aplicação do DCO)
+
+- **Decisão do dono**: workflow separado `dco` (não dentro do `guard`), vale para todos os PRs, inclusive os do mantenedor.
+- **Feito**: `.github/scripts/check-dco.sh` (sign-off do autor ou do committer, merges ignorados, `dependabot[bot]` isento), `.github/scripts/test-check-dco.sh` (14 casos), `.github/workflows/dco.yml` (roda os testes e depois a checagem), `CONTRIBUTING.md`.
+- **Testes**: contra um stub que sempre passa, 6 passaram e 5 falharam. Com a implementação, 14 passam. Mutações no script (maiúsculas, aceitar qualquer e-mail, incluir merges, tirar a isenção do dependabot, só autor, só committer): todas pegas por algum teste; as duas últimas só depois de eu acrescentar testes, que não distinguiam autor de committer. Um mutante equivalente (exigir `@` no regex) não é pego, porque o e-mail já tem de bater com o do autor ou do committer.
+- **Não verificado**: se os PRs do Dependabot trazem `Signed-off-by` (palpite: não; a isenção cobre); comportamento em squash e rebase merge; o check ainda não é exigido no ruleset.
+- **Fica**: depois do merge e do `dco` verde na `main`, incluir `dco` nos checks exigidos do `protect-main` (mexe na proteção da `main`: pedir confirmação); medir as fontes (P-02, P-15).
+
 ### 2026-11-05 — Sessão 2, parte 2 (P-01: DCO)
 
 - **Decisão do dono**: DCO (ADR 0004), depois de comparar com CLA. Premissa registrada: sem plano de dual license hoje (P-11 em aberto).

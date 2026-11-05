@@ -32,4 +32,4 @@ Decisões em aberto, vindas do PRD §18 (nome e licença já decididos: ADR 0001
 | (nome) | Nome definitivo do projeto | polis, ADR 0001 |
 | (licença) | Licença e estratégia de código aberto | AGPL-3.0, ADR 0002 |
 | (repo) | Dono e visibilidade do repositório | masterlxz, público, ADR 0003 |
-| P-01 | Política de contribuição: CLA ou DCO | DCO, ADR 0004. PR externo de código só depois de `CONTRIBUTING.md` e da checagem do sign-off no CI |
+| P-01 | Política de contribuição: CLA ou DCO | DCO, ADR 0004. `CONTRIBUTING.md` e job `dco` no CI feitos (Sessão 2, parte 3). PR externo de código só depois de o `dco` ser exigido no ruleset |

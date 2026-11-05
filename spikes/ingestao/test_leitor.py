@@ -137,7 +137,11 @@ def test_linha_com_numero_de_colunas_diferente_e_rejeitada_e_contada(tmp_path):
 def test_item_que_nao_e_csv_e_ignorado_sem_erro(tmp_path):
     z = montar_zip(
         tmp_path / "a.zip",
-        {"leiame.pdf": b"%PDF-1.4 conteudo binario", "a.csv": csv_bytes(ALLOW, [["1", "ANA", "PT"]])},
+        {
+            # um PDF de verdade tem muitas "linhas" de bytes; uma leitura ingênua as trataria como CSV
+            "leiame.pdf": b"%PDF-1.4\r\nlixo binario 1\r\nlixo binario 2\r\nlixo binario 3\r\n",
+            "a.csv": csv_bytes(ALLOW, [["1", "ANA", "PT"]]),
+        },
     )
     _, linhas = ler(z)
     assert [nome for nome, _ in linhas] == ["a.csv"]

@@ -2,6 +2,14 @@
 
 Mais recente no topo.
 
+### 2026-11-05 — Sessão 6 (P-12: minimização de dados pessoais)
+
+- **Pedido**: decidir quais colunas pessoais o polis ingere e guarda, com base na medição das três fontes. Conduzido como entrevista em árvore de decisão (3 rodadas, 11 perguntas); o dono aceitou a recomendação em todas.
+- **Feito**: ADR 0005 com as 11 decisões e uma allowlist inicial por fonte; P-12 movido para Resolvidas; P-02 atualizado.
+- **Decisões principais**: allowlist por fonte (descarte na leitura); ligação de pessoas sem CPF nem título, nem em hash; bens, prestação de contas e doações fora da Etapa 1; sem atributos demográficos do TSE; bruto filtrado com hash, URL e data de geração; falha fechada em mudança de coluna; data de nascimento completa só interna e ano exposto; nome civil só interno e nome social prevalecendo; lápide para registro retirado pela fonte; últimas 3 cargas do bruto.
+- **Não verificado**: a allowlist é ponto de partida e não foi conferida contra os dicionários de dados das fontes; `NM_CANDIDATO` ser o nome civil é suposição; os endpoints de senadores e os votos individuais não foram medidos; validação jurídica (P-16: LGPD, nome social, prazo de resposta a pedidos); o CPF do TSE de 2026 é medição de um único dia.
+- **Fica**: P-16 (validação jurídica); decidir a stack (P-02) e abrir a Etapa 0 técnica; medir senadores e votos individuais antes de fechar a allowlist.
+
 ### 2026-11-05 — Sessão 5 (medição da fonte TSE)
 
 - **Pedido**: medir o TSE (plan mode, por haver dado sensível e arquivos grandes). Decisões do dono: só estrutura e contagens (nenhum valor individual); ciclos **2026 e 2024**. A opção "2022 e 2024" do plano aprovado foi trocada por 2026 e 2024 depois que a descoberta mostrou dados de 2026 já publicados; o dono confirmou.

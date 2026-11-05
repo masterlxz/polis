@@ -2,6 +2,13 @@
 
 Mais recente no topo.
 
+### 2026-11-05 — Sessão 2, parte 4 (`dco` exigido no ruleset)
+
+- **Alterado** (confirmado pelo dono): `protect-main` passou a exigir `guard` e `dco`. Comparei o ruleset antes e depois via API: só a lista de checks mudou (bypass, condições e demais regras iguais). Os JSONs antes/depois ficaram na pasta temporária da sessão, não no repo.
+- **Testado**: PR #5 descartável com commit sem sign-off: `dco` falhou ("Commit dc45e27 sem Signed-off-by…"), `guard` passou, o estado do merge ficou `BLOCKED`. PR fechado sem mesclar e branch apagada.
+- **Não verificado**: PR do Dependabot sob a nova regra; squash e rebase merge; o bypass do Admin sobre o `dco` (existe via PR, não exercitado).
+- **Fica**: medir as fontes (TSE, Câmara, Senado) para P-02 e P-15.
+
 ### 2026-11-05 — Sessão 2, parte 3 (aplicação do DCO)
 
 - **Decisão do dono**: workflow separado `dco` (não dentro do `guard`), vale para todos os PRs, inclusive os do mantenedor.

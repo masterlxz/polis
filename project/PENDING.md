@@ -23,7 +23,7 @@ Decisões em aberto, vindas do PRD §18 (nome e licença já decididos: ADR 0001
 | P-16 | Interpretações jurídicas que exijam validação especializada | LGPD e dados de processos judiciais |
 | P-17 | Identidade visual, linguagem da marca e domínio | O nome polis tem homônimo conhecido (`pol.is`), ver ADR 0001 |
 | P-18 | Design e navegação definitivos | |
-| P-19 | CI de testes e `dependabot.yml` | Só depois da stack; hoje só o `guard` roda. Security updates já ligados (Sessão 2) |
+| P-19 | CI de testes e `dependabot.yml` | Só depois da stack; hoje só o `guard` e o `dco` rodam. Security updates já ligados (Sessão 2) |
 
 ## Resolvidas
 
@@ -32,4 +32,4 @@ Decisões em aberto, vindas do PRD §18 (nome e licença já decididos: ADR 0001
 | (nome) | Nome definitivo do projeto | polis, ADR 0001 |
 | (licença) | Licença e estratégia de código aberto | AGPL-3.0, ADR 0002 |
 | (repo) | Dono e visibilidade do repositório | masterlxz, público, ADR 0003 |
-| P-01 | Política de contribuição: CLA ou DCO | DCO, ADR 0004. `CONTRIBUTING.md` e job `dco` no CI feitos (Sessão 2, parte 3). PR externo de código só depois de o `dco` ser exigido no ruleset |
+| P-01 | Política de contribuição: CLA ou DCO | DCO, ADR 0004. `CONTRIBUTING.md` e job `dco` no CI feitos e `dco` exigido no ruleset (Sessão 2, partes 3 e 4). PR externo de código já pode ser aceito do ponto de vista da política |

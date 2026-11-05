@@ -1,0 +1,30 @@
+name: Spike ingestao (descartavel)
+
+# Spike da stack (ADR 0006 em preparacao). Nao e check obrigatorio e o PR deste
+# spike nao sera mesclado. So roda quando o proprio spike muda.
+on:
+  pull_request:
+    paths:
+      - 'spikes/ingestao/**'
+      - '.github/workflows/spike-ingestao.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  testes:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+
+      - name: Instalar pytest
+        run: python -m pip install pytest
+
+      - name: Testes do leitor
+        run: python -m pytest spikes/ingestao -v

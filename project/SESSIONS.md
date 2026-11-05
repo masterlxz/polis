@@ -2,6 +2,15 @@
 
 Mais recente no topo.
 
+### 2026-11-05 — Sessão 5 (medição da fonte TSE)
+
+- **Pedido**: medir o TSE (plan mode, por haver dado sensível e arquivos grandes). Decisões do dono: só estrutura e contagens (nenhum valor individual); ciclos **2026 e 2024**. A opção "2022 e 2024" do plano aprovado foi trocada por 2026 e 2024 depois que a descoberta mostrou dados de 2026 já publicados; o dono confirmou.
+- **Feito**: `project/fontes/tse.md`, linha no índice, P-02, P-12 e P-15 atualizados. Cerca de 40 requisições em série (o plano previa 20 a 30; passei por ter reexecutado o script de amostra para refinar a classificação), mais 5 de reprodução. Amostras só em memória, por `Range`; nenhum arquivo de dados foi salvo, e nenhum valor individual foi impresso ou commitado.
+- **Achados principais**: portal CKAN com 190 conjuntos; dados em ZIP no CDN (até 1,36 GB num arquivo; CKAN sem tamanho); `Range` aceito; CSV em ISO-8859-1 com CRLF; arquivos regenerados no mesmo nome várias vezes ao dia, até os de 2024; licença CC BY nos metadados (3 conjuntos sem licença); `www.tse.jus.br` deu 403 para cliente automatizado (não contornei). **Dado pessoal**: o CPF completo e válido dos candidatos está no CSV aberto de 2026 (479/479 passam na verificação dos dígitos), enquanto em 2024 a coluna é uma constante de 2 caracteres; o esquema é igual, então a mudança é invisível para quem só olha as colunas. O título de eleitor vem completo nos dois ciclos.
+- **Verificado de novo** ao final: 16 conjuntos "Ano 2026", `HEAD` do arquivo estático (10.175.412 bytes), e a classificação do CPF (11 dígitos, 479) e do título (12 dígitos, 479) pelo `awk` do próprio documento, com o ZIP de 3,3 MB.
+- **Não verificado**: se o CPF de 2026 vale para todas as UFs e persiste; conteúdo de bens, doações e fornecedores; as Portarias 93/2021 e 525/2021 e o `leiame.pdf`; limite por IP ou taxa; DataStore do CKAN; contagem total de linhas; interpretação jurídica (P-16). Medição de um único dia; 2024 reproduzível só com script descartável (descrito no doc).
+- **Fica**: com as três fontes medidas, decidir o P-12 (quais colunas pessoais ingerir) e só então a stack (P-02); avaliar se alguma medição pede ADR.
+
 ### 2026-11-05 — Sessão 4 (medição da fonte Senado Federal)
 
 - **Pedido**: repetir a medição para o Senado, no formato da Câmara (sem plan mode, por repetir receita já aprovada).

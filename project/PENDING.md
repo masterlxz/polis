@@ -6,7 +6,7 @@ Decisões em aberto, vindas do PRD §18 (nome e licença já decididos: ADR 0001
 
 | ID | Pendência | Observação |
 |---|---|---|
-| P-02 | Stack e versões definitivas | Depois de medir as fontes. Insumos da Câmara e do Senado em `fontes/`; falta o TSE. As duas fontes diferem (arquivos anuais e API paginada na Câmara; API sem paginação, limite de 10 req/s e depreciação em curso no Senado) |
+| P-02 | Stack e versões definitivas | Depois de medir as fontes. Insumos das três fontes em `fontes/`. Elas diferem: arquivos anuais e API paginada na Câmara; API sem paginação, limite de 10 req/s e depreciação em curso no Senado; arquivos ZIP grandes (até 1,36 GB) em CDN, ISO-8859-1 e regenerados várias vezes ao dia no TSE. Dá para decidir a stack agora, depois de decidir o P-12 |
 | P-03 | Estrutura final do repositório | Monorepo ou separado; depende de P-02 |
 | P-04 | Arquitetura de implantação e hospedagem | |
 | P-05 | Banco de dados e tecnologias complementares | |
@@ -16,10 +16,10 @@ Decisões em aberto, vindas do PRD §18 (nome e licença já decididos: ADR 0001
 | P-09 | Estratégia de autenticação | |
 | P-10 | Necessidade e formato da API pública, política de uso e limites | |
 | P-11 | Modelo de financiamento e sustentabilidade | |
-| P-12 | Política definitiva de retenção de dados | LGPD |
+| P-12 | Política definitiva de retenção de dados | LGPD. Insumo do TSE (`fontes/tse.md`): o CSV aberto de candidatos de 2026 traz CPF completo e título de eleitor; decidir quais colunas o polis ingere e guarda antes de desenhar o schema |
 | P-13 | Priorização final dos módulos | |
 | P-14 | Metas quantitativas de desempenho e disponibilidade | |
-| P-15 | Regras específicas para cada fonte de dados | Termos, licenças, limites; primeiro TSE, Câmara e Senado. Câmara e Senado medidos em 2026-11-05 (`fontes/camara.md`, `fontes/senado.md`); falta o TSE. Pendente da Câmara: licença explícita e leitura do Ato da Mesa 45/2012. Pendente do Senado: confirmar se a política de uso do portal (citar a fonte) vale para a API, e o uso comercial, que ele não declara |
+| P-15 | Regras específicas para cada fonte de dados | Termos, licenças, limites; primeiro TSE, Câmara e Senado. Câmara, Senado e TSE medidos em 2026-11-05 (`fontes/camara.md`, `senado.md`, `tse.md`): primeiro corte completo. Pendente do TSE: reconferir o CPF de 2026 (muda entre ciclos sem mudar o esquema), ler as Portarias 93/2021 e 525/2021 e o `leiame.pdf`, e licença dos 3 conjuntos sem licença declarada. Pendente da Câmara: licença explícita e leitura do Ato da Mesa 45/2012. Pendente do Senado: confirmar se a política de uso do portal (citar a fonte) vale para a API, e o uso comercial, que ele não declara |
 | P-16 | Interpretações jurídicas que exijam validação especializada | LGPD e dados de processos judiciais |
 | P-17 | Identidade visual, linguagem da marca e domínio | O nome polis tem homônimo conhecido (`pol.is`), ver ADR 0001 |
 | P-18 | Design e navegação definitivos | |

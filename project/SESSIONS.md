@@ -2,6 +2,15 @@
 
 Mais recente no topo.
 
+### 2026-11-05 — Sessão 4 (medição da fonte Senado Federal)
+
+- **Pedido**: repetir a medição para o Senado, no formato da Câmara (sem plan mode, por repetir receita já aprovada).
+- **Feito**: `project/fontes/senado.md`, linha no índice `fontes/README.md`, P-02 e P-15 atualizados. Cerca de 20 requisições em série (mais 4 de reprodução no fim), sem autenticação, `User-Agent` genérico; respostas brutas só na pasta temporária da sessão.
+- **Achados principais**: limite documentado de 10 req/s (429), com 503 sob demanda; API sem paginação nas listagens principais, com filtro obrigatório em `/processo` e `/votacao`; 42 de 157 endpoints depreciados, e o `Sunset` de `/materia/*` (2026-02-01) já passou com o serviço ainda no ar; código inexistente devolve 200 com dados vazios, não 404; dois estilos de JSON e dois sistemas de ids (processo e matéria legada); política de uso do portal exige citar a fonte, sem licença nomeada, e nada sobre uso comercial.
+- **Verificado de novo** ao final: 157 caminhos e 42 depreciados, cabeçalhos de depreciação de `/materia/172391`, 200 para senador inexistente e 81 senadores.
+- **Não verificado**: comportamento real do 429 (não testei o limite); se a política do portal vale para a API; dados pessoais dos endpoints de senadores (não olhei o conteúdo); volume de `/processo` sem filtro de ano; Plano de Dados Abertos 2026/2028; interpretação jurídica (P-16). Medição de um único dia.
+- **Fica**: TSE; depois das três fontes, decidir se alguma medição pede ADR e, só então, escolher a stack (P-02).
+
 ### 2026-11-05 — Sessão 3 (medição da fonte Câmara dos Deputados)
 
 - **Pedido**: medir as fontes para P-02 e P-15, uma por vez, começando pela Câmara (plan mode; plano aprovado).

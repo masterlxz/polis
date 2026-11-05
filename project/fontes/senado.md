@@ -1,0 +1,113 @@
+# Fonte: Senado Federal (Dados Abertos Legislativos)
+
+Campos do PRD §8.1. Rótulos de origem: ver [README.md](README.md). Medições feitas em **2026-11-05**, depois das 22:14 GMT, de uma única máquina e sem paralelismo (latências dependem da minha rede). Versão da API no momento: `4.1.3.113` (declarada na especificação). Formato do registro igual ao da [Câmara](camara.md), para comparar.
+
+## Identificação
+- **Instituição:** Senado Federal (infraestrutura técnica: Prodasen, segundo a política de uso do portal).
+- **Portal de dados abertos:** <https://www12.senado.leg.br/dados-abertos> (catálogo e plano de dados abertos).
+- **API legislativa:** <https://legis.senado.leg.br/dadosabertos/> (redireciona para o Swagger UI). Especificação OpenAPI em <https://legis.senado.leg.br/dadosabertos/v3/api-docs> (medido: 200, JSON, 174 KB, 157 caminhos). A descrição da API diz abranger Senado e Congresso Nacional.
+- **Catálogo de dados abertos em CSV:** <https://www12.senado.leg.br/dados-abertos/geracsv>
+- **Política de uso do portal:** <https://www12.senado.leg.br/institucional/documentos/politica-de-uso-do-portal-do-senado-federal>
+- **Plano de Dados Abertos 2026/2028:** link no portal (PDF); **não lido**.
+
+## Tipo de acesso
+1. **API REST** em `https://legis.senado.leg.br/dadosabertos/...` (medido).
+2. **Catálogo** com 223 conjuntos de dados em duas categorias, Administrativo (80) e Legislativo (143), espalhados por vários hosts (medido, ver "Catálogo").
+3. **Arquivos estáticos** pontuais, por exemplo `.../dadosabertos/arquivos/*.csv` e `.../dadosabertos/dados/*.zip` (medido em 4 exemplos). Não há, pelo que vi, o equivalente aos arquivos anuais da Câmara; não varri o catálogo inteiro para afirmar.
+
+## Formatos
+- **Documentação (especificação):** JSON, XML e CSV, escolhidos por cabeçalho `Accept` ou por sufixo (`.json`, `.xml`, `.csv`). NDJSON em 7 endpoints, iCal em 1.
+- **Medido:** JSON (`Accept: application/json`) e CSV por sufixo (`/senador/lista/atual.csv`, `text/csv`, 188,5 KB).
+- **Dois estilos de JSON convivem (medido):**
+  - **Legado:** derivado do XML, aninhado, com envelope e metadados. Ex.: `/senador/lista/atual` devolve `ListaParlamentarEmExercicio` > `Metadados` (`Versao`, `VersaoServico`, `DataVersaoServico`, `DescricaoDataSet`) > `Parlamentares` > `Parlamentar`, com `noNamespaceSchemaLocation` apontando para um `.xsd`.
+  - **Novo:** lista plana de objetos, sem envelope. Ex.: `/processo` e `/votacao`.
+
+## Autenticação
+Nenhuma. A descrição da API diz "acesso público, sem necessidade de autenticação" (documentação), e todas as chamadas foram feitas sem credencial (medido).
+
+## Limites de requisição
+- **Documentado (especificação):** "Mais de 10 requisições por segundo estão sujeitas a receber o erro HTTP 429"; evitar rotinas em horários redondos (00:00:00, 01:00:00, 01:15:00 etc.) para não gerar picos; em momentos de muita demanda as requisições estão sujeitas a **503**.
+- **Documentado:** `/processo` exige ao menos um filtro (número, ano, idProcesso, codigoMateria, tramitando, e outros); `/votacao` exige ao menos um filtro, e o intervalo `dataInicio`+`dataFim` deve ser de até 1 ano.
+- **Paginação:** pela especificação, só os endpoints de `comissao` têm `pagina`/`tamanho`. Os demais que medi (`/processo`, `/votacao`, `/senador/lista/atual`) devolvem tudo de uma vez (medido).
+- **Medido:** nenhum 429 nem 503 ocorreu. Fiz cerca de 1 requisição a cada 3 s, muito abaixo do limite, então não sei como o 429 se comporta na prática (não testei de propósito). Nenhum cabeçalho `Retry-After` ou `RateLimit` nas respostas observadas.
+
+## Frequência de atualização
+- **API (medido):** `Cache-Control: max-age=` de 900 s (`/senador/lista/atual`), 1800 s (`/processo`), 600 s (`/votacao`), 300 s e 120 s em outros. Há cabeçalho `Age`, ou seja, existe cache de borda.
+- **Catálogo (documentação, coluna `des_frequencia_atualizacao`, 223 conjuntos):** Diário 73, "A especificar" 77, On-line 28, Mensal 13, Anual 9, Quadrimestral 8, "Não especificada" 4, vazio 3. Mais de um terço dos conjuntos não declara a frequência.
+- **Arquivos estáticos (medido, 4 exemplos):** `ComissoesMistasCongresso.csv` com `Last-Modified` de 2026-11-05 21:19 GMT e `tiposColegiado.csv` de 2026-11-05 17:19 GMT, enquanto `DocumentosSicon.zip` (reuniões anteriores a 2012) tem `Last-Modified` de 2021-11-18. Ou seja, alguns são regenerados no dia e outros são estáticos. Uma única data de medição.
+
+## Termos de uso e licença
+Textos oficiais (documentação), transcritos:
+- **Política de uso do portal** (<https://www12.senado.leg.br/institucional/documentos/politica-de-uso-do-portal-do-senado-federal>): "Todo o conteúdo deste Portal é de propriedade autoral do Senado Federal, mas pode ser utilizado pelos usuários, desde que seja citada a fonte e para fins lícitos."
+- Mesma política: "Este Portal deve ser usado apenas para propósitos legalmente amparados e seu uso não deve infringir, restringir ou inibir o uso por outras pessoas." Também proíbe ataques ao portal, "incluindo ataques do tipo DDoS".
+- **Página de dados abertos** (<https://www12.senado.leg.br/dados-abertos>): "Dados Abertos são representados em meio digital, processáveis por máquina, referenciados na rede mundial de computadores e disponibilizados sob licença que permita sua livre utilização." É a definição geral; a página não nomeia uma licença.
+
+**Diferença em relação à Câmara:** o Senado condiciona o uso a **citar a fonte**; o FAQ da Câmara não menciona atribuição.
+
+**Não verificado:**
+- Se a política do *portal* se aplica expressamente aos dados da API. A política fala em "conteúdo deste Portal"; a API fica em outro host (`legis.senado.leg.br`). Meu entendimento é que é a política mais próxima, mas é interpretação.
+- Não há licença nomeada (por exemplo Creative Commons): o catálogo CSV não tem coluna de licença (medido).
+- Nada sobre uso comercial: o Senado não diz nem que pode nem que não pode. A Câmara diz explicitamente que pode.
+- O Plano de Dados Abertos 2026/2028 e a Lei de Acesso à Informação (LAI) não foram lidos. Qualquer interpretação jurídica é do P-16.
+
+## Restrições de armazenamento, transformação e redistribuição
+Nenhuma declarada além da política acima (citar a fonte, fins lícitos). Ausência de restrição declarada não é autorização verificada: PRD §8.2.
+
+## Entidades e campos (medido, 2026-11-05)
+| Recurso | Forma | Campos de cada item |
+|---|---|---|
+| `/processo?sigla=PEC&ano=2026` | lista plana (14 itens, 23,6 KB) | `autoria, casaIdentificadora, codigoMateria, dataApresentacao, dataSituacaoAtual, dataUltimaAtualizacao, ementa, enteIdentificador, id, identificacao, objetivo, situacaoAtual, tipoConteudo, tipoDocumento, tramitando, ultimaInformacaoAtualizada, urlDocumento` |
+| `/votacao?dataInicio=2026-10-01&dataFim=2026-10-31` | lista plana (3 itens, 55,6 KB) | `ano, casaSessao, codigoMateria, codigoSessao, codigoSessaoLegislativa, codigoSessaoVotacao, dataApresentacao, dataSessao, descricaoVotacao, ementa, idProcesso, identificacao, informeLegislativo, numero, numeroSessao, resultadoVotacao, sequencialSessao, sequencialVotacao, sigla, siglaTipoSessao, totalVotosAbstencao, totalVotosNao, totalVotosSim, votacaoSecreta, votos` (os `votos` vêm aninhados) |
+| `/senador/lista/atual` | aninhado, estilo legado (81 senadores, 129,6 KB) | `Parlamentares.Parlamentar[].IdentificacaoParlamentar.*` (`CodigoParlamentar`, `CodigoPublicoNaLegAtual`, `NomeParlamentar`, `NomeCompletoParlamentar` etc.) |
+
+Grupos de endpoints na especificação (157 caminhos, 42 depreciados): `materia` 39, `plenario` 25, `senador` 20, `processo` 18, `composicao` 16, `comissao` 14, `legislacao` 10, `taquigrafia` 4, `votacaoComissao` 3, `orcamento` 3, `discurso` 2, `autor` 2, `votacao` 1.
+
+## Identificadores oficiais (medido)
+Coexistem **dois sistemas de identificação**:
+- **Novo:** `id` / `idProcesso` do processo legislativo, inteiro (ex.: `8986903`, para a `PEC 1/2026`).
+- **Legado:** `codigoMateria`, inteiro (ex.: `172391`), "código legado da matéria do MATE" (documentação). A listagem de `/processo` devolve os dois ids no mesmo item (medido); a especificação diz que `/processo` aceita `codigoMateria` como filtro (documentação).
+- Texto legível: `identificacao` (ex.: `PEC 1/2026`).
+- Senador: `CodigoParlamentar`; há também `CodigoPublicoNaLegAtual`.
+- Votação: `codigoSessaoVotacao`, `codigoSessao`, `sequencialVotacao`; não identifiquei um único id de votação.
+
+## Catálogo (medido)
+`geracsv`: 1,1 MB, UTF-8 com BOM, separador `;`, 2.230 linhas, 14 colunas (`nom_categoria, nom_sub_categoria, des_grupo_dados, cod_orgao_responsavel, nom_orgao_responsavel, nom_conjunto_dados, des_conjunto_dados, txt_url, des_frequencia_atualizacao, dth_ultima_atualizacao, nom_dicionario_dados, des_dicionario_dados, des_tipo_campo, num_ordem`). Cada linha parece ser um campo do dicionário de dados, e não um conjunto (inferência: 2.230 linhas para 223 conjuntos, e colunas `nom_dicionario_dados`, `des_tipo_campo`, `num_ordem`). Das linhas, **33 têm texto livre na coluna `nom_categoria`** (notas de rodapé, trechos de atos), ou seja, o CSV não é limpo.
+URLs dos 223 conjuntos: 118 em `legis.senado.leg.br`, 40 em `www12.senado.leg.br`, 24 em `adm.senado.gov.br`, 14 em `legis.senado.gov.br`, 7 em `www.senado.leg.br` e 6 em `www.lexml.gov.br`. Por extensão: html 86, csv 60, xml 19, json 5, xlsx 1, zip 1, sem extensão 51. Muitos conjuntos apontam para uma página HTML e não para o dado.
+
+## Tempos de resposta (medido, uma amostra cada)
+API: 0,22 a 0,75 s (`/senador/lista/atual` 0,37 s; `/processo` 0,34 s; `/votacao` 0,75 s; versão `.csv` 1,7 s). A primeira requisição ao redirecionador `/dadosabertos/` levou **23 s** (uma amostra, não repeti).
+
+## Dados pessoais
+**Não medido em agregado nesta rodada.** Os endpoints de senadores (`/senador/{codigo}/...`: profissão, filiações, histórico acadêmico, licenças, cargos) sugerem dado pessoal e profissional público; não olhei o conteúdo. Fica para o P-12 e o P-16 antes de qualquer integração.
+
+## Problemas conhecidos e limitações
+- **Depreciação em massa (documentação e medido):** 42 de 157 endpoints estão `deprecated`, incluindo quase todo o grupo `materia`. A descrição da API diz que os serviços depreciados devolvem os cabeçalhos `Deprecation`, `Sunset` e `Link` (sucessor). Conector precisa de versionamento e plano de migração desde o início (PRD §9.2).
+- **`Sunset` vencido e o serviço ainda responde (medido):** `GET /materia/172391` devolveu 200 com `Deprecation: Tue, 18 Mar 2025`, `Sunset: Sun, 01 Feb 2026` e `Link: <.../dadosabertos/processo/{idProcesso}>; rel="successor"`. A data de desativação passou há cerca de nove meses e o serviço continua no ar em 2026-11-05. Não dá para confiar na data como cronograma.
+- **Código inexistente devolve 200 (medido):** `GET /senador/99999999` respondeu **200** só com os metadados (`DetalheParlamentar` sem dados), não 404. Um conector que confia no status HTTP trata "não existe" como "vazio".
+- **Redirecionamento 301 em endpoint depreciado (medido):** `GET /materia/tiposNatureza` devolveu 301 para um arquivo estático (`.../dadosabertos/dados/ListaTiposNatureza.json`).
+- **Dois estilos de JSON e dois sistemas de ids** (acima).
+- **Catálogo sujo** e com muitos conjuntos sem frequência declarada.
+- **Hosts diversos** para os conjuntos do catálogo.
+
+## Insumos para o P-02 (sem decidir)
+- Um limite documentado de taxa pede throttling no conector, bem abaixo de 10 req/s e fora de horários redondos, com tratamento de 429 e 503.
+- Sem paginação nas listagens principais, a carga histórica se faz por filtros de data e processo, respeitando "intervalo de até 1 ano" nas votações. É um desenho diferente do da Câmara (arquivos anuais).
+- Dois sistemas de ids (processo e matéria legada) e depreciação em curso pedem uma tabela de correspondência de ids e um id de origem em texto.
+- A atribuição (citar a fonte) casa com o princípio de rastreabilidade do PRD, e custa pouco se o modelo já guarda a URL de origem.
+
+## Reproduzir as medições
+Use um `User-Agent` genérico e espere alguns segundos entre as requisições.
+```bash
+B=https://legis.senado.leg.br/dadosabertos
+curl -sS "$B/v3/api-docs" | python3 -c 'import json,sys;d=json.load(sys.stdin);print(len(d["paths"]), sum(v["get"].get("deprecated",False) for v in d["paths"].values()))'   # 157 42
+curl -sS -H 'Accept: application/json' "$B/senador/lista/atual" | python3 -c 'import json,sys;print(len(json.load(sys.stdin)["ListaParlamentarEmExercicio"]["Parlamentares"]["Parlamentar"]))'   # 81 (muda com a composição)
+curl -sS -D - -o /dev/null -H 'Accept: application/json' "$B/materia/172391" | grep -iE '^(deprecation|sunset|link)'
+curl -sS -H 'Accept: application/json' "$B/senador/99999999" -w '\n%{http_code}\n'   # 200 sem dados
+```
+Os números de senadores e de itens de processo e votação mudam com o tempo.
+
+## Estado da integração
+Nenhuma. Histórico de sincronizações: não se aplica ainda.
+
+## Ainda não medido nesta rodada
+O comportamento real do 429 (não testei o limite); volume e custo de `/processo` sem filtro de ano e de `/votacao` num ano inteiro; discursos, taquigrafia, orçamento e votações de comissão; conteúdo dos endpoints `/senador/{codigo}/...` e seus dados pessoais; XML e NDJSON; consistência entre os endpoints legados e novos para o mesmo registro; estabilidade dos ids; o Plano de Dados Abertos 2026/2028; leitura jurídica da política de uso para a API.

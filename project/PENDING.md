@@ -24,7 +24,7 @@ Decisões em aberto, vindas do PRD §18 (nome e licença já decididos: ADR 0001
 | P-16 | Interpretações jurídicas que exijam validação especializada | LGPD e dados de processos judiciais |
 | P-17 | Identidade visual, linguagem da marca e domínio | O nome polis tem homônimo conhecido (`pol.is`), ver ADR 0001 |
 | P-18 | Design e navegação definitivos | |
-| P-19 | CI de testes e `dependabot.yml` | Só depois da stack; hoje só o `guard` roda |
+| P-19 | CI de testes e `dependabot.yml` | Só depois da stack; hoje só o `guard` roda. Security updates já ligados (Sessão 2) |
 
 ## Resolvidas
 

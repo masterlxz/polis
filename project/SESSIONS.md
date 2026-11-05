@@ -2,6 +2,15 @@
 
 Mais recente no topo.
 
+### 2026-11-05 — Sessão 3 (medição da fonte Câmara dos Deputados)
+
+- **Pedido**: medir as fontes para P-02 e P-15, uma por vez, começando pela Câmara (plan mode; plano aprovado).
+- **Feito**: `project/fontes/README.md` (índice e rótulos de origem: medido, documentação, inferência, não verificado) e `project/fontes/camara.md` (campos do PRD §8.1). Medi com 22 requisições (mais 3 de reprodução no fim) em série, sem autenticação, `User-Agent` genérico; respostas brutas ficaram só na pasta temporária da sessão, fora do repo.
+- **Achados principais**: API REST + arquivos em massa (CSV, JSON, XLSX); sem autenticação; limite documentado de 100 itens por página (`itens=101` deu 504 em 15 s); `retry-after: 30` em toda resposta, sem significado documentado; arquivos regenerados de madrugada, inclusive de anos encerrados; `cpf` existe no CSV de deputados mas vem vazio nas 7.889 linhas; 62 de 100 proposições recentes têm `ano = 0`; FAQ diz que se pode cobrar pelo uso e não declara restrição, mas não achei licença explícita.
+- **Verificado de novo** ao final: 3 comandos de reprodução do doc (513 deputados, 42.340.873 bytes no arquivo de proposições 2026, 78 caminhos na especificação).
+- **Não verificado**: limite de taxa e bloqueio (não testei de propósito); XML e ODS; despesas, discursos e votos por deputado; consistência API versus arquivos; ids estáveis; uma única data de medição (a regeneração diária dos arquivos é inferência). Licença e Ato da Mesa 45/2012 não lidos; interpretação jurídica é P-16.
+- **Fica**: Senado e TSE (uma por vez); decidir depois das três se alguma medição pede ADR.
+
 ### 2026-11-05 — Sessão 2, parte 4 (`dco` exigido no ruleset)
 
 - **Alterado** (confirmado pelo dono): `protect-main` passou a exigir `guard` e `dco`. Comparei o ruleset antes e depois via API: só a lista de checks mudou (bypass, condições e demais regras iguais). Os JSONs antes/depois ficaram na pasta temporária da sessão, não no repo.

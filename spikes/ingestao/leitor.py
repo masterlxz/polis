@@ -51,14 +51,15 @@ class LeitorZip:
         for i, coluna in enumerate(cabecalho):
             posicao.setdefault(coluna, i)
         faltando = [c for c in self.allowlist if c not in posicao]
-        if faltando and False:  # MUTAÇÃO: sem falha fechada
+        if faltando:
             raise ColunaAusente(f"{nome}: faltam {faltando}")
-        indices = [(c, posicao[c]) for c in posicao]  # MUTAÇÃO: vaza todas as colunas
+        self.colunas_ignoradas |= set(cabecalho) - set(self.allowlist)
+        indices = [(c, posicao[c]) for c in self.allowlist]
         largura = len(cabecalho)
         for linha in leitor:
             if not linha:
                 continue
-            if len(linha) < 0:  # MUTAÇÃO: não rejeita linha malformada
+            if len(linha) != largura:
                 self.rejeitadas += 1
                 continue
             yield nome, {c: linha[i] for c, i in indices}

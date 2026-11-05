@@ -18,5 +18,5 @@ Medições usam poucas requisições, em série, sem autenticação, com `User-A
 | Fonte | Arquivo | Última medição | Estado |
 |---|---|---|---|
 | Câmara dos Deputados (Dados Abertos) | [camara.md](camara.md) | 2026-11-05 | Medida; sem integração |
-| Senado Federal | (a fazer) | | |
+| Senado Federal (Dados Abertos Legislativos) | [senado.md](senado.md) | 2026-11-05 | Medida; sem integração |
 | TSE | (a fazer) | | |

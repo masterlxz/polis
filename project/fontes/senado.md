@@ -95,6 +95,36 @@ API: 0,22 a 0,75 s (`/senador/lista/atual` 0,37 s; `/processo` 0,34 s; `/votacao
 - Dois sistemas de ids (processo e matéria legada) e depreciação em curso pedem uma tabela de correspondência de ids e um id de origem em texto.
 - A atribuição (citar a fonte) casa com o princípio de rastreabilidade do PRD, e custa pouco se o modelo já guarda a URL de origem.
 
+## Rodada 2: senadores e votos individuais (medido, 2026-11-05)
+Complementa as seções acima. Só estrutura e contagens; nenhum valor individual foi impresso ou commitado.
+
+**Lista `GET /senador/lista/atual` (81 senadores em exercício).** `IdentificacaoParlamentar`: `CodigoParlamentar` (81/81), `CodigoPublicoNaLegAtual` (81/81), `NomeParlamentar` (81/81), `NomeCompletoParlamentar` (81/81), `SiglaPartidoParlamentar`, `UfParlamentar`, `SexoParlamentar`, `FormaTratamento`, `EmailParlamentar` (79/81), `Telefones` (149 entradas), `UrlFotoParlamentar`, `UrlPaginaParlamentar`, `UrlPaginaParticular` (18/81), `MembroMesa`, `MembroLideranca`, `Bloco` (80/81: código, nome, apelido, data de criação). `Mandato`: `CodigoMandato`, `DescricaoParticipacao`, `UfParlamentar`, primeira e segunda legislaturas (número, início, fim), `Exercicios` (131 exercícios; 50 com data fim e causa de afastamento), `Suplentes` (150, com código e nome) e `Titular` (11, para quem é suplente em exercício). **A lista não traz data de nascimento nem CPF.**
+
+**Detalhe `GET /senador/{codigo}` (um senador, n=1).** Além dos campos acima: `DadosBasicosParlamentar` com `DataNascimento` (`aaaa-mm-dd`), `EnderecoParlamentar`, `Naturalidade` e `UfNaturalidade`; `OutrasInformacoes.Servico[]` (13 serviços, com nome, descrição e URL) e `Telefones`. **Sem CPF.** `EnderecoParlamentar` parece institucional (o texto menciona "Senado" e "Anexo") e o e-mail termina em `@senado.leg.br` (inferência, n=1).
+
+**Subrecursos do mesmo senador (n=1).**
+| Subrecurso | O que devolveu |
+|---|---|
+| `/profissao`, `/historicoAcademico` | Só metadados e o código; **sem itens** para este senador |
+| `/filiacoes` | 4 filiações (partido: código, nome, sigla; data de filiação; 3 com data de desfiliação) |
+| `/mandatos` | 1 mandato, com exercícios, 2 partidos e suplentes |
+| `/comissoes` | 82 participações (código, nome, sigla e casa da comissão; participação; início; 56 com fim); 20 KB, 0,78 s |
+| `/discursos` | `Pronunciamentos` vazio na janela padrão (sem filtro de data; não medi com intervalo) |
+
+**Votos individuais, `GET /votacao?dataInicio=2026-10-01&dataFim=2026-10-31` (3 votações nominais).** Cada uma traz **81 votos individuais** (um por senador, 81 códigos distintos). Cada voto tem 7 campos: `codigoParlamentar` (inteiro), `nomeParlamentar`, `sexoParlamentar`, `siglaPartidoParlamentar`, `siglaUFParlamentar`, `siglaVotoParlamentar` e `descricaoVotoParlamentar` (esta preenchida em só 2% a 4% dos votos).
+- **`siglaVotoParlamentar` tem mais que sim e não:** `Sim`, `Não`, `AP`, `LS`, `P-NRV`, `NCom` e `Presidente (art. 51 RISF)` (nas três votações juntas). O significado das siglas `AP`, `LS`, `P-NRV` e `NCom` **não foi verificado** na documentação.
+- **Os totais `totalVotosSim`, `totalVotosNao` e `totalVotosAbstencao` vêm nulos** nas três votações nominais, embora os 81 votos individuais estejam lá. Pela especificação, votações secretas trazem só totais (documentação); as três medidas eram `votacaoSecreta = N`. Os totais, se necessários, têm de ser calculados a partir dos votos.
+- Cada votação traz também `identificacao`, `ementa`, `sigla`, `numero`, `ano`, `idProcesso`, `codigoMateria`, `codigoSessaoVotacao`, `dataSessao`, `resultadoVotacao` e `informeLegislativo`.
+
+Reproduzir os votos e os totais nulos:
+```bash
+curl -sS -H 'Accept: application/json' "https://legis.senado.leg.br/dadosabertos/votacao?dataInicio=2026-10-01&dataFim=2026-10-31" \
+  | python3 -c 'import json,sys;d=json.load(sys.stdin);print(len(d),"votações;",[len(v["votos"]) for v in d],"votos cada; totalVotosSim:",{v["totalVotosSim"] for v in d})'
+# esperado em 2026-11-05: 3 votações; [81, 81, 81] votos cada; totalVotosSim: {None}
+```
+
+**Não verificado nesta rodada:** os campos de senadores além do n=1; discursos e apartes com filtro de data; votações secretas; o significado das siglas de voto; `profissao` e `historicoAcademico` para outros senadores.
+
 ## Reproduzir as medições
 Use um `User-Agent` genérico e espere alguns segundos entre as requisições.
 ```bash

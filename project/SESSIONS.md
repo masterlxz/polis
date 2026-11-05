@@ -2,6 +2,15 @@
 
 Mais recente no topo.
 
+### 2026-11-05 — Sessão 7 (senadores e votos individuais; revisão da allowlist)
+
+- **Pedido**: medir os endpoints de senadores e os votos individuais (Câmara e Senado) para fechar a allowlist do ADR 0005. Sem plan mode (mesma receita); só estrutura e contagens.
+- **Feito**: "Rodada 2" em `fontes/camara.md` e `fontes/senado.md`; revisão da allowlist e nova seção no ADR 0005 (as 11 decisões não mudaram); P-15 atualizado. Cerca de 14 requisições em série (mais 2 de reprodução no fim), e respostas já salvas reaproveitadas sem repetir pedido.
+- **Achados**: (1) o detalhe `/deputados/{id}` da Câmara devolve **CPF preenchido e válido** (n=1), enquanto o CSV em massa o traz vazio nas 7.889 linhas, então o ADR 0005 tinha escrito "cpf vem vazio" a partir de um canal só; (2) os votos nominais da Câmara pela API travam em **504 após 15 s** (2 de 2 tentativas) e `/orientacoes` também (1 de 1), com corpo de texto simples; (3) no Senado, `totalVotosSim/Nao/Abstencao` vêm **nulos** nas votações nominais, e o código de voto tem 7 valores (`Sim`, `Não`, `AP`, `LS`, `P-NRV`, `NCom`, `Presidente (art. 51 RISF)`); (4) a lista de senadores não traz data de nascimento nem CPF, e o detalhe traz data de nascimento e naturalidade, sem CPF.
+- **Proposta, a revisar pelo dono**: cada linha de voto carrega só o id do parlamentar, o voto, a data e o partido no momento; nome, UF, foto e sexo ficam na tabela de pessoas. É uma extensão da decisão 1 e não estava entre as 11 respostas aceitas.
+- **Não verificado**: o CPF do detalhe para mais de um deputado; votos nominais da Câmara pela API; lista completa de valores de `voto`; significado das siglas do Senado; discursos e apartes; votações secretas. Medição de um único dia.
+- **Fica**: P-16 (validação jurídica); decidir a stack (P-02).
+
 ### 2026-11-05 — Sessão 6 (P-12: minimização de dados pessoais)
 
 - **Pedido**: decidir quais colunas pessoais o polis ingere e guarda, com base na medição das três fontes. Conduzido como entrevista em árvore de decisão (3 rodadas, 11 perguntas); o dono aceitou a recomendação em todas.

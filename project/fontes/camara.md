@@ -90,6 +90,31 @@ O CSV de deputados tem as colunas `cpf`, `nomeCivil` e `dataNascimento`. Em 7.88
 - Sem `ETag` na API e com arquivos regenerados diariamente (inclusive anos fechados), detectar mudança exige comparar conteúdo ou `ETag`/`Last-Modified` dos arquivos, não só a data.
 - Ids heterogêneos (inteiro e texto) pedem uma coluna de id de origem em texto.
 
+## Rodada 2: detalhe do deputado e votos individuais (medido, 2026-11-05)
+Complementa as seções acima. Só estrutura e contagens; nenhum valor individual foi impresso ou commitado.
+
+**Detalhe `GET /deputados/{id}` (um deputado em exercício, n=1).** Campos: `id, uri, nomeCivil, cpf, sexo, urlWebsite, redeSocial[], dataNascimento, dataFalecimento, ufNascimento, municipioNascimento, escolaridade` e o bloco `ultimoStatus` (`id, uri, nome, siglaPartido, uriPartido, siglaUf, idLegislatura, urlFoto, email, data, nomeEleitoral, situacao, condicaoEleitoral, descricaoStatus` e `gabinete`: `nome, predio, sala, andar, telefone, email`).
+- **`cpf` vem preenchido: 11 dígitos, e passa na verificação dos dígitos de CPF** (um deputado; não sei se vale para todos). No CSV em massa `deputados.csv` a mesma coluna está **vazia nas 7.889 linhas** (medido na rodada 1). Ou seja: o mesmo dado sai com tratamento diferente conforme o canal. O FAQ diz que os dados abertos não incluem informação pessoal de caráter restrito (documentação); não interpreto a divergência, só registro.
+- `dataNascimento` em `aaaa-mm-dd`; `escolaridade`, `sexo` e `redeSocial` presentes; `ultimoStatus.email` vazio, mas `gabinete.email` e `gabinete.telefone` preenchidos (institucionais; não examinei o conteúdo).
+- A listagem `GET /deputados` **não** traz esses campos (só `id, uri, nome, siglaPartido, uriPartido, siglaUf, idLegislatura, urlFoto, email`).
+
+**Votos individuais pela API (não consegui medir).**
+- `GET /votacoes/{id}/votos` de uma votação de plenário com objeto: **200 com lista vazia** (`dados: []`), provavelmente votação simbólica.
+- `GET /votacoes/{id}/votos` de outra votação de plenário: **504 após cerca de 15 s, com corpo de texto simples** (`upstream request timeout`), **2 tentativas, 2 falhas** (a segunda após 20 s de pausa).
+- `GET /votacoes/{id}/orientacoes`: **504 após cerca de 15 s**, 1 tentativa.
+- Com o `itens=101` da rodada 1, são **quatro casos do mesmo 504** em chamadas diferentes. Para um conector: subrecursos de votação podem travar de forma repetível; é preciso timeout, retentativa limitada e tratamento de corpo que não é JSON.
+
+**Votos individuais pelo arquivo em massa (`votacoesVotos-2025.csv`, 58,2 MB, lido por `Range` nos primeiros 250 KB).** UTF-8 com BOM, separador `;`, 12 colunas: `idVotacao, uriVotacao, dataHoraVoto, voto, deputado_id, deputado_uri, deputado_nome, deputado_siglaPartido, deputado_uriPartido, deputado_siglaUf, deputado_idLegislatura, deputado_urlFoto`. Nas 751 linhas da amostra (as primeiras do arquivo, enviesadas): 100% preenchidas; `voto` com os valores `Sim` (632), `Não` (117) e `Artigo 17` (2); outros valores, como abstenção ou obstrução, não apareceram e **não foram verificados**. Sem coluna de CPF nem de data de nascimento. Cada linha repete nome, partido, UF e foto do deputado, ou seja, é desnormalizada.
+
+Reproduzir o CPF do detalhe (imprime só comprimento e se são dígitos; o `id` é público):
+```bash
+curl -sS -H 'Accept: application/json' https://dadosabertos.camara.leg.br/api/v2/deputados/204379 \
+  | python3 -c 'import json,sys;c=json.load(sys.stdin)["dados"].get("cpf") or "";print("cpf: comprimento",len(c),"| só dígitos",c.isdigit())'
+# esperado em 2026-11-05: cpf: comprimento 11 | só dígitos True
+```
+
+**Não verificado nesta rodada:** os campos de todos os deputados no detalhe (o CPF em mais de um); votos nominais pela API; `orientacoes`; a lista completa de valores de `voto`; discursos e despesas (despesas pertencem à Etapa 3, ADR 0005).
+
 ## Reproduzir as medições
 Use um `User-Agent` genérico e espere alguns segundos entre as requisições.
 ```bash

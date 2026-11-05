@@ -6,7 +6,7 @@ Decisões em aberto, vindas do PRD §18 (nome e licença já decididos: ADR 0001
 
 | ID | Pendência | Observação |
 |---|---|---|
-| P-02 | Stack e versões definitivas | Depois de medir as fontes |
+| P-02 | Stack e versões definitivas | Depois de medir as fontes. Insumos da Câmara em `fontes/camara.md`; faltam Senado e TSE |
 | P-03 | Estrutura final do repositório | Monorepo ou separado; depende de P-02 |
 | P-04 | Arquitetura de implantação e hospedagem | |
 | P-05 | Banco de dados e tecnologias complementares | |
@@ -19,7 +19,7 @@ Decisões em aberto, vindas do PRD §18 (nome e licença já decididos: ADR 0001
 | P-12 | Política definitiva de retenção de dados | LGPD |
 | P-13 | Priorização final dos módulos | |
 | P-14 | Metas quantitativas de desempenho e disponibilidade | |
-| P-15 | Regras específicas para cada fonte de dados | Termos, licenças, limites; primeiro TSE, Câmara e Senado |
+| P-15 | Regras específicas para cada fonte de dados | Termos, licenças, limites; primeiro TSE, Câmara e Senado. Câmara medida em 2026-11-05 (`fontes/camara.md`); faltam Senado e TSE. Pendente da Câmara: licença explícita e leitura do Ato da Mesa 45/2012 |
 | P-16 | Interpretações jurídicas que exijam validação especializada | LGPD e dados de processos judiciais |
 | P-17 | Identidade visual, linguagem da marca e domínio | O nome polis tem homônimo conhecido (`pol.is`), ver ADR 0001 |
 | P-18 | Design e navegação definitivos | |

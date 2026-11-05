@@ -2,6 +2,13 @@
 
 Mais recente no topo.
 
+### 2026-11-05 — Sessão 2, parte 2 (P-01: DCO)
+
+- **Decisão do dono**: DCO (ADR 0004), depois de comparar com CLA. Premissa registrada: sem plano de dual license hoje (P-11 em aberto).
+- **Feito**: ADR 0004; P-01 movido para Resolvidas; PR #2 mesclado antes (`guard` verde na `main`, run 42114858200).
+- **Não verificado**: validação jurídica (P-16).
+- **Fica**: PR de aplicação (`CONTRIBUTING.md` e checagem de `Signed-off-by` no `guard`, com teste primeiro); medir as fontes (P-02, P-15).
+
 ### 2026-11-05 — Sessão 2 (fechamento da proteção da `main`)
 
 - **Pedido**: fechar a governança da Etapa 0 deixada em aberto na Sessão 1.

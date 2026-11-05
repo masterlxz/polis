@@ -19,4 +19,4 @@ Medições usam poucas requisições, em série, sem autenticação, com `User-A
 |---|---|---|---|
 | Câmara dos Deputados (Dados Abertos) | [camara.md](camara.md) | 2026-11-05 | Medida; sem integração |
 | Senado Federal (Dados Abertos Legislativos) | [senado.md](senado.md) | 2026-11-05 | Medida; sem integração |
-| TSE | (a fazer) | | |
+| TSE (Portal de Dados Abertos) | [tse.md](tse.md) | 2026-11-05 | Medida (ciclos 2026 e 2024); sem integração |

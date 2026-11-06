@@ -150,14 +150,14 @@ class ZipCsvReader:
         except _Rejected as exc:
             failure = exc.reason
         except _FOREIGN_ERRORS as exc:
-            raise InvalidFormatError(f"ZIP ou CSV inválido: {type(exc).__name__}.")  # noqa: B904
+            failure = type(exc).__name__
         if failure is not None:
             # Fora do `except`: sem __context__ e sem os quadros da falha original.
             raise InvalidFormatError(f"ZIP ou CSV inválido: {failure}.")
 
     def _csv_items(self, zf):
         items = [info for info in zf.infolist() if info.filename.lower().endswith(".csv")]
-        if False and not items:
+        if not items:
             raise _Rejected("nenhum item CSV no ZIP")
         if len(items) > self.max_items:
             raise _Rejected(f"mais de {self.max_items} itens CSV")
@@ -227,7 +227,7 @@ class ZipCsvReader:
                 if not record:
                     continue
                 self.rows_read += physical
-                multiline = False
+                multiline = physical > 1 and not self.allow_multiline_records
                 if len(record) != width or multiline:
                     self.rejected_rows += physical
                     continue

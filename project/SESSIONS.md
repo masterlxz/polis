@@ -2,6 +2,14 @@
 
 Mais recente no topo.
 
+### 2026-11-06 — Sessão 21 (P-15: leiame do TSE, licenças e especificação do Senado)
+
+- **Pedido**: fechar os itens menores do P-15 que não exigem navegador.
+- **Feito**: (1) `leiame.pdf` do `consulta_cand_2026.zip` lido com `pdftotext`; (2) 9 conjuntos do TSE sem `license_id` identificados por `package_search` (181 `cc-by`, 9 vazios, 190 no total); (3) especificação OpenAPI do Senado sem `license`, `termsOfService` nem `contact`. `fontes/tse.md`, `fontes/senado.md`, ADR 0008 (decisões 1 e 8) atualizados. Sem tocar em `www.tse.jus.br`.
+- **Achado**: o `leiame` diz que o CPF "não será divulgado" (Res. TSE 23.609/2019, art. 33 § 2º, incluído pela 23.729/2024) e fala em "Eleições 2024", mas o CSV de 2026 traz CPF de 11 dígitos em 42.028 linhas. Contradição não explicada; a regra do ADR 0005 (descartar o CPF) vale em qualquer hipótese.
+- **Não verificado**: se a regra do CPF mudou para 2026 ou o `leiame` está desatualizado; o `leiame` dos outros ZIPs; a Resolução 23.609 inteira; Portarias TSE 93 e 525/2021 e termos do TSE (403).
+- **Fica**: o P-15 segue aberto só pelas Portarias e termos do TSE (leitura humana). Vale perguntar ao TSE sobre o CPF de 2026 (P-16).
+
 ### 2026-11-06 — Sessão 20 (ADR 0008, regras por fonte)
 
 - **Pedido**: escrever o ADR do P-15. Recomendei esperar as Portarias do TSE; o dono preferiu seguir. Escolhas do dono: TSE sem `license_id` **não é coletado** até haver licença; **atribuição uniforme** em toda fonte.

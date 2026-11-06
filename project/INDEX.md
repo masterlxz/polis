@@ -1,6 +1,6 @@
 # polis: Estado do Projeto
 
-> Última atualização: 2026-11-06 (Sessão 16: ADR 0007)
+> Última atualização: 2026-11-06 (Sessão 17: leitor de ZIP de CSV)
 
 ## Como usar este arquivo
 

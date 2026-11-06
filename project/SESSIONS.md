@@ -2,6 +2,18 @@
 
 Mais recente no topo.
 
+### 2026-11-06 — Sessão 17 (leitor de ZIP de CSV com allowlist, PR #23)
+
+- **Pedido**: leitor do TSE, parte 1 (plan mode): leitura em fluxo, allowlist por nome, falha fechada, SHA-256, sem banco. Escolhas do dono: o leitor só conta linhas malformadas (o limite é do conector); valida todos os cabeçalhos antes de devolver qualquer linha; depois da revisão adversária, registro multilinha rejeitado por padrão (com opção para permitir) e limites de recursos neste PR.
+- **Medições (só contagens, arquivos apagados)**, `consulta_cand_2026.zip` (3,3 MB, 29 CSVs): 0 bytes entre `0x80` e `0x9F`, nenhum BOM, nenhum item é UTF-8 válido, 42.063 quebras CRLF (codificação em `fontes/tse.md`); 42.034 registros, 0 multilinha, 0 com largura diferente, no máximo 50 colunas, maior linha com 721 caracteres.
+- **Feito**: `apps/sources/zip_csv.py` (`ZipCsvReader`, `sha256_file`, `MissingColumnError`, `DuplicateColumnError`, `InvalidFormatError`), partindo do leitor do spike (PR #12) em inglês (ADR 0007); `tests/test_zip_csv.py` (58 testes). Cabeçalhos validados antes da primeira linha; colunas duplicadas, item vazio, ZIP sem CSV, nomes de item repetidos, BOM UTF-8, item com senha e CRC inválido falham; erros citam só nomes e são levantados fora do `except`; leitor de uso único; limites configuráveis de colunas, caracteres por linha, itens e tamanho descomprimido declarado.
+- **Revisão adversária** (agente `adversarial-reviewer`): 2 críticos e vários importantes, todos tratados menos o NUL em valores e o tempo de CPU. **C1**: aspas abertas juntavam a linha seguinte (com o CPF) num valor devolvido; **C2**: `from None` não escondia `__context__`, e os quadros do traceback guardavam bytes do arquivo (`data`, `line`, `header`). 17 mutações sobreviviam aos primeiros testes; os testes novos cobrem as mais relevantes.
+- **Testes primeiro (CI)**: 1ª vez, `ModuleNotFoundError`; depois da revisão, 21 dos 31 testes novos falharam antes da correção e todos passaram depois (101 no total).
+- **Quebra de propósito (3 rodadas, todas revertidas)**: validar só o 1º cabeçalho + devolver todas as colunas + `>` na largura: 5 falhas esperadas; ler por posição: 2 falhas (`le_pelo_nome` e canário); aceitar multilinha + levantar dentro do `except` + aceitar ZIP sem CSV: 5 falhas esperadas.
+- **Correções minhas no caminho**: os testes de traceback do canário falhavam porque o próprio teste guardava o canário em variável local (`raw`, `rows`); o teste do bit de senha precisou marcar o bit direto nos bytes (o `writestr` o zera).
+- **Não verificado**: o NUL (`\x00`) em valores passa; tempo de CPU não é limitado; o `RuntimeError`, `zlib.error` e a compressão não suportada não têm teste próprio (só o genérico de dado corrompido); desempenho depois das mudanças (o spike mediu 66 a 74 MB/s antes); o limite padrão de 200.000 caracteres por linha foi escolhido por folga (o TSE tem 721), não medido em outros conjuntos; Windows-1252 só foi descartado para o `consulta_cand_2026`; nada rodou localmente, só `ruff`.
+- **Fica**: fatia do conector (ligar o leitor ao `Dataset.allowed_columns` e ao `IngestionRun`, transação, limite de linhas rejeitadas, `error_code` `malformed_row`/`schema`/`hash`, tratar "todas as linhas rejeitadas"); remedir desempenho; cadastrar as 3 fontes (P-15); `docker` no `dependabot.yml`; decidir NUL em valores.
+
 ### 2026-11-06 — Sessão 16 (ADR 0007)
 
 - **Pedido**: o dono aceitou registrar o ADR 0007 depois do merge do PR #21 (`4c684ca`).

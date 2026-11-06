@@ -111,7 +111,7 @@ Leitura:
 ## Problemas conhecidos e limitações
 - **Conteúdo de uma coluna muda entre ciclos sem mudar o esquema** (CPF, acima).
 - **Nomes de arquivo estáveis, conteúdo regenerado várias vezes ao dia**, sem versão no nome (medido: `Last-Modified` de hoje em arquivos de 2024 e 2026). Detectar mudança exige `ETag`/`Last-Modified` ou o par `DT_GERACAO`/`HH_GERACAO`.
-- **Codificação ISO-8859-1 e CRLF** (um conector que assume UTF-8 corrompe acentos).
+- **Codificação ISO-8859-1 e CRLF** (um conector que assume UTF-8 corrompe acentos). **Conferido em 2026-11-06** em `consulta_cand_2026.zip` (3,3 MB, 29 CSVs, 23,7 MB descomprimidos), só contagens: 0 bytes entre `0x80` e `0x9F` (os que distinguiriam Windows-1252), 548.590 bytes `≥ 0xA0` (acentos), nenhum BOM UTF-8, nenhum item decodifica como UTF-8 válido, e as 42.063 quebras de linha são todas CRLF. Coerente com ISO-8859-1 (e com Windows-1252, que só difere naquela faixa). Vale para esse arquivo de 2026, não para os demais conjuntos nem para 2024.
 - **Placeholders em texto** (`#NULO#`, `#NE#`, `-1`, `-3`) no lugar de vazio.
 - **ZIPs grandes** (até 1,36 GB num único arquivo de 2024) e um item por UF.
 - **CKAN sem tamanho** (`size` vazio).

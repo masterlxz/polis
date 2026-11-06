@@ -2,6 +2,13 @@
 
 Mais recente no topo.
 
+### 2026-11-06 — Sessão 10 (check `tests` exigido no ruleset)
+
+- **Pedido**: depois do merge do PR #14 (`6879c40`), exigir o check `tests` no ruleset `protect-main`. O dono confirmou ("vamos de 1").
+- **Feito**: `PUT` no ruleset 26285460 mudando só a lista de checks (`guard`, `dco` e agora `tests`); o restante foi copiado do estado ativo (lido antes por `gh api`). Conferido pela resposta da API: os três contextos presentes. `Tests` e `CI Private Files` verdes na `main` após o merge do #14. O JSON aplicado ficou só no scratchpad da sessão, não no repo.
+- **Não verificado**: ainda não vi um PR esperar o `tests` (este PR de docs será o primeiro); o `strict_required_status_checks_policy` segue falso. O `padrao/ruleset-protect-main.json` do workspace não inclui `dco` nem `tests` (é genérico por projeto).
+- **Fica**: `dependabot.yml`; Docker Compose; apagar a branch `spike/ingestao-python`; seção "Contribuições" do README desatualizada.
+
 ### 2026-11-06 — Sessão 9 (criação do projeto Django, PR #14)
 
 - **Pedido**: criar o projeto Django (Etapa 0 técnica), em plan mode. Escopo escolhido pelo dono: só esqueleto, testes e CI de testes; projeto na raiz; `uv` instalado pelo dono; `pt-br` e `America/Sao_Paulo`; teste fixa o PostgreSQL 18.

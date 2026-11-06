@@ -1,0 +1,37 @@
+[project]
+name = "polis"
+version = "0.0.0"
+description = "Plataforma aberta de transparência e inteligência cívica sobre o Brasil"
+readme = "README.md"
+license = "AGPL-3.0-only"
+requires-python = ">=3.14,<3.15"
+dependencies = [
+    "django==6.1.3",
+    "psycopg[binary]==3.3.8",
+]
+
+[dependency-groups]
+dev = [
+    "pytest==9.2.0",
+    "pytest-django==4.14.0",
+    "ruff==0.17.4",
+]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.settings"
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.ruff]
+target-version = "py314"
+line-length = 100
+extend-exclude = ["migrations"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "S"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101", "S603"]

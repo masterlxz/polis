@@ -1,6 +1,6 @@
 # polis: Estado do Projeto
 
-> Última atualização: 2026-11-05 (Sessão 2: proteção da `main` conferida e fechada)
+> Última atualização: 2026-11-06 (Sessão 9: projeto Django criado, PR #14)
 
 ## Como usar este arquivo
 

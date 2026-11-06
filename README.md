@@ -2,7 +2,19 @@
 
 Plataforma aberta de transparência e inteligência cívica: reúne, organiza e apresenta informações públicas sobre o Brasil (representantes, instituições, votações, gastos, decisões e políticas públicas), sempre com rastreabilidade até a fonte original.
 
-**Status:** pré-código. Há o [PRD](project/PRD.md), as decisões iniciais, a medição das fontes e a stack escolhida (Python, Django e PostgreSQL, [ADR 0006](project/adr/0006-stack-do-nucleo.md)). O projeto ainda não foi criado.
+**Status:** fundação. Há o [PRD](project/PRD.md), as decisões iniciais, a medição das fontes, a stack ([ADR 0006](project/adr/0006-stack-do-nucleo.md)) e o esqueleto do projeto Django (Python 3.14, Django 6.1, PostgreSQL 18). Ainda não há modelos, conectores nem ingestão.
+
+## Desenvolvimento
+
+Requer [`uv`](https://docs.astral.sh/uv/) e um PostgreSQL 18. Copie `.env.example` para `.env`, preencha e exporte as variáveis (ou use as do CI como referência em `.github/workflows/tests.yml`).
+
+```bash
+uv sync --locked
+uv run pytest
+uv run ruff check . && uv run ruff format --check .
+```
+
+Os testes são validados pelo CI (job `tests`). Docker Compose ainda não existe.
 
 ## Princípios
 

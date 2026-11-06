@@ -2,6 +2,15 @@
 
 Mais recente no topo.
 
+### 2026-11-06 — Sessão 9 (criação do projeto Django, PR #14)
+
+- **Pedido**: criar o projeto Django (Etapa 0 técnica), em plan mode. Escopo escolhido pelo dono: só esqueleto, testes e CI de testes; projeto na raiz; `uv` instalado pelo dono; `pt-br` e `America/Sao_Paulo`; teste fixa o PostgreSQL 18.
+- **Feito**: `pyproject.toml` e `uv.lock` (Django 6.1.3, psycopg 3.3.8, pytest 9.2.0, pytest-django 4.14.0, ruff 0.17.4; `uv` 0.13.6 fixado no workflow); `manage.py`, `config/settings.py` (tudo do ambiente, falha fechada sem `DJANGO_SECRET_KEY`, `DEBUG` só liga explícito), `apps/` vazio, `tests/test_configuracao.py` (10 testes), `.github/workflows/tests.yml` (job `tests` com `postgres:18`), `.env.example`.
+- **Testes primeiro**: `pytest` contra o projeto vazio falhou por completo (`No module named 'config'`), o que prova pouco. A prova real foi a quebra de propósito.
+- **CI (resultado visto)**: `tests` verde com 10 passados (Python 3.14.10, `postgres:18`), `guard` e `dco` verdes. Quebra de propósito (checagem da `SECRET_KEY` desligada): `tests` falhou com 2 testes (`sem_secret_key` e `secret_key_vazia`), 8 passaram; revertida com `git revert` e commit de reversão.
+- **Não verificado**: nenhum teste rodou localmente (convenção do workspace; só `manage.py check`); versão exata do PostgreSQL 18 do serviço do CI (o teste só confere a major); comportamento com `DEBUG` ligado; `setup-uv@v6` não foi lido na documentação, só funcionou no CI.
+- **Fica**: Docker Compose; `dependabot.yml` e exigir o check `tests` no ruleset (P-19); verificador de tipos; apps de domínio e conectores (Etapa 1); ADRs de hospedagem, busca, autenticação, IA, fila e agendamento; apagar a branch remota `spike/ingestao-python`; P-16.
+
 ### 2026-11-05 — Sessão 8 (stack do núcleo: P-02, P-03, P-05)
 
 - **Pedido**: decidir a stack (plan mode). O dono comparou Django e Rails, reconheceu o empate técnico e escolheu **Django**, sem comparar por medição; escopo só P-02, P-03 e P-05; spike com dados sintéticos no CI.

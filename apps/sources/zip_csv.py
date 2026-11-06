@@ -117,7 +117,7 @@ class ZipCsvReader:
         duplicated = [column for column in self.allowed_columns if occurrences[column] > 1]
         if duplicated:
             raise DuplicateColumnError(f"{name}: colunas repetidas no cabeçalho: {duplicated}.")
-        indices = [(column, i) for i, column in enumerate(self.allowed_columns)]
+        indices = [(column, header.index(column)) for column in self.allowed_columns]
         ignored = set(header) - set(self.allowed_columns)
         return indices, len(header), ignored
 

@@ -88,7 +88,7 @@ class ZipCsvReader:
                     for info in zf.infolist()
                     if not info.is_dir() and info.filename.lower().endswith(".csv")
                 ]
-                layouts = [(info, *self._read_layout(zf, info)) for info in items[:1]]
+                layouts = [(info, *self._read_layout(zf, info)) for info in items]
                 self.ignored_columns = set().union(*(ignored for _, _, _, ignored in layouts))
                 for info, indices, width, _ in layouts:
                     yield from self._read_item(zf, info, indices, width)
@@ -117,7 +117,7 @@ class ZipCsvReader:
         duplicated = [column for column in self.allowed_columns if occurrences[column] > 1]
         if duplicated:
             raise DuplicateColumnError(f"{name}: colunas repetidas no cabeçalho: {duplicated}.")
-        indices = [(column, i) for i, column in enumerate(header)]
+        indices = [(column, header.index(column)) for column in self.allowed_columns]
         ignored = set(header) - set(self.allowed_columns)
         return indices, len(header), ignored
 
@@ -129,7 +129,7 @@ class ZipCsvReader:
                 if not line:
                     continue
                 self.rows_read += 1
-                if len(line) > width:
+                if len(line) != width:
                     self.rejected_rows += 1
                     continue
                 yield info.filename, {column: line[index] for column, index in indices}

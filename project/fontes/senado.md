@@ -54,7 +54,7 @@ Textos oficiais (documentação), transcritos:
 - `https://www12.senado.leg.br/dados-abertos/sobre`: define dados abertos como "exigindo-se, no máximo, citar sua proveniência". É definição geral, não licença do Senado.
 - Plano de Dados Abertos 2026/2028 (`.../dados-abertos/pdf/plano-2026-2028-de-dados-abertos-do-senado-federal.pdf`, texto extraído com `pdftotext`): o glossário define dados abertos como "disponibilizados sob licença aberta que permita sua livre utilização, consumo ou cruzamento". **Não nomeia** licença nenhuma; busquei por licen*, creative, cc by, citar, proveni*, reutiliza*, atribui* e só esse trecho apareceu.
 - A política de uso do portal fala só em "Portal do Senado Federal"; **não cita a API nem os dados abertos**, uso comercial ou limite numérico de requisições (a única restrição técnica é a proibição de ataques, incluindo DDoS).
-- `https://legis.senado.leg.br/dadosabertos/docs/` é Swagger renderizado por JavaScript: não li termos nem licença ali (só o JSON da especificação, já usado nas medições de limites).
+- `https://legis.senado.leg.br/dadosabertos/docs/` é Swagger renderizado por JavaScript. Li a especificação que ele carrega (`/dadosabertos/v3/api-docs`, versão 4.1.3.113, medido em 2026-11-06): os campos `info.license`, `info.termsOfService`, `info.contact` e `externalDocs` são **nulos**. A descrição só traz formatos de saída, a "Restrição de requisições" (10 req/s, horários redondos, 503) e um aviso sobre a remodelagem dos sistemas. Ou seja, a API **não declara licença nem termos**.
 
 **Conclusão (inferência):** a política do portal continua sendo a regra mais próxima, mas **nenhuma fonte lida a liga expressamente à API**. Licença nomeada: não encontrada. Uso comercial: não dito.
 

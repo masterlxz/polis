@@ -42,15 +42,22 @@ Nenhuma (medido: todas as chamadas sem credencial).
 
 **Leitura de 2026-11-06:**
 - `package_show` de `comparecimento-e-abstencao-2026` e `-2024` (medido): `license_id` e `license_title` **vazios**, `isopen: false`, sem `license_url` nem `license_notes`; as `notes` são só um aviso de software para abrir arquivos grandes. Ambos são dados agregados ("Perfil de comparecimento e abstenção"), área gestora CGE.
-- `https://dadosabertos.tse.jus.br/dataset/` (medido): o filtro de licenças mostra um único item, "Creative Commons Atribuição - 181", de 190 conjuntos no portal inteiro. Ou seja, **9 conjuntos do portal não têm licença**, e 3 deles são os já listados acima (não identifiquei os outros 6).
+- `https://dadosabertos.tse.jus.br/dataset/` (medido): o filtro de licenças mostra um único item, "Creative Commons Atribuição - 181", de 190 conjuntos no portal inteiro. Ou seja, **9 conjuntos do portal não têm licença**. Identificados por `package_search` (medido, 2026-11-06, `rows=1000`, 190 retornados: 181 `cc-by`, 9 vazios): `comparecimento-e-abstencao-2022`, `-2024` e `-2026`; `resultados-eleicoes-suplementares-2022` e `-2024`; `resultados-2020-suplementares`; `mesarios-2022`; `correspondencia-entre-numero-interno-e-modelo-da-urna-1`; e `resultados-2026-logs-do-sistema-de-preparacao-das-urnas-eletronicas-gedai-2-turno`.
 - `/about` (documentação): chama a Portaria 93/2021 de "Política de Dados Abertos do Tribunal Superior Eleitoral" e aponta "Termos de uso e privacidade" em `http://www.tse.jus.br/transparencia/politica-de-privacidade-e-termos-de-uso`; o Plano de Dados Abertos 2021-2023 está em `https://www.tse.jus.br/hotsites/catalogo-publicacoes/pdf/plano-dados-abertos-2021-2023.pdf`. Não abri esses dois links.
 
 - **CPF de 2026 reconferido (medido, 2026-11-06, `consulta_cand_2026.zip`, só classe de formato):** 29 CSVs com `NR_CPF_CANDIDATO`; 42.028 linhas com 11 dígitos e 6 linhas com 2 caracteres não numéricos (placeholder). Ou seja, o CPF de 2026 continua preenchido em todas as UFs, mudando de 2024 (constante de 2 caracteres). Total de 42.034 linhas, igual ao medido na Sessão 17. Arquivo apagado.
+- **`leiame.pdf` do `consulta_cand_2026.zip` (documentação, lido em 2026-11-06 com `pdftotext`; 208 KB, 1 dos 30 itens do ZIP):**
+  - Codificação "Latin 1", campos entre aspas com `;`. `#NULO` (numérico: `-1`) é branco no banco; `#NE` (numérico: `-3`) é informação não registrada naquele ano. O campo UF pode ser `BR` (nacional), `VT` (voto em trânsito) ou `ZZ` (exterior). Coerente com o que o leitor já trata.
+  - "Os arquivos estão em constante processo de atualização": alguns podem estar em branco ou com mensagem de erro por indisponibilidade temporária de um estado.
+  - **CPF:** cita o § 2º do art. 33 da Resolução TSE nº 23.609/2019 (incluído pela Resolução nº 23.729/2024): endereços, telefone e e-mail pessoais, "número do CPF e o documento pessoal de identificação **não serão divulgados** no DivulgaCandContas". E conclui: "são considerados como não divulgáveis, para as Eleições 2024, as informações registradas na variável `NR_CPF_CANDIDATO` dos arquivos de candidaturas do Portal de Dados Abertos". É o que explica o CPF constante de 2 caracteres em 2024.
+  - **Candidatos não divulgáveis:** seus dados pessoais vêm como `-4` (numérico), `"NÃO DIVULGÁVEL"` (texto) ou vazio (idade).
+  - Não traz licença, atribuição ou termos de reuso.
+- **Contradição a registrar (medido + documentação):** o `leiame.pdf` de 2026 ainda fala em "Eleições 2024" e diz que o CPF não é divulgável, mas o CSV de 2026 traz o CPF de 11 dígitos em 42.028 linhas. Não sei se a regra mudou para 2026, se o `leiame` está desatualizado ou se o TSE publicou o CPF por engano. Inferência: as 6 linhas de 2 caracteres não numéricos são o `-4` dos "não divulgáveis". Em qualquer hipótese, a regra do ADR 0005 (descartar o CPF na leitura) está certa, e o `NR_CPF_CANDIDATO` não deve ser tratado como dado que o TSE autorizou publicar.
 
 **Não verificado:**
 - **Texto das Portarias TSE nº 93/2021 e nº 525/2021:** as duas URLs de `www.tse.jus.br` devolveram HTTP 403 também na leitura de hoje. Uma tentativa minha de contornar o 403 com outro `User-Agent` foi barrada pelo ambiente e **não deve ser repetida**: o 403 é uma recusa do servidor. Para ler, é preciso abrir pelo navegador, ou o dono colar o texto.
 - Termos de uso do portal e Plano de Dados Abertos (links acima, não abertos).
-- O `leiame.pdf` dentro dos ZIPs.
+- O `leiame.pdf` dos outros ZIPs (li só o de `consulta_cand_2026`); a Resolução TSE nº 23.609/2019 em si (só o trecho citado pelo `leiame`).
 - Se a CC BY vale para os conjuntos sem `license_id` (inferência: não herdam; a ausência é de metadado, não de decisão conhecida).
 - Restrições específicas sobre dados pessoais. O que isso implica para o polis é interpretação jurídica (P-16).
 
@@ -61,7 +68,7 @@ Nenhuma declarada além da licença acima. Ausência de restrição declarada n�
 | Tema | Regra proposta | Base |
 |---|---|---|
 | Atribuição | Citar "TSE, Portal de Dados Abertos" e a licença CC BY em toda tela e exportação com dado de conjunto `cc-by` | CC BY (medido, metadado) |
-| Conjuntos sem licença | **Não coletar** `comparecimento-e-abstencao-*` e os logs `gedai` até o P-16 ou até o TSE declarar licença; checar `license_id` por conjunto antes de habilitar um `Dataset` | medido |
+| Conjuntos sem licença | **Não coletar** os 9 conjuntos sem `license_id` (lista na seção "Termos de uso e licença") até o P-16 ou até o TSE declarar licença; checar `license_id` por conjunto antes de habilitar um `Dataset` | medido |
 | Taxa | Série, pausa de 3 s entre requisições (como nas medições), sem paralelismo; limite do CDN desconhecido | medido |
 | Leitura | `Range` para o índice do ZIP; arquivos de até 1,36 GB: leitura em fluxo, nunca em memória inteira | medido |
 | Janela | Arquivos regenerados várias vezes ao dia com o mesmo nome: usar SHA-256 do conteúdo (e `DT_GERACAO`) para saber se mudou, não só `Last-Modified` | medido |

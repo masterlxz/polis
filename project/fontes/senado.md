@@ -48,10 +48,28 @@ Textos oficiais (documentação), transcritos:
 - Se a política do *portal* se aplica expressamente aos dados da API. A política fala em "conteúdo deste Portal"; a API fica em outro host (`legis.senado.leg.br`). Meu entendimento é que é a política mais próxima, mas é interpretação.
 - Não há licença nomeada (por exemplo Creative Commons): o catálogo CSV não tem coluna de licença (medido).
 - Nada sobre uso comercial: o Senado não diz nem que pode nem que não pode. A Câmara diz explicitamente que pode.
-- O Plano de Dados Abertos 2026/2028 e a Lei de Acesso à Informação (LAI) não foram lidos. Qualquer interpretação jurídica é do P-16.
+- A Lei de Acesso à Informação (LAI) não foi lida. Qualquer interpretação jurídica é do P-16.
+
+**Leitura de 2026-11-06 (documentação):**
+- `https://www12.senado.leg.br/dados-abertos/sobre`: define dados abertos como "exigindo-se, no máximo, citar sua proveniência". É definição geral, não licença do Senado.
+- Plano de Dados Abertos 2026/2028 (`.../dados-abertos/pdf/plano-2026-2028-de-dados-abertos-do-senado-federal.pdf`, texto extraído com `pdftotext`): o glossário define dados abertos como "disponibilizados sob licença aberta que permita sua livre utilização, consumo ou cruzamento". **Não nomeia** licença nenhuma; busquei por licen*, creative, cc by, citar, proveni*, reutiliza*, atribui* e só esse trecho apareceu.
+- A política de uso do portal fala só em "Portal do Senado Federal"; **não cita a API nem os dados abertos**, uso comercial ou limite numérico de requisições (a única restrição técnica é a proibição de ataques, incluindo DDoS).
+- `https://legis.senado.leg.br/dadosabertos/docs/` é Swagger renderizado por JavaScript: não li termos nem licença ali (só o JSON da especificação, já usado nas medições de limites).
+
+**Conclusão (inferência):** a política do portal continua sendo a regra mais próxima, mas **nenhuma fonte lida a liga expressamente à API**. Licença nomeada: não encontrada. Uso comercial: não dito.
 
 ## Restrições de armazenamento, transformação e redistribuição
 Nenhuma declarada além da política acima (citar a fonte, fins lícitos). Ausência de restrição declarada não é autorização verificada: PRD §8.2.
+
+## Regras operacionais (decisão de engenharia, não parecer jurídico)
+| Tema | Regra proposta | Base |
+|---|---|---|
+| Atribuição | Citar "Senado Federal, Dados Abertos Legislativos" em toda tela e exportação que use o dado (cumpre a política do portal e a definição de "citar proveniência") | política do portal (documentação) |
+| Taxa | Bem abaixo de 10 req/s (ex.: 1 a cada 3 s, como nas medições); em 429/503, recuar e tentar mais tarde | especificação (documentação) |
+| Horário | Não agendar em horários redondos (00:00, 01:00, 01:15 etc.); usar minuto aleatório | especificação (documentação) |
+| Filtros | `/processo` e `/votacao` exigem filtro; `/votacao` com no máximo 1 ano por chamada | especificação (documentação) |
+| Endpoints depreciados | Não construir sobre os 42 `deprecated` (quase todo o grupo `materia`) | medido |
+| Armazenamento e redistribuição | Fins lícitos, citando a fonte; **uso comercial não dito**: não presumir até o P-16 | política do portal; PRD §8.2 |
 
 ## Entidades e campos (medido, 2026-11-05)
 | Recurso | Forma | Campos de cada item |

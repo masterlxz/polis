@@ -40,10 +40,34 @@ Nenhuma (medido: todas as chamadas sem credencial).
 - **Texto do portal (documentação, <https://dadosabertos.tse.jus.br/about>):** "Os arquivos fornecidos podem ser importados para qualquer programa estatístico, base de dados ou planilha eletrônica. Consultas, filtros e cruzamentos são de responsabilidade da pessoa interessada em analisar os dados." E: "Estão incompletos os dados de candidatos e de resultados das eleições de 1994 a 1998, pois os mesmos não foram completamente centralizados nas bases no TSE."
 - **Diferença em relação às outras duas fontes:** é a única das três com **licença nomeada** (CC BY) nos metadados. A CC BY exige **atribuição**, na mesma linha da exigência de "citar a fonte" do Senado. A Câmara não declara atribuição.
 
-**Não verificado:** o texto das Portarias TSE nº 93/2021 e nº 525/2021; o `leiame.pdf` dentro dos ZIPs; se a licença do CKAN vale para todos os arquivos de um conjunto sem licença declarada; restrições específicas sobre dados pessoais. O que isso implica para o polis é interpretação jurídica (P-16).
+**Leitura de 2026-11-06:**
+- `package_show` de `comparecimento-e-abstencao-2026` e `-2024` (medido): `license_id` e `license_title` **vazios**, `isopen: false`, sem `license_url` nem `license_notes`; as `notes` são só um aviso de software para abrir arquivos grandes. Ambos são dados agregados ("Perfil de comparecimento e abstenção"), área gestora CGE.
+- `https://dadosabertos.tse.jus.br/dataset/` (medido): o filtro de licenças mostra um único item, "Creative Commons Atribuição - 181", de 190 conjuntos no portal inteiro. Ou seja, **9 conjuntos do portal não têm licença**, e 3 deles são os já listados acima (não identifiquei os outros 6).
+- `/about` (documentação): chama a Portaria 93/2021 de "Política de Dados Abertos do Tribunal Superior Eleitoral" e aponta "Termos de uso e privacidade" em `http://www.tse.jus.br/transparencia/politica-de-privacidade-e-termos-de-uso`; o Plano de Dados Abertos 2021-2023 está em `https://www.tse.jus.br/hotsites/catalogo-publicacoes/pdf/plano-dados-abertos-2021-2023.pdf`. Não abri esses dois links.
+
+- **CPF de 2026 reconferido (medido, 2026-11-06, `consulta_cand_2026.zip`, só classe de formato):** 29 CSVs com `NR_CPF_CANDIDATO`; 42.028 linhas com 11 dígitos e 6 linhas com 2 caracteres não numéricos (placeholder). Ou seja, o CPF de 2026 continua preenchido em todas as UFs, mudando de 2024 (constante de 2 caracteres). Total de 42.034 linhas, igual ao medido na Sessão 17. Arquivo apagado.
+
+**Não verificado:**
+- **Texto das Portarias TSE nº 93/2021 e nº 525/2021:** as duas URLs de `www.tse.jus.br` devolveram HTTP 403 também na leitura de hoje. Uma tentativa minha de contornar o 403 com outro `User-Agent` foi barrada pelo ambiente e **não deve ser repetida**: o 403 é uma recusa do servidor. Para ler, é preciso abrir pelo navegador, ou o dono colar o texto.
+- Termos de uso do portal e Plano de Dados Abertos (links acima, não abertos).
+- O `leiame.pdf` dentro dos ZIPs.
+- Se a CC BY vale para os conjuntos sem `license_id` (inferência: não herdam; a ausência é de metadado, não de decisão conhecida).
+- Restrições específicas sobre dados pessoais. O que isso implica para o polis é interpretação jurídica (P-16).
 
 ## Restrições de armazenamento, transformação e redistribuição
 Nenhuma declarada além da licença acima. Ausência de restrição declarada não é autorização verificada: PRD §8.2. Ver "Dados pessoais".
+
+## Regras operacionais (decisão de engenharia, não parecer jurídico)
+| Tema | Regra proposta | Base |
+|---|---|---|
+| Atribuição | Citar "TSE, Portal de Dados Abertos" e a licença CC BY em toda tela e exportação com dado de conjunto `cc-by` | CC BY (medido, metadado) |
+| Conjuntos sem licença | **Não coletar** `comparecimento-e-abstencao-*` e os logs `gedai` até o P-16 ou até o TSE declarar licença; checar `license_id` por conjunto antes de habilitar um `Dataset` | medido |
+| Taxa | Série, pausa de 3 s entre requisições (como nas medições), sem paralelismo; limite do CDN desconhecido | medido |
+| Leitura | `Range` para o índice do ZIP; arquivos de até 1,36 GB: leitura em fluxo, nunca em memória inteira | medido |
+| Janela | Arquivos regenerados várias vezes ao dia com o mesmo nome: usar SHA-256 do conteúdo (e `DT_GERACAO`) para saber se mudou, não só `Last-Modified` | medido |
+| Codificação | ISO-8859-1, CRLF, `;`: já tratado pelo leitor (`apps/sources/zip_csv.py`) | medido |
+| Dado pessoal | CPF, título, nascimento, cor/raça só pela allowlist do ADR 0005; nenhuma coluna fora dela é gravada | ADR 0005 |
+| Armazenamento e redistribuição | CC BY permite com atribuição; o dado pessoal dentro do conjunto não é coberto por essa conclusão: P-16 | PRD §8.2 |
 
 ## Conjuntos e volumes (medido, 2026-11-05)
 O CKAN lista 16 conjuntos por ano (2026 e 2024), cada um com dezenas ou centenas de recursos (um por UF, turno ou tipo):

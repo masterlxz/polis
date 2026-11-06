@@ -1,6 +1,6 @@
 # polis: Estado do Projeto
 
-> Última atualização: 2026-11-06 (Sessão 12: P-19 fechado)
+> Última atualização: 2026-11-06 (Sessão 13: Docker Compose de desenvolvimento)
 
 ## Como usar este arquivo
 

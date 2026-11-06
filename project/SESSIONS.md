@@ -2,6 +2,15 @@
 
 Mais recente no topo.
 
+### 2026-11-06 — Sessão 13 (Docker Compose de desenvolvimento, PR #19)
+
+- **Pedido**: criar o Docker Compose da Etapa 0 técnica (plan mode). Escolhas do dono: `db` + `web` com Dockerfile de desenvolvimento, e job `compose` no CI.
+- **Feito**: `Dockerfile` (`python:3.14-slim`, uv 0.13.6, venv em `/opt/venv`, usuário UID 1000), `compose.yaml` (`postgres:18` com volume em `/var/lib/postgresql`, healthcheck, portas só em `127.0.0.1`, `POSTGRES_PASSWORD` e `DJANGO_SECRET_KEY` obrigatórios por `:?`), `.dockerignore`, `.github/workflows/compose.yml`, README e `.env.example`.
+- **Testes primeiro**: o workflow `compose.yml` foi escrito antes do `compose.yaml` e falhou no primeiro passo (sem `compose.yaml`); os passos seguintes só puderam ser provados depois, e a prova de que o de falha fechada discrimina é a quebra de propósito.
+- **CI (resultado visto)**: com os arquivos, `compose` verde: falha fechada nos dois segredos, portas 2 de 2 em `127.0.0.1`, banco `Healthy`, 10 testes passados dentro do `web` e `200` em `/admin/login/`; `dco`, `guard` e `tests` verdes. Um passo falhou antes por erro meu (flag `--retry-connection-refused` do `curl` não existe) e foi corrigido. Quebra de propósito (senha padrão no `POSTGRES_PASSWORD`): `compose` falhou em `docker compose config aceitou a falta de POSTGRES_PASSWORD`; revertida com commit de reversão.
+- **Não verificado**: nada foi rodado localmente (convenção do workspace); o bind mount com UID diferente de 1000 no host; o comportamento do volume `pgdata` entre execuções (no CI o volume nasce limpo); `runserver` com recarga automática; o job `compose` ainda não é exigido no ruleset.
+- **Fica**: ecossistema `docker` no `dependabot.yml` (precisa de `ignore` para o bot não propor Python 3.15); decidir o PR #17 do bot; apagar a branch `spike/ingestao-python`; seção "Contribuições" do README desatualizada; imagem de produção (P-04).
+
 ### 2026-11-06 — Sessão 12 (fechamento do P-19)
 
 - **Pedido**: fechar o P-19 depois do merge do PR #16.

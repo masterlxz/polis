@@ -2,6 +2,16 @@
 
 Mais recente no topo.
 
+### 2026-11-05 — Sessão 8 (stack do núcleo: P-02, P-03, P-05)
+
+- **Pedido**: decidir a stack (plan mode). O dono comparou Django e Rails, reconheceu o empate técnico e escolheu **Django**, sem comparar por medição; escopo só P-02, P-03 e P-05; spike com dados sintéticos no CI.
+- **Feito**: versões conferidas nas páginas oficiais; spike no PR #12 (aberto como rascunho, a fechar sem mesclar): testes primeiro (contra um leitor ingênuo, 5 falharam e 6 passaram), leitor real (11 passam), quebra de propósito (falharam os 4 testes esperados) e 3 execuções de medição; ADR 0006; P-02, P-03 e P-05 em Resolvidas; `OVERVIEW.md` e `README.md` atualizados.
+- **Resultado do spike**: ZIP sintético de 12,11 GB descomprimidos (0,89 GB comprimido, 20,57 milhões de linhas): leitura com allowlist em 165 a 185 s (66 a 74 MB/s), SHA-256 em menos de 1 s, `COPY` de 2 milhões de linhas em 19 a 21 s, memória ≤ 49 MB. Critério (menos de 20 min e menos de 500 MB) atendido com folga de cerca de 6 vezes.
+- **Escolhas minhas para o dono revisar no PR**: começar no Django 6.1 e migrar para o 6.2 LTS em abril de 2027 (em vez do 5.2 LTS, cujas correções comuns terminaram em 2025-12-03); Python 3.14 (em vez do 3.15, recém-lançado); PostgreSQL 18.
+- **Erro meu no caminho**: ao reverter a quebra de propósito, o `git revert` não rodou como eu esperava e o `commit --amend` reescreveu a mensagem do commit errado; o push foi recusado, nada mudou no remoto, e refiz com um commit de reversão de verdade.
+- **Não verificado**: o pico de memória real por etapa (os 49 MB são limite superior, o valor se repete); o `psycopg` com o PostgreSQL 18 na documentação (só rodou no spike); razão de compressão e volume real (extrapolação de uma amostra); `COPY` com índices; Windows-1252 versus ISO-8859-1; Rails (não medido, por escolha do dono).
+- **Fica**: fechar o PR #12 sem mesclar depois do merge do ADR; criar o projeto Django (Etapa 0 técnica) em plan mode; fila e agendamento, hospedagem, busca, autenticação e IA com ADRs próprios; P-16.
+
 ### 2026-11-05 — Sessão 7 (senadores e votos individuais; revisão da allowlist)
 
 - **Pedido**: medir os endpoints de senadores e os votos individuais (Câmara e Senado) para fechar a allowlist do ADR 0005. Sem plan mode (mesma receita); só estrutura e contagens.

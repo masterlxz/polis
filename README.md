@@ -2,7 +2,7 @@
 
 Plataforma aberta de transparência e inteligência cívica: reúne, organiza e apresenta informações públicas sobre o Brasil (representantes, instituições, votações, gastos, decisões e políticas públicas), sempre com rastreabilidade até a fonte original.
 
-**Status:** pré-código. Só há o [PRD](project/PRD.md) e as decisões iniciais. A stack ainda não foi escolhida.
+**Status:** pré-código. Há o [PRD](project/PRD.md), as decisões iniciais, a medição das fontes e a stack escolhida (Python, Django e PostgreSQL, [ADR 0006](project/adr/0006-stack-do-nucleo.md)). O projeto ainda não foi criado.
 
 ## Princípios
 

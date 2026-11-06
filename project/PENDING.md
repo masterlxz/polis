@@ -6,10 +6,7 @@ Decisões em aberto, vindas do PRD §18 (nome e licença já decididos: ADR 0001
 
 | ID | Pendência | Observação |
 |---|---|---|
-| P-02 | Stack e versões definitivas | Depois de medir as fontes. Insumos das três fontes em `fontes/`. Elas diferem: arquivos anuais e API paginada na Câmara; API sem paginação, limite de 10 req/s e depreciação em curso no Senado; arquivos ZIP grandes (até 1,36 GB) em CDN, ISO-8859-1 e regenerados várias vezes ao dia no TSE. P-12 decidido (ADR 0005); dá para decidir a stack |
-| P-03 | Estrutura final do repositório | Monorepo ou separado; depende de P-02 |
 | P-04 | Arquitetura de implantação e hospedagem | |
-| P-05 | Banco de dados e tecnologias complementares | |
 | P-06 | Estratégia de busca | |
 | P-07 | Estratégia de armazenamento de documentos | |
 | P-08 | Provedores e modelos de IA, RAG, embeddings e custos | |
@@ -31,5 +28,8 @@ Decisões em aberto, vindas do PRD §18 (nome e licença já decididos: ADR 0001
 | (nome) | Nome definitivo do projeto | polis, ADR 0001 |
 | (licença) | Licença e estratégia de código aberto | AGPL-3.0, ADR 0002 |
 | (repo) | Dono e visibilidade do repositório | masterlxz, público, ADR 0003 |
+| P-02 | Stack e versões definitivas | Python 3.14 + Django 6.1 (migrar para o 6.2 LTS em abril de 2027), ADR 0006. Spike de ingestão atendeu o critério com folga de cerca de 6 vezes; versões conferidas em 2026-11-05 |
+| P-03 | Estrutura final do repositório | Monorepo (o próprio `polis`), ADR 0006 |
+| P-05 | Banco de dados e tecnologias complementares | PostgreSQL 18, único banco da Etapa 1, ADR 0006. Busca textual segue no P-06 |
 | P-12 | Política de retenção e minimização de dados pessoais | ADR 0005: allowlist de colunas por fonte, sem CPF nem título, nome civil e data completa só internos, lápide para retirada pela fonte, bruto filtrado com 3 cargas. Validação jurídica segue no P-16 |
 | P-01 | Política de contribuição: CLA ou DCO | DCO, ADR 0004. `CONTRIBUTING.md` e job `dco` no CI feitos e `dco` exigido no ruleset (Sessão 2, partes 3 e 4). PR externo de código já pode ser aceito do ponto de vista da política |

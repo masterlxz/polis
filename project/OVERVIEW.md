@@ -4,7 +4,7 @@
 Plataforma aberta de transparência e inteligência cívica: unifica informações públicas sobre o Brasil (pessoas, instituições, eleições, legislativo, executivo, judiciário, finanças públicas, fiscalização, políticas públicas) com rastreabilidade até a fonte. A IA é camada de pesquisa, nunca fonte primária. Detalhes no `PRD.md`.
 
 ## Stack
-**A decidir.** A escolha depende de medir antes as fontes (TSE, Câmara, Senado): formato, volume, limites e termos de uso (PRD §8 e §19).
+Decidida no ADR 0006 (2026-11-05): **Python 3.14 + Django 6.1** (migrar para o 6.2 LTS em abril de 2027), **PostgreSQL 18**, monorepo, páginas renderizadas no servidor, ingestão como comandos do projeto. Ainda em aberto, cada um com ADR próprio: hospedagem, busca, documentos, IA, autenticação, API pública, fila e agendamento. Nenhum código de produção existe ainda.
 
 ## Licença
 Código: AGPL-3.0 (ADR 0002). Dados: conforme os termos de cada fonte.

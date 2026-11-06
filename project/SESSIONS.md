@@ -2,6 +2,13 @@
 
 Mais recente no topo.
 
+### 2026-11-06 — Sessão 11 (`dependabot.yml` de version updates, P-19)
+
+- **Pedido**: criar o `dependabot.yml` (plan mode). Conflito apontado por mim: o ADR 0006 do workspace descartou `dependabot.yml` de versões pelo volume de PRs (anchor e truthid); o dono confirmou que o **polis é exceção** (árvore pequena, 0 alertas, security updates já ligados), e o ADR do workspace não foi alterado.
+- **Feito**: `.github/dependabot.yml` com `uv` e `github-actions`, semanal (segunda 06:00 `America/Sao_Paulo`), um PR agrupado por ecossistema, limite 2, prefixos `deps` e `ci`, e `ignore` de minor e major do `django` (a virada para o 6.2 LTS segue manual, ADR 0006). Campos conferidos na referência oficial de opções do GitHub; o YAML parseia (Ruby, 2 entradas em `updates`). `cooldown` fora (o padrão de 3 dias vale; suporte a uv não confirmado).
+- **Não verificado**: se o Dependabot aceita o arquivo (só se vê depois do merge); o aninhamento de `groups` e `ignore` não tem exemplo na doc (inferência, confiança média); como o PR agrupado se comporta quando `ruff` 0.x muda o `format`.
+- **Fica**: conferir o Dependabot depois do merge e então fechar o P-19; Docker Compose; apagar a branch `spike/ingestao-python`; seção "Contribuições" do README desatualizada.
+
 ### 2026-11-06 — Sessão 10 (check `tests` exigido no ruleset)
 
 - **Pedido**: depois do merge do PR #14 (`6879c40`), exigir o check `tests` no ruleset `protect-main`. O dono confirmou ("vamos de 1").

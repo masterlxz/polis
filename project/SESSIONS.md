@@ -2,6 +2,13 @@
 
 Mais recente no topo.
 
+### 2026-11-06 — Sessão 19 (P-15: leitura do Ato da Mesa 45/2012 e dos termos da Câmara)
+
+- **Pedido**: seguir com o P-15.
+- **Feito**: o 429 da Câmara da Sessão 18 era limite de taxa; uma nova requisição por URL, com `User-Agent` genérico e 10 s entre elas, voltou 200. Li o Ato da Mesa 45/2012 (texto atualizado) e os termos do portal. `fontes/camara.md`: Art. 27 (informações pessoais, incluindo "número de documentos de identificação pessoal"), conclusão sem licença nem atribuição, regra "Robôs" nas regras operacionais.
+- **Não verificado**: por que a API de detalhe serve o CPF se o Ato o lista como pessoal; o regulamento do § 10; Portarias TSE (403, não contornar) e termos de uso do TSE.
+- **Fica**: o P-15 segue aberto só pelo TSE; precisa de leitura humana pelo navegador.
+
 ### 2026-11-06 — Sessão 18 (P-15: leituras e regras operacionais por fonte)
 
 - **Pedido**: fechar o P-15 (plan mode). Escolhas do dono: leituras oficiais + síntese de regras; busca na web só de leitura.

@@ -13,7 +13,7 @@ Código: AGPL-3.0 (ADR 0002). Dados: conforme os termos de cada fonte.
 
 | Etapa | Descrição | Status |
 |---|---|---|
-| 0 | Fundação (repo, docs, ambiente, banco, cadastro de fontes, pipeline, CI) | Em andamento: repo, licença, docs, padrão de fluxo e proteção da `main` e esqueleto Django com CI de testes feitos; falta Docker Compose, `dependabot.yml`, banco modelado, cadastro de fontes, pipeline e monitoramento |
+| 0 | Fundação (repo, docs, ambiente, banco, cadastro de fontes, pipeline, CI) | Em andamento: repo, licença, docs, padrão de fluxo e proteção da `main` e esqueleto Django com CI de testes feitos; `dependabot.yml` criado na Sessão 11 (validação pós-merge pendente); falta Docker Compose, banco modelado, cadastro de fontes, pipeline e monitoramento |
 | 1 | Legislativo e eleições | Não iniciada |
 | 2 | Experiência pública | Não iniciada |
 | 3 | Finanças públicas | Não iniciada |
@@ -22,4 +22,4 @@ Código: AGPL-3.0 (ADR 0002). Dados: conforme os termos de cada fonte.
 | 6 | Expansão nacional | Não iniciada |
 
 ## Repositório
-`masterlxz/polis`, público. Proteção da `main` pelo `padrao/` do workspace (ADR 0005 do workspace), ligada e conferida na Sessão 2: ruleset `protect-main` (PR + `guard` + `dco` obrigatórios, e `tests` desde a Sessão 10, sem force push nem exclusão; bypass só do Admin e só via PR), secret scanning, push protection, alertas e security updates do Dependabot, `delete_branch_on_merge`. Push direto na `main` testado e recusado. Ainda não há `dependabot.yml` (version updates): P-19.
+`masterlxz/polis`, público. Proteção da `main` pelo `padrao/` do workspace (ADR 0005 do workspace), ligada e conferida na Sessão 2: ruleset `protect-main` (PR + `guard` + `dco` obrigatórios, e `tests` desde a Sessão 10, sem force push nem exclusão; bypass só do Admin e só via PR), secret scanning, push protection, alertas e security updates do Dependabot, `delete_branch_on_merge`. Push direto na `main` testado e recusado. Version updates pelo `.github/dependabot.yml` (Sessão 11, P-19): semanal, um PR agrupado por ecossistema (`uv` e `github-actions`), sem auto-merge, Django só em patches.

@@ -1,6 +1,6 @@
 # polis: Estado do Projeto
 
-> Última atualização: 2026-11-06 (Sessão 10: check `tests` exigido no ruleset)
+> Última atualização: 2026-11-06 (Sessão 11: `dependabot.yml`)
 
 ## Como usar este arquivo
 

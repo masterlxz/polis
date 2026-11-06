@@ -1,0 +1,38 @@
+# Version updates semanais, um PR agrupado por ecossistema (P-19).
+# Security updates são outro fluxo, ligado no repositório (Sessão 2), e não
+# passam por este arquivo. Sem auto-merge: guard, dco e tests são obrigatórios.
+version: 2
+updates:
+  - package-ecosystem: "uv"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "America/Sao_Paulo"
+    open-pull-requests-limit: 2
+    commit-message:
+      prefix: "deps"
+    groups:
+      python:
+        patterns: ["*"]
+    ignore:
+      # A virada 6.1 -> 6.2 LTS (abril de 2027) é decisão manual (ADR 0006).
+      - dependency-name: "django"
+        update-types:
+          - "version-update:semver-minor"
+          - "version-update:semver-major"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "America/Sao_Paulo"
+    open-pull-requests-limit: 2
+    commit-message:
+      prefix: "ci"
+    groups:
+      actions:
+        patterns: ["*"]

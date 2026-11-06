@@ -19,7 +19,7 @@ Decisões em aberto, vindas do PRD §18 (nome e licença já decididos: ADR 0001
 | P-16 | Interpretações jurídicas que exijam validação especializada | LGPD e dados de processos judiciais |
 | P-17 | Identidade visual, linguagem da marca e domínio | O nome polis tem homônimo conhecido (`pol.is`), ver ADR 0001 |
 | P-18 | Design e navegação definitivos | |
-| P-19 | CI de testes e `dependabot.yml` | Job `tests` criado na Sessão 9 (PR #14) e exigido no ruleset na Sessão 10. Falta `dependabot.yml` (version updates). Security updates já ligados (Sessão 2) |
+| P-19 | CI de testes e `dependabot.yml` | Job `tests` criado na Sessão 9 (PR #14) e exigido no ruleset na Sessão 10. `dependabot.yml` criado na Sessão 11; **falta conferir depois do merge** que o Dependabot leu o arquivo sem erro (aba Dependabot e runs "Dependabot Updates"), e então fechar o P-19. Security updates já ligados (Sessão 2) |
 
 ## Resolvidas
 

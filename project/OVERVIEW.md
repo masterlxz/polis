@@ -13,7 +13,7 @@ Código: AGPL-3.0 (ADR 0002). Dados: conforme os termos de cada fonte.
 
 | Etapa | Descrição | Status |
 |---|---|---|
-| 0 | Fundação (repo, docs, ambiente, banco, cadastro de fontes, pipeline, CI) | Em andamento: repo, licença, docs, padrão de fluxo e proteção da `main` e esqueleto Django com CI de testes feitos; `dependabot.yml` criado na Sessão 11 (validação pós-merge pendente); falta Docker Compose, banco modelado, cadastro de fontes, pipeline e monitoramento |
+| 0 | Fundação (repo, docs, ambiente, banco, cadastro de fontes, pipeline, CI) | Em andamento: repo, licença, docs, padrão de fluxo e proteção da `main` e esqueleto Django com CI de testes feitos; `dependabot.yml` ativo e conferido (Sessão 12); falta Docker Compose, banco modelado, cadastro de fontes, pipeline e monitoramento |
 | 1 | Legislativo e eleições | Não iniciada |
 | 2 | Experiência pública | Não iniciada |
 | 3 | Finanças públicas | Não iniciada |

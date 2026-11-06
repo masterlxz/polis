@@ -1,6 +1,6 @@
 # polis: Estado do Projeto
 
-> Última atualização: 2026-11-06 (Sessão 11: `dependabot.yml`)
+> Última atualização: 2026-11-06 (Sessão 12: P-19 fechado)
 
 ## Como usar este arquivo
 

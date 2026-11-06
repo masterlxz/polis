@@ -2,6 +2,14 @@
 
 Mais recente no topo.
 
+### 2026-11-06 — Sessão 12 (fechamento do P-19)
+
+- **Pedido**: fechar o P-19 depois do merge do PR #16.
+- **Conferido**: runs `uv in /.` (#1685310393) e `github_actions in /.` (#1685310398) concluídos com sucesso na `main`; o Dependabot abriu o PR #17 (`ci: bump the actions group with 2 updates`: `actions/checkout` v4 → v7 nos 3 workflows e `astral-sh/setup-uv` v6 → v7), com `dco`, `guard` e `tests` verdes. O run do `uv` não abriu PR (versões já fixadas). Não vi alerta de configuração.
+- **Feito**: P-19 movido para Resolvidas; `OVERVIEW.md` e `INDEX.md` atualizados.
+- **Não verificado**: o conteúdo do PR #17 (salto de três majors do `checkout`; release notes não lidas), que segue aberto para o dono decidir (AGENTS §4, CI/CD); a aba Dependabot da interface, só os runs pela API.
+- **Fica**: decidir o PR #17; Docker Compose; apagar a branch `spike/ingestao-python`; seção "Contribuições" do README desatualizada.
+
 ### 2026-11-06 — Sessão 11 (`dependabot.yml` de version updates, P-19)
 
 - **Pedido**: criar o `dependabot.yml` (plan mode). Conflito apontado por mim: o ADR 0006 do workspace descartou `dependabot.yml` de versões pelo volume de PRs (anchor e truthid); o dono confirmou que o **polis é exceção** (árvore pequena, 0 alertas, security updates já ligados), e o ADR do workspace não foi alterado.

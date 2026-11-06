@@ -20,3 +20,15 @@ Medições usam poucas requisições, em série, sem autenticação, com `User-A
 | Câmara dos Deputados (Dados Abertos) | [camara.md](camara.md) | 2026-11-05 | Medida; sem integração |
 | Senado Federal (Dados Abertos Legislativos) | [senado.md](senado.md) | 2026-11-05 | Medida; sem integração |
 | TSE (Portal de Dados Abertos) | [tse.md](tse.md) | 2026-11-05 | Medida (ciclos 2026 e 2024); sem integração |
+
+## Regimes de uso lado a lado (leitura de 2026-11-06)
+
+Cada fonte tem a seção "Regras operacionais" no próprio arquivo. São decisões de engenharia; o que pode ser armazenado e redistribuído depende do P-16.
+
+| | Câmara | Senado | TSE |
+|---|---|---|---|
+| Licença nomeada | não encontrada | não encontrada | CC BY nos metadados (181 de 190 conjuntos do portal) |
+| Atribuição | não exigida (FAQ pede retribuição) | "citar a fonte" (política do portal; não se liga expressamente à API) | exigida pela CC BY |
+| Uso comercial | permitido pelo FAQ | não dito | CC BY não o restringe; dado pessoal fica no P-16 |
+| Limite de taxa | não documentado (`retry-after: 30`) | 10 req/s documentado | não documentado |
+| Texto lido na íntegra | FAQ; **Ato da Mesa 45/2012 e termos do portal não** (HTTP 429) | política do portal e Plano 2026/2028 | `/about`; **Portarias 93/2021 e 525/2021 não** (HTTP 403) |

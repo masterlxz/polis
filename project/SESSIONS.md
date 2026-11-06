@@ -2,6 +2,14 @@
 
 Mais recente no topo.
 
+### 2026-11-06 — Sessão 18 (P-15: leituras e regras operacionais por fonte)
+
+- **Pedido**: fechar o P-15 (plan mode). Escolhas do dono: leituras oficiais + síntese de regras; busca na web só de leitura.
+- **Feito**: seção "Regras operacionais" em `fontes/camara.md`, `senado.md` e `tse.md`; tabela de regimes lado a lado em `fontes/README.md`; "Não verificado" reescrito com o que foi lido em 2026-11-06. Plano 2026/2028 do Senado lido com `pdftotext`: define dados abertos como "licença aberta" e não nomeia licença. TSE: `comparecimento-e-abstencao-2026/2024` sem `license_id` (confirmado), 181 de 190 conjuntos do portal com CC BY. CPF de 2026 reconferido (29 CSVs, 42.028 linhas de 11 dígitos, 6 placeholders).
+- **Não lido, por bloqueio do servidor**: Portarias TSE 93/2021 e 525/2021 (HTTP 403) e Ato da Mesa 45/2012 e termos do portal da Câmara (HTTP 429). Tentei reler as Portarias com outro `User-Agent`; o ambiente barrou como contorno de bloqueio e **não repeti** (o 403 é recusa do servidor). Termos de uso do TSE e Plano de Dados Abertos 2021-2023 só citados, não abertos.
+- **Não verificado**: documentação da API do Senado (Swagger por JavaScript), `leiame.pdf` do TSE, quais são os outros 6 conjuntos do TSE sem licença (inferência: 190 menos 181).
+- **Fica**: o P-15 **segue aberto** só pelos 4 textos acima, que precisam de leitura humana pelo navegador ou do dono colando; ADR 0008 (regras por fonte) a decidir; cadastro das 3 fontes no banco depende disso.
+
 ### 2026-11-06 — Sessão 17 (leitor de ZIP de CSV com allowlist, PR #23)
 
 - **Pedido**: leitor do TSE, parte 1 (plan mode): leitura em fluxo, allowlist por nome, falha fechada, SHA-256, sem banco. Escolhas do dono: o leitor só conta linhas malformadas (o limite é do conector); valida todos os cabeçalhos antes de devolver qualquer linha; depois da revisão adversária, registro multilinha rejeitado por padrão (com opção para permitir) e limites de recursos neste PR.

@@ -39,10 +39,23 @@ Texto do FAQ (documentação, <https://dadosabertos.camara.leg.br/faq/faq-home.h
 - "Os dados abertos incluem as informações pessoais de parlamentares e colaboradores? Não, pelo menos por enquanto. Existem restrições às informações que podem ser divulgadas, especialmente as de caráter pessoal e/ou familiar. O Ato da Mesa 45/2012 é atualmente o principal dos marcos regulatórios da Câmara que definem quais informações podem ser tornadas públicas ou não."
 - Marcos citados no FAQ: Lei 12.527/2011 (Lei de Acesso à Informação) e Ato da Mesa 45/2012.
 
-**Não verificado:** não encontrei no portal uma licença explícita (por exemplo uma licença Creative Commons) nem regra de atribuição. Também não li o Ato da Mesa 45/2012 nem a página institucional `www2.camara.leg.br/transparencia/dados-abertos`. Se a licença importar para o produto, é caso para o P-16.
+**Leitura de 2026-11-06 (documentação):** reli `https://dadosabertos.camara.leg.br/`, o FAQ e `https://dadosabertos.camara.leg.br/swagger/api.html`: nenhuma menção a Creative Commons, ODbL, domínio público, regra de atribuição, limite de requisições ou termos de uso. `www2.camara.leg.br/transparencia/dados-abertos` redireciona (302) para `dadosabertos.camara.leg.br`, então não há página institucional separada. A página de metadados do Ato da Mesa 45/2012 traz só a ementa ("Dispõe sobre a aplicação, no âmbito da Câmara dos Deputados, da Lei de Acesso à Informação") e "Não consta revogação expressa".
+
+**Não verificado:** o **texto dos artigos** do Ato da Mesa 45/2012 (a URL do texto atualizado devolveu HTTP 429 sem `Retry-After`; não repeti) e os **termos de uso e política de privacidade** do portal (`www2.camara.leg.br/termo-de-uso-e-politica-de-privacidade`, também 429), que são o lugar mais provável de uma licença. Ou seja: a Câmara continua **sem licença nem atribuição encontradas**, e isso é ausência de achado, não confirmação de que não existem. Interpretação é do P-16.
 
 ## Restrições de armazenamento, transformação e redistribuição
 Nenhuma declarada no FAQ (documentação). Ausência de restrição declarada não é autorização verificada: ver o "Não verificado" acima e PRD §8.2.
+
+## Regras operacionais (decisão de engenharia, não parecer jurídico)
+| Tema | Regra proposta | Base |
+|---|---|---|
+| Atribuição | Citar "Câmara dos Deputados, Dados Abertos" mesmo sem exigência encontrada; o FAQ pede retribuição à sociedade | FAQ (documentação) |
+| Taxa | Série, sem paralelismo; pausa entre requisições; respeitar `retry-after: 30` se vier em 429/503 | medido: `retry-after: 30` em todas as respostas, sem 429 |
+| Tamanho de página | `itens` ≤ 100 (acima disso houve 504) | FAQ e medido |
+| Canal | Arquivos anuais em massa para carga; API para detalhe e atualização incremental | medido |
+| Janela | Arquivos regenerados de madrugada (04:00 a 07:00 GMT): coletar depois das 08:00 GMT | medido, um dia só |
+| Dado pessoal | Só o que a allowlist do ADR 0005 permite; CPF vem no detalhe da API mas não no CSV em massa: não coletar o detalhe para obter CPF | ADR 0005; `camara.md` |
+| Armazenamento e redistribuição | Sem restrição declarada; **não tratar como autorização** até o P-16 | PRD §8.2 |
 
 ## Entidades e campos (medido, listagens da API, 2026-11-05)
 | Recurso | Campos de cada item da listagem |

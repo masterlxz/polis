@@ -4,7 +4,7 @@
 Plataforma aberta de transparência e inteligência cívica: unifica informações públicas sobre o Brasil (pessoas, instituições, eleições, legislativo, executivo, judiciário, finanças públicas, fiscalização, políticas públicas) com rastreabilidade até a fonte. A IA é camada de pesquisa, nunca fonte primária. Detalhes no `PRD.md`.
 
 ## Stack
-Decidida no ADR 0006 (2026-11-05): **Python 3.14 + Django 6.1** (migrar para o 6.2 LTS em abril de 2027), **PostgreSQL 18**, monorepo, páginas renderizadas no servidor, ingestão como comandos do projeto. Ainda em aberto, cada um com ADR próprio: hospedagem, busca, documentos, IA, autenticação, API pública, fila e agendamento. Nenhum código de produção existe ainda.
+Decidida no ADR 0006 (2026-11-05): **Python 3.14 + Django 6.1** (migrar para o 6.2 LTS em abril de 2027), **PostgreSQL 18**, monorepo, páginas renderizadas no servidor, ingestão como comandos do projeto. Ainda em aberto, cada um com ADR próprio: hospedagem, busca, documentos, IA, autenticação, API pública, fila e agendamento. O esqueleto do projeto Django existe desde a Sessão 9 (`config/`, `apps/` vazio, `tests/`, job `tests` no CI); ainda não há modelos, conectores nem ingestão.
 
 ## Licença
 Código: AGPL-3.0 (ADR 0002). Dados: conforme os termos de cada fonte.
@@ -13,7 +13,7 @@ Código: AGPL-3.0 (ADR 0002). Dados: conforme os termos de cada fonte.
 
 | Etapa | Descrição | Status |
 |---|---|---|
-| 0 | Fundação (repo, docs, ambiente, banco, cadastro de fontes, pipeline, CI) | Em andamento: repo, licença, docs, padrão de fluxo e proteção da `main` feitos; o restante depende da stack |
+| 0 | Fundação (repo, docs, ambiente, banco, cadastro de fontes, pipeline, CI) | Em andamento: repo, licença, docs, padrão de fluxo e proteção da `main` e esqueleto Django com CI de testes feitos; falta Docker Compose, `dependabot.yml`, banco modelado, cadastro de fontes, pipeline e monitoramento |
 | 1 | Legislativo e eleições | Não iniciada |
 | 2 | Experiência pública | Não iniciada |
 | 3 | Finanças públicas | Não iniciada |

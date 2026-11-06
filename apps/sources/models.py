@@ -1,0 +1,183 @@
+"""Cadastro de fontes e registro de execuções de coleta.
+
+Regras de dados pessoais (ADR 0005): nenhuma fonte entra sem allowlist de colunas
+declarada no conjunto; a execução guarda só nomes de colunas, contagens e o
+SHA-256 do arquivo original, nunca valores de linha nem texto livre de erro.
+"""
+
+from django.contrib.postgres.fields import ArrayField
+from django.core.exceptions import ValidationError
+from django.db import models
+from django.db.models import F, Q
+from django.utils import timezone
+
+SHA256_HEX_REGEX = r"^[0-9a-f]{64}$"
+
+
+class Source(models.Model):
+    """Instituição ou portal que publica dados (PRD §8.1)."""
+
+    class AccessType(models.TextChoices):
+        API = "api", "API"
+        DOWNLOAD = "download", "Download"
+        PAGE = "page", "Página"
+        FILE = "file", "Arquivo"
+        OTHER = "other", "Outro"
+
+    class Status(models.TextChoices):
+        MEASURED = "measured", "Medida, sem integração"
+        INTEGRATING = "integrating", "Em integração"
+        ACTIVE = "active", "Ativa"
+        PAUSED = "paused", "Pausada"
+
+    slug = models.SlugField("identificador", max_length=50, unique=True)
+    name = models.CharField("nome", max_length=200)
+    institution = models.CharField("instituição responsável", max_length=200)
+    official_url = models.URLField("endereço oficial", max_length=500)
+    access_type = models.CharField("tipo de acesso", max_length=20, choices=AccessType)
+    terms_url = models.URLField("termos de uso", max_length=500, blank=True)
+    license_note = models.TextField("licença e restrições", blank=True)
+    status = models.CharField(
+        "estado da integração", max_length=20, choices=Status, default=Status.MEASURED
+    )
+    notes = models.TextField("observações", blank=True)
+
+    class Meta:
+        verbose_name = "fonte"
+        verbose_name_plural = "fontes"
+        ordering = ["slug"]
+
+    def __str__(self):
+        return self.name
+
+
+class Dataset(models.Model):
+    """Um arquivo ou endpoint de uma fonte, com a allowlist de colunas (ADR 0005)."""
+
+    class Format(models.TextChoices):
+        CSV = "csv", "CSV"
+        ZIP_CSV = "zip_csv", "ZIP com CSV"
+        JSON = "json", "JSON"
+        XML = "xml", "XML"
+        OTHER = "other", "Outro"
+
+    source = models.ForeignKey(
+        Source, on_delete=models.PROTECT, related_name="datasets", verbose_name="fonte"
+    )
+    slug = models.SlugField("identificador", max_length=100)
+    name = models.CharField("nome", max_length=200)
+    url = models.URLField("endereço", max_length=500)
+    format = models.CharField("formato", max_length=20, choices=Format)
+    allowed_columns = ArrayField(
+        models.CharField(max_length=100),
+        default=list,
+        blank=True,
+        verbose_name="colunas permitidas",
+        help_text="Allowlist: só estas colunas são lidas; o resto é descartado na leitura.",
+    )
+    internal_columns = ArrayField(
+        models.CharField(max_length=100),
+        default=list,
+        blank=True,
+        verbose_name="colunas internas",
+        help_text="Subconjunto das permitidas que nunca é exposto (interface e API).",
+    )
+    enabled = models.BooleanField(
+        "habilitado", default=False, help_text="Só pode ser habilitado com colunas permitidas."
+    )
+
+    class Meta:
+        verbose_name = "conjunto de dados"
+        verbose_name_plural = "conjuntos de dados"
+        ordering = ["source__slug", "slug"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["source", "slug"], name="dataset_unique_slug_per_source"
+            ),
+            models.CheckConstraint(
+                condition=Q(enabled=False) | Q(allowed_columns__len__gt=0),
+                name="dataset_enabled_requires_allowed_columns",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.source.slug}/{self.slug}"
+
+    def clean(self):
+        super().clean()
+        fora = sorted(set(self.internal_columns) - set(self.allowed_columns))
+        if fora:
+            raise ValidationError(
+                {"internal_columns": f"Colunas internas fora das permitidas: {', '.join(fora)}."}
+            )
+
+
+class IngestionRun(models.Model):
+    """Registro de uma coleta (PRD §9.1, passo 2). Imutável depois de concluída."""
+
+    class State(models.TextChoices):
+        RUNNING = "running", "Em andamento"
+        SUCCEEDED = "succeeded", "Concluída com sucesso"
+        FAILED = "failed", "Falhou"
+
+    class ErrorCode(models.TextChoices):
+        DOWNLOAD = "download", "Falha de download"
+        SCHEMA = "schema", "Esquema diferente do esperado"
+        MALFORMED_ROW = "malformed_row", "Linha malformada"
+        HASH = "hash", "Hash não confere"
+        OTHER = "other", "Outro"
+
+    dataset = models.ForeignKey(
+        Dataset, on_delete=models.PROTECT, related_name="runs", verbose_name="conjunto de dados"
+    )
+    state = models.CharField("estado", max_length=20, choices=State, default=State.RUNNING)
+    started_at = models.DateTimeField("início", default=timezone.now)
+    finished_at = models.DateTimeField("fim", null=True, blank=True)
+    source_url = models.URLField("endereço coletado", max_length=500)
+    sha256_original = models.CharField("SHA-256 do arquivo original", max_length=64, blank=True)
+    etag = models.CharField("ETag", max_length=200, blank=True)
+    source_generated_at = models.DateTimeField("gerado pela fonte em", null=True, blank=True)
+    size_bytes = models.PositiveBigIntegerField("tamanho (bytes)", null=True, blank=True)
+    rows_read = models.PositiveIntegerField("linhas lidas", default=0)
+    rows_loaded = models.PositiveIntegerField("linhas gravadas", default=0)
+    dropped_columns = ArrayField(
+        models.CharField(max_length=100),
+        default=list,
+        blank=True,
+        verbose_name="colunas descartadas (só nomes)",
+    )
+    error_code = models.CharField("código do erro", max_length=20, choices=ErrorCode, blank=True)
+
+    class Meta:
+        verbose_name = "execução de coleta"
+        verbose_name_plural = "execuções de coleta"
+        ordering = ["-started_at"]
+        constraints = [
+            models.CheckConstraint(
+                condition=~Q(state="succeeded")
+                | (Q(sha256_original__regex=SHA256_HEX_REGEX) & Q(finished_at__isnull=False)),
+                name="run_succeeded_requires_hash_and_end",
+            ),
+            models.CheckConstraint(
+                condition=~Q(state="failed") | (~Q(error_code="") & Q(finished_at__isnull=False)),
+                name="run_failed_requires_error_code_and_end",
+            ),
+            models.CheckConstraint(
+                condition=~Q(state="running") | Q(finished_at__isnull=True),
+                name="run_running_has_no_end",
+            ),
+            models.CheckConstraint(
+                condition=Q(rows_loaded__lte=F("rows_read")),
+                name="run_rows_loaded_not_above_read",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.dataset} em {self.started_at:%Y-%m-%d %H:%M} ({self.state})"
+
+    def save(self, *args, **kwargs):
+        if not self._state.adding:
+            anterior = type(self).objects.filter(pk=self.pk).values_list("state", flat=True).first()
+            if anterior is not None and anterior != self.State.RUNNING:
+                raise ValueError("Execução concluída é imutável.")
+        super().save(*args, **kwargs)

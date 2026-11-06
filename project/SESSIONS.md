@@ -2,6 +2,16 @@
 
 Mais recente no topo.
 
+### 2026-11-06 — Sessão 15 (cadastro de fontes e execuções de coleta, PR #21)
+
+- **Pedido**: primeira fatia de domínio da Etapa 0 (plan mode). Escolhas do dono: `Source` + `Dataset` (allowlist no conjunto) e nomes em inglês no código, português na interface.
+- **Feito**: app `apps/sources` com `Source`, `Dataset` e `IngestionRun`, migração `0001_initial` e admin; `Dataset` só habilita com colunas permitidas (restrição no banco) e valida colunas internas ⊆ permitidas; `IngestionRun` sem texto livre de erro (`error_code` fechado), com `CheckConstraint` para hash SHA-256 válido, fim, falha com código e linhas gravadas ≤ lidas, e `save()` que recusa alterar execução concluída; admin da execução só leitura. `tests/test_sources.py` (33 testes). `pyproject.toml`: `apps` e `config` como primeiro-partido no isort do `ruff`.
+- **Testes primeiro**: no CI o `pytest` falhou na coleta (`No module named 'apps.sources'`), prova fraca; a prova real foi a quebra de propósito.
+- **CI (resultado visto)**: `tests` e `compose` verdes com 43 testes; `dco` e `guard` verdes. Quebra de propósito (imutabilidade e validação de colunas internas desligadas): falharam exatamente `test_coluna_interna_fora_das_permitidas_e_recusada`, `test_execucao_concluida_nao_pode_ser_alterada` e `test_execucao_com_falha_tambem_nao_pode_ser_alterada`; revertida com commit de reversão.
+- **Correções minhas no caminho**: (1) o Django exige `django.contrib.postgres` em `INSTALLED_APPS` para `ArrayField` (o plano dizia que não); (2) o hash com 65 caracteres é barrado pelo tipo da coluna (`DataError`), não pela restrição (`IntegrityError`): ajustei o teste; (3) um teste construía com `create()` um `error_code` maior que a coluna: passou a montar a instância sem salvar; (4) `ruff` tratava `apps` como terceiro: configurei `known-first-party`.
+- **Não verificado**: a imutabilidade é só na aplicação (`QuerySet.update()` e SQL direto contornam; sem trigger); a corrida entre duas gravações da mesma execução (o `save()` lê e depois grava sem trava); o admin mostrando as colunas em tela real (só status HTTP); nada rodou localmente (convenção do workspace), só `makemigrations` e `ruff`.
+- **Fica**: perguntar se crio o ADR 0007 (nomes em inglês no código e modelo de fontes); cadastrar as 3 fontes reais (P-15: licença da Câmara e do Senado); conector e leitor (reaproveitar os 11 testes do spike no PR #12); ecossistema `docker` no `dependabot.yml`; exigir ou não o check `compose` (recomendo não); imagem de produção (P-04).
+
 ### 2026-11-06 — Sessão 14 (PR #17 do Dependabot e faxina)
 
 - **Pedido**: decidir o PR #17 e fazer a faxina (README e branch do spike).

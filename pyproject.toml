@@ -33,5 +33,8 @@ extend-exclude = ["migrations"]
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "S"]
 
+[tool.ruff.lint.isort]
+known-first-party = ["apps", "config"]
+
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["S101", "S603"]

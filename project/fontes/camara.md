@@ -41,10 +41,21 @@ Texto do FAQ (documentação, <https://dadosabertos.camara.leg.br/faq/faq-home.h
 
 **Leitura de 2026-11-06 (documentação):** reli `https://dadosabertos.camara.leg.br/`, o FAQ e `https://dadosabertos.camara.leg.br/swagger/api.html`: nenhuma menção a Creative Commons, ODbL, domínio público, regra de atribuição, limite de requisições ou termos de uso. `www2.camara.leg.br/transparencia/dados-abertos` redireciona (302) para `dadosabertos.camara.leg.br`, então não há página institucional separada. A página de metadados do Ato da Mesa 45/2012 traz só a ementa ("Dispõe sobre a aplicação, no âmbito da Câmara dos Deputados, da Lei de Acesso à Informação") e "Não consta revogação expressa".
 
-**Não verificado:** o **texto dos artigos** do Ato da Mesa 45/2012 (a URL do texto atualizado devolveu HTTP 429 sem `Retry-After`; não repeti) e os **termos de uso e política de privacidade** do portal (`www2.camara.leg.br/termo-de-uso-e-politica-de-privacidade`, também 429), que são o lugar mais provável de uma licença. Ou seja: a Câmara continua **sem licença nem atribuição encontradas**, e isso é ausência de achado, não confirmação de que não existem. Interpretação é do P-16.
+**Ato da Mesa 45/2012, texto atualizado (documentação, lido em 2026-11-06 depois de um 429 anterior, com uma nova requisição de User-Agent genérico):** `http://www2.camara.leg.br/legin/int/atomes/2012/atodamesa-45-16-julho-2012-773823-normaatualizada-cd-mesa.html`. O Art. 27 (com redação dada pelo Ato da Mesa nº 246/2018) trata das informações pessoais:
+- **§ 1º lista, "entre outros", como informações pessoais:** nome de cônjuge ou companheiro e parentes até o 4º grau; endereço de residência, e-mail particular e telefone particular; **número de documentos de identificação pessoal**; identificadores de contratos de telecomunicações reembolsáveis; dados de reembolso médico-hospitalar; informações médicas; descontos facultativos ou judiciais sobre remuneração; **informações patrimoniais e financeiras**; dados biométricos.
+- **§ 2º:** quando relativas à intimidade, vida privada, honra e imagem, têm acesso restrito por até 100 anos.
+- **§ 4º e § 6º:** quem obtém acesso responde pelo uso indevido; o acesso de terceiros "vincula-se à finalidade e à destinação" e exige termo de responsabilidade.
+- **§ 8º:** o interesse público preponderante se caracteriza, entre outros, quando a informação é "decorrente de investidura em cargo ou função pública" ou "vinculada a atos e documentos atinentes ao exercício da atividade legislativa".
+- O Ato é sobre **acesso** a informação pela Câmara (aplicação da LAI); **não** fala de licença nem de reuso por terceiros dos dados abertos. Isso é leitura minha do texto.
+
+**Termos de uso e política de privacidade do portal (documentação, lido em 2026-11-06):** `https://www2.camara.leg.br/termo-de-uso-e-politica-de-privacidade`. É voltado a quem se cadastra e usa o portal (cadastro, senha, comentários). Não cita dados abertos, licença, atribuição ou reuso. Único ponto técnico: "Podemos coibir a participação de sistemas automatizados ou robôs (scripts, bots, entre outros) que tentem **imitar pessoas**" (item 22). Não é o caso de um coletor que se identifica como tal; a aplicação à API é interpretação (P-16).
+
+**Conclusão:** depois de ler tudo o que a Câmara publica sobre o tema, a Câmara continua **sem licença nem atribuição declaradas**. O que existe é o FAQ (uso, inclusive comercial, sem restrição) e o Art. 27 do Ato, que limita as informações pessoais. O CPF de deputado (que a API de detalhe traz) cai em "número de documentos de identificação pessoal" no § 1º, III; o § 8º não o torna público por si só. Isso reforça a regra do ADR 0005 de não coletar o CPF. Interpretação jurídica é do P-16.
+
+**Não verificado:** a aplicação do Art. 27 ao CPF que a API devolve no detalhe do deputado (por que a Câmara o serve, se o Ato o lista como pessoal); o regulamento do § 10.
 
 ## Restrições de armazenamento, transformação e redistribuição
-Nenhuma declarada no FAQ (documentação). Ausência de restrição declarada não é autorização verificada: ver o "Não verificado" acima e PRD §8.2.
+Nenhuma sobre reuso declarada no FAQ nem nos termos do portal (documentação). As restrições existentes são sobre **informações pessoais** (Art. 27 do Ato da Mesa 45/2012, acima). Ausência de restrição declarada não é autorização verificada: PRD §8.2.
 
 ## Regras operacionais (decisão de engenharia, não parecer jurídico)
 | Tema | Regra proposta | Base |
@@ -54,7 +65,8 @@ Nenhuma declarada no FAQ (documentação). Ausência de restrição declarada n�
 | Tamanho de página | `itens` ≤ 100 (acima disso houve 504) | FAQ e medido |
 | Canal | Arquivos anuais em massa para carga; API para detalhe e atualização incremental | medido |
 | Janela | Arquivos regenerados de madrugada (04:00 a 07:00 GMT): coletar depois das 08:00 GMT | medido, um dia só |
-| Dado pessoal | Só o que a allowlist do ADR 0005 permite; CPF vem no detalhe da API mas não no CSV em massa: não coletar o detalhe para obter CPF | ADR 0005; `camara.md` |
+| Dado pessoal | Só o que a allowlist do ADR 0005 permite; CPF vem no detalhe da API mas não no CSV em massa: não coletar o detalhe para obter CPF (o Ato da Mesa 45/2012, Art. 27 § 1º, III, lista documentos de identificação como informação pessoal) | ADR 0005; Ato da Mesa 45/2012 (documentação) |
+| Robôs | Identificar o coletor com `User-Agent` próprio e honesto; os termos do portal só falam em sistemas que "imitem pessoas" | termos do portal, item 22 |
 | Armazenamento e redistribuição | Sem restrição declarada; **não tratar como autorização** até o P-16 | PRD §8.2 |
 
 ## Entidades e campos (medido, listagens da API, 2026-11-05)

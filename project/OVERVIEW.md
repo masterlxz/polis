@@ -22,4 +22,4 @@ Código: AGPL-3.0 (ADR 0002). Dados: conforme os termos de cada fonte.
 | 6 | Expansão nacional | Não iniciada |
 
 ## Repositório
-`masterlxz/polis`, público. Proteção da `main` pelo `padrao/` do workspace (ADR 0005 do workspace), ligada e conferida na Sessão 2: ruleset `protect-main` (PR + `guard` + `dco` obrigatórios, sem force push nem exclusão; bypass só do Admin e só via PR), secret scanning, push protection, alertas e security updates do Dependabot, `delete_branch_on_merge`. Push direto na `main` testado e recusado. Ainda não há `dependabot.yml` (version updates): P-19.
+`masterlxz/polis`, público. Proteção da `main` pelo `padrao/` do workspace (ADR 0005 do workspace), ligada e conferida na Sessão 2: ruleset `protect-main` (PR + `guard` + `dco` obrigatórios, e `tests` desde a Sessão 10, sem force push nem exclusão; bypass só do Admin e só via PR), secret scanning, push protection, alertas e security updates do Dependabot, `delete_branch_on_merge`. Push direto na `main` testado e recusado. Ainda não há `dependabot.yml` (version updates): P-19.

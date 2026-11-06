@@ -1,6 +1,6 @@
 # polis: Estado do Projeto
 
-> Última atualização: 2026-11-06 (Sessão 9: projeto Django criado, PR #14)
+> Última atualização: 2026-11-06 (Sessão 10: check `tests` exigido no ruleset)
 
 ## Como usar este arquivo
 

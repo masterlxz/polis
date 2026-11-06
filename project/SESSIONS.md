@@ -2,6 +2,13 @@
 
 Mais recente no topo.
 
+### 2026-11-06 — Sessão 16 (ADR 0007)
+
+- **Pedido**: o dono aceitou registrar o ADR 0007 depois do merge do PR #21 (`4c684ca`).
+- **Feito**: `project/adr/0007-nomes-no-codigo-e-cadastro-de-fontes.md` (nomes em inglês no código e português na interface, tabela de correspondência de termos, estrutura `Source`/`Dataset`/`IngestionRun`, `error_code` fechado, imutabilidade). Só docs.
+- **Não verificado**: o idioma de docstrings, comentários e nomes de teste não foi discutido com o dono (hoje em português); ficou marcado como "não decidido" no ADR. A tabela de termos cobre só o que existe.
+- **Fica**: escolher a próxima fatia (leitor e conector do TSE em duas partes, ou cadastro das 3 fontes reais após o P-15, ou `docker` no `dependabot.yml`); `GLOSSARY.md` do projeto, se o dono quiser (não existe).
+
 ### 2026-11-06 — Sessão 15 (cadastro de fontes e execuções de coleta, PR #21)
 
 - **Pedido**: primeira fatia de domínio da Etapa 0 (plan mode). Escolhas do dono: `Source` + `Dataset` (allowlist no conjunto) e nomes em inglês no código, português na interface.

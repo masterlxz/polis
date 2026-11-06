@@ -1,0 +1,57 @@
+name: Tests
+
+# Lint, formatação e testes do projeto Django (ADR 0006). O job `tests` ainda
+# não é exigido no ruleset protect-main; isso é um PR próprio (P-19).
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_DB: polis
+          POSTGRES_USER: polis
+          POSTGRES_PASSWORD: ci-descartavel
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U polis -d polis"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DJANGO_SECRET_KEY: ci-chave-descartavel-sem-valor
+      POSTGRES_DB: polis
+      POSTGRES_USER: polis
+      POSTGRES_PASSWORD: ci-descartavel
+      POSTGRES_HOST: localhost
+      POSTGRES_PORT: "5432"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Instala o uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.13.6"
+
+      - name: Instala as dependências (lock respeitado)
+        run: uv sync --locked
+
+      - name: Lint
+        run: uv run --locked ruff check .
+
+      - name: Formatação
+        run: uv run --locked ruff format --check .
+
+      - name: Testes
+        run: uv run --locked pytest -v

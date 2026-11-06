@@ -6,7 +6,22 @@ Plataforma aberta de transparência e inteligência cívica: reúne, organiza e 
 
 ## Desenvolvimento
 
-Requer [`uv`](https://docs.astral.sh/uv/) e um PostgreSQL 18. Copie `.env.example` para `.env`, preencha e exporte as variáveis (ou use as do CI como referência em `.github/workflows/tests.yml`).
+### Com Docker Compose (recomendado)
+
+Requer Docker com o plugin Compose. Copie `.env.example` para `.env` e preencha ao menos `DJANGO_SECRET_KEY` e `POSTGRES_PASSWORD` (sem eles o Compose recusa subir).
+
+```bash
+docker compose up -d --wait db          # PostgreSQL 18, só em 127.0.0.1:5432
+docker compose run --rm web python manage.py migrate
+docker compose up web                   # http://127.0.0.1:8000/admin/login/
+docker compose run --rm web pytest      # testes dentro do contêiner
+```
+
+O `Dockerfile` e o `compose.yaml` são só de desenvolvimento; a imagem de produção depende da decisão de hospedagem (P-04).
+
+### Sem Docker
+
+Requer [`uv`](https://docs.astral.sh/uv/) e um PostgreSQL 18. Preencha as variáveis do `.env.example` e exporte-as (o CI em `.github/workflows/tests.yml` serve de referência).
 
 ```bash
 uv sync --locked
@@ -14,7 +29,7 @@ uv run pytest
 uv run ruff check . && uv run ruff format --check .
 ```
 
-Os testes são validados pelo CI (job `tests`). Docker Compose ainda não existe.
+Os testes são validados pelo CI (jobs `tests` e `compose`).
 
 ## Princípios
 

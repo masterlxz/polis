@@ -1,6 +1,6 @@
 # polis: Estado do Projeto
 
-> Última atualização: 2026-11-06 (Sessão 14: PR #17 e faxina)
+> Última atualização: 2026-11-06 (Sessão 15: cadastro de fontes e execuções de coleta)
 
 ## Como usar este arquivo
 

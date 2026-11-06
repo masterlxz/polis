@@ -1,6 +1,6 @@
 import pytest
 from django.core.exceptions import ValidationError
-from django.db import IntegrityError, transaction
+from django.db import DataError, IntegrityError, transaction
 from django.db.models import ProtectedError
 from django.utils import timezone
 
@@ -139,7 +139,8 @@ def test_execucao_com_sucesso_valida_e_aceita():
     ids=["vazio", "curto", "longo", "maiusculo", "nao-hex", "espaco"],
 )
 def test_execucao_com_sucesso_exige_sha256_valido(hash_invalido):
-    with pytest.raises(IntegrityError), transaction.atomic():
+    # Hash longo demais é barrado pelo tipo da coluna (DataError); os demais, pela restrição.
+    with pytest.raises((IntegrityError, DataError)), transaction.atomic():
         make_run(**succeeded_run_kwargs(sha256_original=hash_invalido))
 
 

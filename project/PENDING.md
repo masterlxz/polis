@@ -19,7 +19,6 @@ Decisões em aberto, vindas do PRD §18 (nome e licença já decididos: ADR 0001
 | P-16 | Interpretações jurídicas que exijam validação especializada | LGPD e dados de processos judiciais |
 | P-17 | Identidade visual, linguagem da marca e domínio | O nome polis tem homônimo conhecido (`pol.is`), ver ADR 0001 |
 | P-18 | Design e navegação definitivos | |
-| P-19 | CI de testes e `dependabot.yml` | Job `tests` criado na Sessão 9 (PR #14) e exigido no ruleset na Sessão 10. `dependabot.yml` criado na Sessão 11; **falta conferir depois do merge** que o Dependabot leu o arquivo sem erro (aba Dependabot e runs "Dependabot Updates"), e então fechar o P-19. Security updates já ligados (Sessão 2) |
 
 ## Resolvidas
 
@@ -32,4 +31,5 @@ Decisões em aberto, vindas do PRD §18 (nome e licença já decididos: ADR 0001
 | P-03 | Estrutura final do repositório | Monorepo (o próprio `polis`), ADR 0006 |
 | P-05 | Banco de dados e tecnologias complementares | PostgreSQL 18, único banco da Etapa 1, ADR 0006. Busca textual segue no P-06 |
 | P-12 | Política de retenção e minimização de dados pessoais | ADR 0005: allowlist de colunas por fonte, sem CPF nem título, nome civil e data completa só internos, lápide para retirada pela fonte, bruto filtrado com 3 cargas. Validação jurídica segue no P-16 |
+| P-19 | CI de testes e `dependabot.yml` | Job `tests` (PR #14) exigido no ruleset (Sessão 10); `dependabot.yml` (PR #16) com security updates já ligados (Sessão 2). Conferido em 2026-11-06 que o Dependabot leu o arquivo: os runs `uv` e `github_actions` terminaram com sucesso e abriram o PR #17. Exceção ao ADR 0006 do workspace, confirmada pelo dono. Docker Compose não era parte do P-19 |
 | P-01 | Política de contribuição: CLA ou DCO | DCO, ADR 0004. `CONTRIBUTING.md` e job `dco` no CI feitos e `dco` exigido no ruleset (Sessão 2, partes 3 e 4). PR externo de código já pode ser aceito do ponto de vista da política |

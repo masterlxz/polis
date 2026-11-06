@@ -1,6 +1,6 @@
 # polis: Estado do Projeto
 
-> Última atualização: 2026-11-06 (Sessão 15: cadastro de fontes e execuções de coleta)
+> Última atualização: 2026-11-06 (Sessão 16: ADR 0007)
 
 ## Como usar este arquivo
 

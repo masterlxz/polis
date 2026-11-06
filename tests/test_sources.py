@@ -173,7 +173,9 @@ def test_execucao_com_falha_e_codigo_de_erro_e_aceita():
 
 
 def test_codigo_de_erro_fora_do_conjunto_fechado_e_recusado():
-    run = make_run(
+    run = IngestionRun(
+        dataset=make_dataset(),
+        source_url="https://example.org/consulta_cand.zip",
         state=IngestionRun.State.FAILED,
         finished_at=timezone.now(),
         error_code="Traceback: linha com 123.456.789-09",

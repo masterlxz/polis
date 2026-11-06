@@ -2,6 +2,14 @@
 
 Mais recente no topo.
 
+### 2026-11-06 — Sessão 14 (PR #17 do Dependabot e faxina)
+
+- **Pedido**: decidir o PR #17 e fazer a faxina (README e branch do spike).
+- **Feito**: li as release notes do `actions/checkout` (v4 → v7) e do `astral-sh/setup-uv` (v6 → v7) por um subagente de leitura; o único breaking relevante do `checkout` (bloqueio de PR de fork em `pull_request_target`/`workflow_run`) não nos afeta, e o do `setup-uv` (Node 24) "just works" em runner hospedado. O dono mesclou o #17 (`300ff93`); `Tests`, `Compose` e `CI Private Files` verdes na `main` depois. Seção "Contribuições" do README corrigida (DCO, `CONTRIBUTING.md`). Branch `spike/ingestao-python` apagada (remota e local) com autorização do dono, depois de conferir que `refs/pull/12/head` guarda o mesmo commit (`c758f78`).
+- **Não verificado**: o changelog do github.blog sobre o breaking do `checkout` não foi lido; o `setup-uv` está na v10 e o bot propôs a v7 (motivo desconhecido; da v8 em diante não há tag flutuante `@v8`, o que afeta as próximas propostas do bot).
+- **Nota sobre o ADR 0006**: o texto diz que o spike "fica só na branch e no PR #12 fechado"; agora ele fica só no PR #12 (`refs/pull/12/head`). Não editei o ADR.
+- **Fica**: ecossistema `docker` no `dependabot.yml` (com `ignore` do Python 3.15); exigir ou não o check `compose` no ruleset (recomendo não exigir); modelo de dados e cadastro de fontes (próxima fase, em plan mode); imagem de produção (P-04).
+
 ### 2026-11-06 — Sessão 13 (Docker Compose de desenvolvimento, PR #19)
 
 - **Pedido**: criar o Docker Compose da Etapa 0 técnica (plan mode). Escolhas do dono: `db` + `web` com Dockerfile de desenvolvimento, e job `compose` no CI.

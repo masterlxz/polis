@@ -50,4 +50,4 @@ Copyright (C) 2026 Fabio Anjos Junior.
 
 ## Contribuições
 
-Ainda não aceitamos contribuições de código. Antes disso é preciso decidir a política de contribuição (CLA ou DCO). Issues com sugestões e correções de documentação são bem-vindas.
+Contribuições de código são aceitas sob o DCO ([ADR 0004](project/adr/0004-dco-para-contribuicoes.md)): cada commit precisa de `Signed-off-by`. O passo a passo está no [`CONTRIBUTING.md`](CONTRIBUTING.md). Issues com sugestões e correções de documentação também são bem-vindas.

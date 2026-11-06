@@ -66,7 +66,7 @@ jobs:
           DJANGO_SECRET_KEY: descartavel
         run: |
           docker compose up -d web
-          curl --retry 20 --retry-delay 2 --retry-connection-refused --retry-all-errors \
+          curl --retry 20 --retry-delay 2 --retry-all-errors \
             -fsS -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8000/admin/login/
 
       - name: Logs em caso de falha

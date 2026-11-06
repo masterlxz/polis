@@ -2,6 +2,13 @@
 
 Mais recente no topo.
 
+### 2026-11-06 — Sessão 20 (ADR 0008, regras por fonte)
+
+- **Pedido**: escrever o ADR do P-15. Recomendei esperar as Portarias do TSE; o dono preferiu seguir. Escolhas do dono: TSE sem `license_id` **não é coletado** até haver licença; **atribuição uniforme** em toda fonte.
+- **Feito**: `project/adr/0008-regras-por-fonte.md` (portão de licença por conjunto, falha fechada se a licença mudar, atribuição uniforme, `User-Agent` honesto, etiqueta de rede com 429/503 recuando e 403 parando sem contornar, agendamento, canal, o que fica no P-16). Só docs.
+- **Não verificado**: as decisões 1 a 3 foram escritas sem o texto das Portarias TSE 93 e 525/2021 e dos termos do TSE (403); o ADR diz que será revisto se elas contradisserem. Valores (3 s, 08:00 GMT) vêm de medições de um dia só.
+- **Fica**: campos de licença no `Dataset` e códigos `blocked`/`license` no `error_code` (ficam para o conector, em plan mode); leitura humana das Portarias; P-15 só fecha com ela.
+
 ### 2026-11-06 — Sessão 19 (P-15: leitura do Ato da Mesa 45/2012 e dos termos da Câmara)
 
 - **Pedido**: seguir com o P-15.

@@ -328,12 +328,23 @@ def test_registro_multilinha_so_e_aceito_com_a_opcao_explicita(tmp_path):
 # --- Erros sem contexto nem variáveis com dado pessoal (revisão adversária, C2) ---
 
 
-def test_erro_de_crc_nao_carrega_contexto_nem_variaveis_com_o_canario(tmp_path):
+def zip_with_corrupted_crc(tmp_path):
+    """Montado aqui para o canário não ficar em variável local do teste (aparece no traceback)."""
     data = csv_bytes(CPF_HEADER, [["1", "MARCADOR-CRC-UNICO", "PT", CANARY]])
     zip_path = build_zip(tmp_path / "a.zip", {"a.csv": data}, compression=zipfile.ZIP_STORED)
     raw = bytearray(zip_path.read_bytes())
     raw[raw.find(b"MARCADOR-CRC-UNICO")] ^= 0x01
     zip_path.write_bytes(bytes(raw))
+    return zip_path
+
+
+def zip_with_long_line_after_canary_row(tmp_path):
+    rows = [["1", "ANA", "PT", CANARY], ["2", "BIA", "PT", CANARY * 20]]
+    return canary_zip(tmp_path, csv_bytes(CPF_HEADER, rows))
+
+
+def test_erro_de_crc_nao_carrega_contexto_nem_variaveis_com_o_canario(tmp_path):
+    zip_path = zip_with_corrupted_crc(tmp_path)
     with pytest.raises(InvalidFormatError) as info:
         list(ZipCsvReader(zip_path, ALLOW).rows())
     assert info.value.__context__ is None
@@ -342,8 +353,7 @@ def test_erro_de_crc_nao_carrega_contexto_nem_variaveis_com_o_canario(tmp_path):
 
 
 def test_linha_acima_do_limite_nao_deixa_o_canario_no_traceback(tmp_path):
-    rows = [["1", "ANA", "PT", CANARY], ["2", "BIA", "PT", CANARY * 20]]
-    zip_path = canary_zip(tmp_path, csv_bytes(CPF_HEADER, rows))
+    zip_path = zip_with_long_line_after_canary_row(tmp_path)
     with pytest.raises(InvalidFormatError) as info:
         list(ZipCsvReader(zip_path, ALLOW, max_line_chars=120).rows())
     assert CANARY not in str(info.value) + traceback_text(info.value)
@@ -413,12 +423,12 @@ def test_nome_de_item_com_quebra_de_linha_nao_injeta_linha_no_log(tmp_path):
 
 
 def test_item_protegido_por_senha_falha(tmp_path):
-    zip_path = tmp_path / "a.zip"
-    with zipfile.ZipFile(zip_path, "w") as zf:
-        info = zipfile.ZipInfo("a.csv")
-        info.flag_bits |= 0x1
-        zf.writestr(info, csv_bytes(ALLOW, [["1", "ANA", "PT"]]))
-    with pytest.raises(InvalidFormatError):
+    zip_path = build_zip(tmp_path / "a.zip", {"a.csv": csv_bytes(ALLOW, [["1", "ANA", "PT"]])})
+    raw = bytearray(zip_path.read_bytes())
+    raw[raw.find(b"PK\x03\x04") + 6] |= 0x1  # bit de criptografia no cabeçalho local
+    raw[raw.find(b"PK\x01\x02") + 8] |= 0x1  # e no diretório central (o que o leitor consulta)
+    zip_path.write_bytes(bytes(raw))
+    with pytest.raises(InvalidFormatError, match="senha"):
         next(ZipCsvReader(zip_path, ALLOW).rows())
 
 

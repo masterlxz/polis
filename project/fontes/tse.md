@@ -197,7 +197,11 @@ python3 -I -c "import zipfile,sys;sys.stdout.buffer.write(zipfile.ZipFile('c26.z
 A medição de 2024 (CPF constante de 2 caracteres) foi feita lendo o fim e o começo do ZIP de 64,7 MB por `Range`, com um script descartável não versionado; para reproduzir sem ele, baixe o ZIP inteiro e use o mesmo `awk` sobre `consulta_cand_2024_TO.csv`.
 
 ## Estado da integração
-Nenhuma. Histórico de sincronizações: não se aplica ainda.
+Cadastrada (Sessão 26), **sem coleta ainda**. `manage.py seed_sources` cria a `Source` `tse` (status `measured`) e o `Dataset` `consulta-cand-2026` (`enabled=False`, licença `declared` cc-by) a partir de `apps/sources/catalog.py`. Histórico de sincronizações: nenhum.
+
+**Allowlist (34 das 50 colunas de `consulta_cand`, decisão do dono, ADR 0005):** ficam de fora `NR_CPF_CANDIDATO`, `NR_TITULO_ELEITORAL_CANDIDATO`, `DS_EMAIL` (decisão 1); `CD_`/`DS_` de gênero, grau de instrução, estado civil, cor/raça e ocupação (decisão 4); e `NM_CANDIDATO`, `DT_NASCIMENTO`, `SG_UF_NASCIMENTO` (ainda sem uso, sem ligação entre fontes). Nenhuma coluna interna.
+
+**Primeira carga real (só o dono, uma requisição):** (1) `python manage.py seed_sources`; (2) no admin, pôr a fonte `tse` em `integrating` e habilitar o conjunto; (3) `python manage.py ingest_dataset tse/consulta-cand-2026`. O cabeçalho do ZIP é conferido contra as 34 colunas, e qualquer diferença falha a carga inteira (`schema`), sem gravar nada. Um 403 pausa a fonte (ADR 0008, decisão 5).
 
 ## Ainda não medido nesta rodada
 Se o CPF de 2026 aparece em todas as UFs e se continua assim depois de novas gerações; o conteúdo e a cobertura de bens, doações, fornecedores e extratos bancários; os arquivos de eleitorado, boletim de urna (conteúdo), resultados (conteúdo) e pesquisas eleitorais; o `leiame.pdf`; as Portarias 93/2021 e 525/2021; outros canais do TSE (resultados em tempo real, DivulgaCand); DataStore do CKAN; limite real por IP ou por taxa; contagem total de linhas por arquivo; tamanho descomprimido total dos pacotes; eleições anteriores a 2024.

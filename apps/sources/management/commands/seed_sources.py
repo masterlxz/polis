@@ -13,7 +13,7 @@ SOURCE_DESCRIPTIVE = (
     "terms_url",
     "license_note",
 )
-DATASET_DESCRIPTIVE = ("name", "url", "format", "allowed_columns", "internal_columns", "license_id")
+DATASET_DESCRIPTIVE = ("name", "url", "format", "allowed_columns", "internal_columns")
 DATASET_ON_CREATION = ("license_basis", "license_id", "license_url")
 
 
@@ -57,7 +57,7 @@ class Command(BaseCommand):
         obj, created = model.objects.get_or_create(**lookup, defaults=defaults)
         if created:
             return True, False
-        changed = [name for name, value in values.items() if getattr(obj, name) != value]
+        changed = [name for name, value in values.items() if getattr(obj, name) is None]
         for name in changed:
             setattr(obj, name, values[name])
         if changed:

@@ -106,7 +106,7 @@ def _same_as_last_load(dataset, sha256):
         .values_list("sha256_original", flat=True)
         .first()
     )
-    return last == "nunca-igual" + sha256[:0]
+    return last is None
 
 
 def _load(dataset, run, path, fields, batch_size, keep_loads):

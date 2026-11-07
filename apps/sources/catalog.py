@@ -63,8 +63,7 @@ DATASETS = [
         "slug": "consulta-cand-2026",
         "name": "Consulta de candidatos 2026",
         "url": (
-            "https://cdn.tse.jus.br/estatistica/sead/odsele/consulta_cand/"
-            "consulta_cand_2026.zip"
+            "https://cdn.tse.jus.br/estatistica/sead/odsele/consulta_cand/consulta_cand_2026.zip"
         ),
         "format": "zip_csv",
         "allowed_columns": [

@@ -234,3 +234,28 @@ class IngestionRun(models.Model):
             if anterior is not None and anterior != self.State.RUNNING:
                 raise ValueError("Execução concluída é imutável.")
         super().save(*args, **kwargs)
+
+
+class RawRecord(models.Model):
+    """Linha da camada bruta filtrada (ADR 0005, decisão 5): só as colunas permitidas.
+
+    Guarda o que o leitor devolveu, nada além da allowlist do conjunto. Pode ter colunas
+    internas (nome civil, data de nascimento); nunca é exposta. Só as 3 últimas cargas por
+    conjunto ficam (decisão 11); a história vive no modelo normalizado.
+    """
+
+    run = models.ForeignKey(
+        IngestionRun,
+        on_delete=models.PROTECT,
+        related_name="raw_records",
+        verbose_name="execução de coleta",
+    )
+    item_name = models.CharField("item do arquivo", max_length=255)
+    values = models.JSONField("valores", default=dict)
+
+    class Meta:
+        verbose_name = "registro bruto"
+        verbose_name_plural = "registros brutos"
+
+    def __str__(self):
+        return f"{self.run_id}/{self.item_name}"

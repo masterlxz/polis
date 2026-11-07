@@ -100,11 +100,14 @@ def test_carga_grava_as_linhas_e_fecha_a_execucao_com_sucesso():
     assert run.etag == '"abc"'
     assert run.source_url == dataset.url
     assert run.finished_at is not None
-    gravados = {(r.item_name, tuple(r.values.items())) for r in RawRecord.objects.filter(run=run)}
+    gravados = {
+        (r.item_name, r.values["SQ_CANDIDATO"], r.values["NM_URNA_CANDIDATO"], len(r.values))
+        for r in RawRecord.objects.filter(run=run)
+    }
     assert gravados == {
-        ("cand_AC.csv", (("SQ_CANDIDATO", "1"), ("NM_URNA_CANDIDATO", "ANA"))),
-        ("cand_AC.csv", (("SQ_CANDIDATO", "2"), ("NM_URNA_CANDIDATO", "BIA"))),
-        ("cand_SP.csv", (("SQ_CANDIDATO", "3"), ("NM_URNA_CANDIDATO", "CAIO"))),
+        ("cand_AC.csv", "1", "ANA", 2),
+        ("cand_AC.csv", "2", "BIA", 2),
+        ("cand_SP.csv", "3", "CAIO", 2),
     }
 
 

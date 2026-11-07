@@ -2,6 +2,15 @@
 
 Mais recente no topo.
 
+### 2026-11-07 — Sessão 24 (conector, fatia 2: cliente HTTP com etiqueta de rede)
+
+- **Pedido**: seguir o conector (plan mode). Escolhas do dono: `urllib` da stdlib (sem dependência nova) e recusar todo redirecionamento; aprovou a tabela de testes, 502/504 sem recuo, 4 tentativas e teto de 300 s.
+- **Feito**: `apps/sources/http_client.py` (`PoliteClient`, `DownloadResult`, `DownloadError`, `BlockedError`): `User-Agent` fixo e honesto, só https, 3xx recusado, pausa de 3 s por host, recuo exponencial em 429/503 com `Retry-After` (segundos ou data) e teto, 401/403/451 bloqueiam o host na instância, download atômico em fluxo conferido por `Content-Length` e `max_bytes`, erros só com host e status e sem contexto. 35 testes em `tests/test_http_client.py` contra um servidor HTTP local, com relógio e `sleep` falsos.
+- **Provas (CI, `workflow_dispatch`, sem PR)**: sem implementação, falha de importação; com ela, 158 verdes; seis mutações de propósito (tirar o 403 do bloqueio, não marcar o host, remover a pausa, `min` no lugar de `max` no `Retry-After`, recuo linear, tirar a conferência de `Content-Length`) derrubaram 13 testes, todas pegas; revertidas.
+- **Tropeços**: o `ruff` de py314 exige `except A, B:` sem parênteses (PEP 758); o primeiro CI parou na formatação.
+- **Não verificado**: nenhuma requisição às fontes reais (3 s, 429, redirecionamento dos CDNs: se algum redirecionar, o cliente recusa e aparece no primeiro uso); proxy do ambiente é ignorado; sem filtro de IP privado (a URL vem do cadastro); o teste de timeout e o de servidor inalcançável dependem do comportamento do sistema.
+- **Fica**: fatia 3, ligar cliente, `ZipCsvReader`, `Dataset` e `IngestionRun` (inclui gravar `blocked` e `license`, e a comparação da licença da decisão 2); agendamento com minuto aleatório; cliente de API JSON.
+
 ### 2026-11-07 — Sessão 23 (conector, fatia 1: licença no cadastro)
 
 - **Pedido**: seguir para o conector (plan mode). Escolhas do dono: primeira fatia só a licença no cadastro (as outras duas, cliente HTTP com etiqueta de rede e fluxo ponta a ponta, ficam para depois); `license_basis` como enum.

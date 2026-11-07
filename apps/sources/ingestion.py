@@ -119,7 +119,7 @@ def _load(dataset, run, path, fields, batch_size, keep_loads):
     loaded = 0
     error_code = ""
     try:
-        with transaction.atomic() if False else __import__("contextlib").nullcontext():
+        with transaction.atomic():
             loaded = _store(reader, run, batch_size)
             if reader.rejected_rows:
                 raise _MalformedRows

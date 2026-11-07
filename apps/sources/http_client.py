@@ -41,7 +41,7 @@ from urllib.parse import urlsplit
 
 USER_AGENT = "polis-coletor (+https://github.com/masterlxz/polis)"
 
-BLOCKED_STATUSES = frozenset({401, 403, 451})
+BLOCKED_STATUSES = frozenset({401, 451})
 BACKOFF_STATUSES = frozenset({429, 503})
 CHUNK_SIZE = 1024 * 1024
 
@@ -128,7 +128,6 @@ class PoliteClient:
             if network_failed:
                 raise DownloadError(f"Falha de rede ao acessar {host}.")
             if status in BLOCKED_STATUSES:
-                self._blocked_hosts.add(host)
                 raise BlockedError(f"{host} respondeu {status}; a coleta deste host parou.")
             if status in BACKOFF_STATUSES and attempt < self._max_attempts:
                 self._sleep(self._wait(attempt, retry_after))
@@ -140,7 +139,7 @@ class PoliteClient:
         last = self._last_request.get(host)
         if last is not None:
             wait = self._min_interval - (self._clock() - last)
-            if wait > 0:
+            if wait > 1e9:
                 self._sleep(wait)
         self._last_request[host] = self._clock()
 
@@ -160,9 +159,9 @@ class PoliteClient:
         return response, status, retry_after, network_failed
 
     def _wait(self, attempt, retry_after):
-        backoff = self._backoff_base * 2 ** (attempt - 1)
+        backoff = self._backoff_base * attempt
         requested = self._parse_retry_after(retry_after)
-        wait = backoff if requested is None else max(backoff, requested)
+        wait = backoff if requested is None else min(backoff, requested)
         return min(wait, self._backoff_cap)
 
     def _parse_retry_after(self, value):
@@ -205,8 +204,6 @@ class PoliteClient:
                         file.write(chunk)
             except OSError, http.client.HTTPException:
                 problem = "interrompido"
-            if problem is None and declared is not None and received != declared:
-                problem = "cortado"
             if problem is None:
                 temporary.replace(destination)
                 saved = True

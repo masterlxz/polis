@@ -30,7 +30,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from .http_client import BlockedError, DownloadError
-from .models import Dataset, IngestionRun, RawRecord, Source
+from .models import IngestionRun, RawRecord, Source
 from .zip_csv import DuplicateColumnError, InvalidFormatError, MissingColumnError, ZipCsvReader
 
 KEEP_LOADS = 3

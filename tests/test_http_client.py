@@ -66,7 +66,7 @@ class _Handler(BaseHTTPRequestHandler):
                 self.wfile.write(resposta.body)
                 if tamanho > len(resposta.body):
                     self.close_connection = True
-        except (BrokenPipeError, ConnectionResetError):
+        except BrokenPipeError, ConnectionResetError:
             pass
 
 

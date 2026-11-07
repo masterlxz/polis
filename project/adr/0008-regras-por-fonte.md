@@ -15,7 +15,7 @@ O P-15 pede regras específicas para cada fonte de dados: termos, licenças e li
 
 Este ADR cobre licença, atribuição, etiqueta de rede e agendamento. Quais **colunas** entram, retenção e retirada pela fonte já estão no ADR 0005; o modelo `Source`/`Dataset`/`IngestionRun` está no ADR 0007. A interpretação jurídica (LGPD, redistribuição, uso comercial) continua no P-16 e não está validada.
 
-**Lacunas de leitura quando este ADR foi escrito:** as Portarias TSE nº 93/2021 e nº 525/2021 e os termos de uso do TSE não foram lidos (HTTP 403, recusa do servidor). A documentação da API do Senado (Swagger por JavaScript) também não. As decisões 1 a 3 valem com essas lacunas e devem ser reconferidas quando o texto das Portarias for lido.
+**Lacunas de leitura quando este ADR foi escrito:** as Portarias TSE nº 93/2021 e nº 525/2021 e os termos de uso do TSE não foram lidos (HTTP 403, recusa do servidor). A documentação da API do Senado (Swagger por JavaScript) também não. As decisões 1 a 3 valem com essas lacunas e devem ser reconferidas quando o texto das Portarias for lido. **Reconferido em 2026-11-07:** as três foram lidas e não contradizem as decisões (ver Consequências).
 
 ## Decisão
 
@@ -46,5 +46,5 @@ Este ADR cobre licença, atribuição, etiqueta de rede e agendamento. Quais **c
 - O `error_code` fechado do `IngestionRun` (ADR 0007) não tem um código para "bloqueado pela fonte" nem "licença mudou"; o conector vai precisar acrescentar um ou dois (`blocked`, `license`). Isso exige alterar a lista fechada e a `CheckConstraint`, com migração.
 - A interface e a API pública precisam de um componente de atribuição por fonte antes de qualquer tela pública.
 - O conector precisa de limitador de taxa, recuo, identificação e agendamento aleatório; testes de contrato cobrem 429, 503 e 403 com respostas simuladas, sem rede.
-- **O P-15 só fecha por inteiro quando as Portarias TSE 93 e 525/2021 e os termos de uso do TSE forem lidos.** Se elas disserem algo que contradiga as decisões 1 a 3, este ADR é revisto.
+- **Leituras que faltavam (feitas em 2026-11-07, texto colado pelo dono):** a Portaria TSE 93/2021 define dados abertos como os sob "licença aberta" com atribuição como única condição, sem nomear licença; a 525/2021 só aprova o plano (o Anexo não foi lido, vigência encerrada); a Política de Privacidade do TSE não trata de reuso. Nenhuma contradiz as decisões 1 a 3; a 93 apoia as decisões 1 e 3. Detalhes em `fontes/tse.md`. Os textos vieram de cópia manual e a página da 93 avisa que não substitui o DJE-TSE. Se um texto oficial contradisser as decisões, este ADR é revisto.
 - Os valores numéricos (3 s, 08:00 GMT, `itens` ≤ 100) vêm de medições de um dia só e são iniciais.

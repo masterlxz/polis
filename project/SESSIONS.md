@@ -2,6 +2,14 @@
 
 Mais recente no topo.
 
+### 2026-11-07 — Sessão 22 (P-15: Portarias do TSE e fechamento)
+
+- **Pedido**: seguir com o P-15, que só tinha pendente a leitura das Portarias TSE 93 e 525/2021 e dos termos do TSE.
+- **Feito**: tentei ler pelo Chrome com autorização explícita do dono; a extensão bloqueou `www.tse.jus.br` ("blocked by your site permissions") e **não contornei**. O dono copiou os textos à mão: Política de Privacidade do TSE (versão 1, 02/08/2021), Portaria 93/2021 e Portaria 525/2021. `fontes/tse.md`, ADR 0008 (nota de reconferência) e `PENDING.md` atualizados; **P-15 movido para Resolvidas**.
+- **Achado**: a Portaria 93 define "dados abertos" como sob "licença aberta" com atribuição como única condição, sem nomear licença; isso apoia o portão de licença (decisão 1) e a atribuição uniforme (decisão 3). A política de privacidade não trata de reuso (fala em dados "anonimizados" para pesquisadores, o que reforça descartar o CPF). A 525 só aprova o plano. Nada contradiz o ADR 0008.
+- **Não verificado**: o Anexo da 525 (Plano de Dados Abertos 2021-2023, dispensado); a Portaria 404/2021; os textos vieram de cópia manual (a página da 93 diz que não substitui o DJE-TSE); a contradição do CPF de 2026 segue sem explicação.
+- **Fica**: conector (campos de licença no `Dataset`, códigos `blocked`/`license`), em plan mode; P-16 (CPF de 2026 e uso comercial).
+
 ### 2026-11-06 — Sessão 21 (P-15: leiame do TSE, licenças e especificação do Senado)
 
 - **Pedido**: fechar os itens menores do P-15 que não exigem navegador.

@@ -12,8 +12,8 @@ class SourceAdmin(admin.ModelAdmin):
 
 @admin.register(Dataset)
 class DatasetAdmin(admin.ModelAdmin):
-    list_display = ["__str__", "format", "enabled"]
-    list_filter = ["enabled", "format", "source"]
+    list_display = ["__str__", "format", "license_basis", "enabled"]
+    list_filter = ["enabled", "license_basis", "format", "source"]
     search_fields = ["slug", "name"]
 
 

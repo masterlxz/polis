@@ -2,6 +2,15 @@
 
 Mais recente no topo.
 
+### 2026-11-07 — Sessão 23 (conector, fatia 1: licença no cadastro)
+
+- **Pedido**: seguir para o conector (plan mode). Escolhas do dono: primeira fatia só a licença no cadastro (as outras duas, cliente HTTP com etiqueta de rede e fluxo ponta a ponta, ficam para depois); `license_basis` como enum.
+- **Feito**: `Dataset.license_basis` (`none`, `declared`, `owner_decision`), `license_id`, `license_url`, `license_justification`; `CheckConstraint` `dataset_enabled_requires_license_basis`; `clean()` com mensagens em português (também barra justificativa só com espaços); `IngestionRun.ErrorCode` com `blocked` e `license`; admin lista e filtra pela base; migração `0002` **escrita à mão** (sem `uv` local) e um teste (`test_nao_ha_migracao_pendente`) que confere que o modelo e as migrações não se afastam. 14 testes novos (contando os 2 casos parametrizados).
+- **Provas (CI, `workflow_dispatch` na branch, sem PR)**: testes sem implementação, 14 vermelhos pelo motivo esperado (`AttributeError`); com implementação, 115 verdes; mutação de propósito (tirar a exigência de justificativa na constraint e o `strip()`) derrubou exatamente 2 testes; revertida, 115 verdes.
+- **Tropeços**: o primeiro CI parou na formatação (`ruff format`); o helper de teste pôs licença `declared` no caso `owner_decision` e quebrou 1 teste; um `git revert -q` falhou e o `--amend` seguinte reescreveu o commit errado (só local, descartado antes de publicar).
+- **Não verificado**: a migração não foi gerada pelo Django (escrita à mão); rodou só em banco vazio no CI (sem dado habilitado preexistente).
+- **Fica**: cliente HTTP com etiqueta de rede (decisão da biblioteca: `urllib` ou `httpx`), depois o fluxo que liga leitor, `Dataset` e `IngestionRun`; comparação da licença entre coletas (decisão 2).
+
 ### 2026-11-07 — Sessão 22 (P-15: Portarias do TSE e fechamento)
 
 - **Pedido**: seguir com o P-15, que só tinha pendente a leitura das Portarias TSE 93 e 525/2021 e dos termos do TSE.

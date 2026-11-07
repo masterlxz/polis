@@ -1,5 +1,6 @@
 import pytest
 from django.core.exceptions import ValidationError
+from django.core.management import call_command
 from django.db import DataError, IntegrityError, transaction
 from django.db.models import ProtectedError
 from django.utils import timezone
@@ -24,6 +25,12 @@ def make_source(slug="tse", **kwargs):
 
 def make_dataset(source=None, slug="consulta-cand", **kwargs):
     kwargs.setdefault("allowed_columns", ["SQ_CANDIDATO", "NM_URNA_CANDIDATO"])
+    if kwargs.get("enabled"):
+        # Os testes que não tratam do portão de licença habilitam com licença válida,
+        # para que a falha deles seja só da regra que testam.
+        base = kwargs.setdefault("license_basis", Dataset.LicenseBasis.DECLARED)
+        if base == Dataset.LicenseBasis.DECLARED:
+            kwargs.setdefault("license_id", "cc-by")
     return Dataset.objects.create(
         source=source or make_source(),
         slug=slug,
@@ -104,6 +111,91 @@ def test_mesmo_slug_em_fontes_diferentes_e_aceito():
     make_dataset(source=make_source("senado"), slug="votos")
 
 
+# --- Dataset: portão de licença por conjunto (ADR 0008, decisão 1) ---
+
+
+def test_conjunto_habilitado_sem_base_de_licenca_e_recusado():
+    with pytest.raises(IntegrityError), transaction.atomic():
+        make_dataset(enabled=True, license_basis=Dataset.LicenseBasis.NONE)
+
+
+def test_conjunto_habilitado_com_licenca_declarada_e_aceito():
+    dataset = make_dataset(
+        enabled=True,
+        license_basis=Dataset.LicenseBasis.DECLARED,
+        license_id="cc-by",
+        license_url="http://www.opendefinition.org/licenses/cc-by",
+    )
+    assert dataset.enabled is True
+
+
+def test_conjunto_habilitado_com_licenca_declarada_sem_identificador_e_recusado():
+    with pytest.raises(IntegrityError), transaction.atomic():
+        make_dataset(enabled=True, license_basis=Dataset.LicenseBasis.DECLARED, license_id="")
+
+
+def test_conjunto_habilitado_por_decisao_do_dono_com_justificativa_e_aceito():
+    dataset = make_dataset(
+        enabled=True,
+        license_basis=Dataset.LicenseBasis.OWNER_DECISION,
+        license_justification="Fonte não declara licença; dono decidiu coletar em 2026-11-07.",
+    )
+    assert dataset.license_id == ""
+
+
+def test_conjunto_habilitado_por_decisao_do_dono_sem_justificativa_e_recusado():
+    with pytest.raises(IntegrityError), transaction.atomic():
+        make_dataset(
+            enabled=True,
+            license_basis=Dataset.LicenseBasis.OWNER_DECISION,
+            license_justification="",
+        )
+
+
+def test_conjunto_sem_licenca_nao_habilitado_e_aceito():
+    dataset = make_dataset(enabled=False)
+    assert dataset.license_basis == Dataset.LicenseBasis.NONE
+
+
+def test_licenca_na_fonte_nao_habilita_o_conjunto():
+    fonte = make_source(license_note="CC BY nos metadados do portal")
+    with pytest.raises(IntegrityError), transaction.atomic():
+        make_dataset(source=fonte, enabled=True, license_basis=Dataset.LicenseBasis.NONE)
+
+
+def test_validacao_do_formulario_recusa_habilitar_sem_licenca():
+    dataset = make_dataset(enabled=False)
+    dataset.enabled = True
+    with pytest.raises(ValidationError) as erro:
+        dataset.full_clean()
+    assert "license_basis" in erro.value.message_dict
+
+
+def test_validacao_do_formulario_recusa_justificativa_so_com_espacos():
+    dataset = make_dataset(
+        enabled=False,
+        license_basis=Dataset.LicenseBasis.OWNER_DECISION,
+        license_justification="   ",
+    )
+    dataset.enabled = True
+    with pytest.raises(ValidationError) as erro:
+        dataset.full_clean()
+    assert "license_justification" in erro.value.message_dict
+
+
+def test_base_de_licenca_fora_do_conjunto_fechado_e_recusada():
+    dataset = make_dataset(license_basis="qualquer-coisa")
+    with pytest.raises(ValidationError):
+        dataset.full_clean()
+
+
+# --- Migrações: o modelo e as migrações não se afastam ---
+
+
+def test_nao_ha_migracao_pendente():
+    call_command("makemigrations", "--check", "--dry-run", verbosity=0)
+
+
 # --- PROTECT: o histórico não some (PRD §9.1) ---
 
 
@@ -171,6 +263,17 @@ def test_execucao_com_falha_e_codigo_de_erro_e_aceita():
         error_code=IngestionRun.ErrorCode.SCHEMA,
     )
     assert run.error_code == "schema"
+
+
+@pytest.mark.parametrize("codigo", ["blocked", "license"])
+def test_execucao_com_falha_aceita_codigos_de_bloqueio_e_de_licenca(codigo):
+    run = make_run(
+        state=IngestionRun.State.FAILED,
+        finished_at=timezone.now(),
+        error_code=codigo,
+    )
+    run.full_clean()
+    assert run.error_code == codigo
 
 
 def test_codigo_de_erro_fora_do_conjunto_fechado_e_recusado():
@@ -250,6 +353,13 @@ def test_admin_mostra_execucao_somente_leitura(admin_client):
     run.refresh_from_db()
     assert resposta.status_code in (200, 403)
     assert run.rows_read == 10
+
+
+def test_admin_lista_conjuntos_com_a_base_de_licenca(admin_client):
+    make_dataset(enabled=True, license_basis=Dataset.LicenseBasis.DECLARED, license_id="cc-by")
+    resposta = admin_client.get("/admin/sources/dataset/")
+    assert resposta.status_code == 200
+    assert "Declarada pela fonte" in resposta.content.decode()
 
 
 def test_admin_edita_fonte_e_conjunto(admin_client):

@@ -83,7 +83,6 @@ DATASETS = [
             "CD_CARGO",
             "DS_CARGO",
             "SQ_CANDIDATO",
-            "NR_CPF_CANDIDATO",
             "NR_CANDIDATO",
             "NM_URNA_CANDIDATO",
             "NM_SOCIAL_CANDIDATO",

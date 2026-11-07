@@ -13,7 +13,7 @@ SOURCE_DESCRIPTIVE = (
     "terms_url",
     "license_note",
 )
-DATASET_DESCRIPTIVE = ("name", "url", "format", "allowed_columns", "internal_columns", "license_id")
+DATASET_DESCRIPTIVE = ("name", "url", "format", "allowed_columns", "internal_columns")
 DATASET_ON_CREATION = ("license_basis", "license_id", "license_url")
 
 
@@ -54,8 +54,6 @@ class Command(BaseCommand):
     def _upsert(model, lookup, definition, descriptive, on_creation):
         values = {name: definition[name] for name in descriptive}
         defaults = {**values, **{name: definition[name] for name in on_creation}}
-        if model is Dataset:
-            defaults["enabled"] = True
         obj, created = model.objects.get_or_create(**lookup, defaults=defaults)
         if created:
             return True, False

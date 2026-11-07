@@ -57,7 +57,7 @@ class Command(BaseCommand):
         obj, created = model.objects.get_or_create(**lookup, defaults=defaults)
         if created:
             return True, False
-        changed = [name for name, value in values.items() if getattr(obj, name) is None]
+        changed = [name for name, value in values.items() if getattr(obj, name) != value]
         for name in changed:
             setattr(obj, name, values[name])
         if changed:

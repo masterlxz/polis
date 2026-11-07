@@ -2,6 +2,15 @@
 
 Mais recente no topo.
 
+### 2026-11-07 — Sessão 26 (cadastro inicial: 3 fontes e o primeiro conjunto)
+
+- **Pedido**: cadastrar as fontes e o primeiro `Dataset` (plan mode). Escolhas do dono: allowlist **mínima, 34 colunas** (sem CPF, título, e-mail, demográficos, nem nome civil, data e UF de nascimento), 3 fontes + 1 conjunto do TSE, e comando `seed_sources` (descartados: migração de dados, que colide com os testes, e cadastro só pelo admin).
+- **Feito**: `apps/sources/catalog.py` (definições: fontes TSE, Câmara e Senado com termos e nota de licença lidos em `fontes/*.md`; `Dataset` `consulta-cand-2026` com licença `declared` cc-by) e `seed_sources` (idempotente; atualiza só campos descritivos; nunca muda `status`, `enabled`, `notes` nem a licença registrada). 19 testes em `tests/test_catalog.py`, incluindo o contrato da allowlist contra o esquema medido de 50 colunas e a exclusão das 16 colunas sensíveis.
+- **Provas (CI, `workflow_dispatch`)**: sem implementação, falha de importação; com ela, 203 verdes; mutações de propósito pegas: CPF na allowlist (2 testes), conjunto nascendo habilitado (1), seed que nunca atualiza (2). **Uma mutação sobreviveu** (o seed reescrevendo o `license_id`): lacuna do meu teste, que só checava a base e a justificativa; reforçado (`license_id` e `license_url`) e a mutação passou a ser pega.
+- **Tropeços**: o `ruff format` quis a URL do conjunto numa linha só dentro dos parênteses; o commit do teste reforçado carregou uma mutação, então o desfazer foi à mão (e o código final foi conferido idêntico ao validado).
+- **Não verificado**: o cabeçalho real do ZIP contra as 34 colunas (só na primeira carga); o `license_id` do conjunto de candidatos de 2026 foi inferido de "14 de 16 com cc-by, exceto comparecimento e logs" (`fontes/tse.md`), não lido do CKAN por conjunto; nenhuma requisição.
+- **Fica**: a primeira carga real, só pelo dono (passo a passo em `fontes/tse.md`); cliente de API JSON do CKAN e comparação da licença; agendamento; normalização.
+
 ### 2026-11-07 — Sessão 25 (conector, fatia 3: carga de um Dataset)
 
 - **Pedido**: ligar cliente, leitor, `Dataset` e `IngestionRun` (plan mode). Escolhas do dono: destino numa tabela `RawRecord` (a camada bruta do ADR 0005, decisão 5) e tolerância zero a linhas rejeitadas; aprovou `Source.paused` como trava do bloqueio e execução "arquivo igual" como `succeeded` com 0 linhas.

@@ -61,6 +61,11 @@ class Dataset(models.Model):
         XML = "xml", "XML"
         OTHER = "other", "Outro"
 
+    class LicenseBasis(models.TextChoices):
+        NONE = "none", "Sem licença"
+        DECLARED = "declared", "Declarada pela fonte"
+        OWNER_DECISION = "owner_decision", "Decisão do dono"
+
     source = models.ForeignKey(
         Source, on_delete=models.PROTECT, related_name="datasets", verbose_name="fonte"
     )
@@ -82,8 +87,29 @@ class Dataset(models.Model):
         verbose_name="colunas internas",
         help_text="Subconjunto das permitidas que nunca é exposto (interface e API).",
     )
+    license_basis = models.CharField(
+        "base da licença",
+        max_length=20,
+        choices=LicenseBasis,
+        default=LicenseBasis.NONE,
+        help_text="Licença é do conjunto, não da fonte (ADR 0008, decisão 1).",
+    )
+    license_id = models.CharField(
+        "identificador da licença",
+        max_length=100,
+        blank=True,
+        help_text="Como a fonte declara (por exemplo, o license_id do CKAN do TSE).",
+    )
+    license_url = models.URLField("endereço da licença", max_length=500, blank=True)
+    license_justification = models.TextField(
+        "justificativa do dono",
+        blank=True,
+        help_text="Obrigatória na decisão do dono: por que coletar sem licença declarada.",
+    )
     enabled = models.BooleanField(
-        "habilitado", default=False, help_text="Só pode ser habilitado com colunas permitidas."
+        "habilitado",
+        default=False,
+        help_text="Só pode ser habilitado com colunas permitidas e base de licença.",
     )
 
     class Meta:
@@ -98,6 +124,12 @@ class Dataset(models.Model):
                 condition=Q(enabled=False) | Q(allowed_columns__len__gt=0),
                 name="dataset_enabled_requires_allowed_columns",
             ),
+            models.CheckConstraint(
+                condition=Q(enabled=False)
+                | (Q(license_basis="declared") & ~Q(license_id=""))
+                | (Q(license_basis="owner_decision") & ~Q(license_justification="")),
+                name="dataset_enabled_requires_license_basis",
+            ),
         ]
 
     def __str__(self):
@@ -109,6 +141,25 @@ class Dataset(models.Model):
         if fora:
             raise ValidationError(
                 {"internal_columns": f"Colunas internas fora das permitidas: {', '.join(fora)}."}
+            )
+        if self.enabled:
+            self._clean_license()
+
+    def _clean_license(self):
+        if self.license_basis == self.LicenseBasis.DECLARED and not self.license_id.strip():
+            raise ValidationError(
+                {"license_id": "Licença declarada pela fonte exige o identificador da licença."}
+            )
+        if (
+            self.license_basis == self.LicenseBasis.OWNER_DECISION
+            and not self.license_justification.strip()
+        ):
+            raise ValidationError(
+                {"license_justification": "Decisão do dono exige a justificativa por escrito."}
+            )
+        if self.license_basis == self.LicenseBasis.NONE:
+            raise ValidationError(
+                {"license_basis": "Conjunto sem licença não pode ser habilitado."}
             )
 
 
@@ -125,6 +176,8 @@ class IngestionRun(models.Model):
         SCHEMA = "schema", "Esquema diferente do esperado"
         MALFORMED_ROW = "malformed_row", "Linha malformada"
         HASH = "hash", "Hash não confere"
+        BLOCKED = "blocked", "Bloqueado pela fonte"
+        LICENSE = "license", "Licença mudou ou sumiu"
         OTHER = "other", "Outro"
 
     dataset = models.ForeignKey(

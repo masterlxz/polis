@@ -13,7 +13,7 @@ SOURCE_DESCRIPTIVE = (
     "terms_url",
     "license_note",
 )
-DATASET_DESCRIPTIVE = ("name", "url", "format", "allowed_columns", "internal_columns")
+DATASET_DESCRIPTIVE = ("name", "url", "format", "allowed_columns", "internal_columns", "license_id")
 DATASET_ON_CREATION = ("license_basis", "license_id", "license_url")
 
 

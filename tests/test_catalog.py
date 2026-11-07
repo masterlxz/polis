@@ -181,12 +181,15 @@ def test_seed_nao_sobrescreve_observacoes_nem_a_licenca_registrada():
     Dataset.objects.update(
         license_basis=Dataset.LicenseBasis.OWNER_DECISION,
         license_id="",
+        license_url="",
         license_justification="Decisão do dono em 2026-11-07.",
     )
     seed()
     assert Source.objects.get(slug="tse").notes == "anotação do dono"
     dataset = dataset_tse()
     assert dataset.license_basis == Dataset.LicenseBasis.OWNER_DECISION
+    assert dataset.license_id == ""
+    assert dataset.license_url == ""
     assert dataset.license_justification == "Decisão do dono em 2026-11-07."
 
 

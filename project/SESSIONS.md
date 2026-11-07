@@ -2,6 +2,15 @@
 
 Mais recente no topo.
 
+### 2026-11-07 — Sessão 25 (conector, fatia 3: carga de um Dataset)
+
+- **Pedido**: ligar cliente, leitor, `Dataset` e `IngestionRun` (plan mode). Escolhas do dono: destino numa tabela `RawRecord` (a camada bruta do ADR 0005, decisão 5) e tolerância zero a linhas rejeitadas; aprovou `Source.paused` como trava do bloqueio e execução "arquivo igual" como `succeeded` com 0 linhas.
+- **Feito**: `RawRecord` e migração `0003` (escrita à mão); `apps/sources/ingestion.py` (`ingest()`, `IngestionError`): portão antes da rede (conjunto habilitado e fonte em integração ou ativa), carga numa transação com falha fechada, mapa de erros só por `error_code` (`blocked`, `download`, `schema`, `malformed_row`, `other`), retenção das 3 últimas cargas, arquivo igual não relido, ZIP apagado ao fim, erro inesperado sem causa nem contexto; comando `ingest_dataset <fonte>/<conjunto>`. 26 testes novos (contando os parametrizados), com cliente falso.
+- **Provas (CI, `workflow_dispatch`, sem PR)**: sem implementação, falha de importação; com ela, 184 verdes; seis mutações de propósito pegas (tolerância, pausar a fonte, retenção de 4 cargas, arquivo repetido, portão `enabled`, e a transação, esta rodada sozinha porque outra mutação a mascarava). Uma das mutações (`last is None`) foi destrutiva demais e foi trocada.
+- **Tropeços**: import sem uso derrubou o primeiro CI no lint.
+- **Não verificado**: nenhuma requisição real; arquivos de milhões de linhas (votação por seção) não medidos (carga em lotes de 1.000, sem teste de volume); duas cargas simultâneas do mesmo `Dataset` não são barradas; a migração `0003` foi escrita à mão e só rodou em banco vazio; `rows_read` vem do leitor (linhas físicas não vazias, sem cabeçalho).
+- **Fica**: cliente de API JSON do CKAN e comparação da licença (decisão 2, código `license`); agendamento; a primeira carga real, só pelo dono, com `ingest_dataset`; normalização para pessoa/candidatura.
+
 ### 2026-11-07 — Sessão 24 (conector, fatia 2: cliente HTTP com etiqueta de rede)
 
 - **Pedido**: seguir o conector (plan mode). Escolhas do dono: `urllib` da stdlib (sem dependência nova) e recusar todo redirecionamento; aprovou a tabela de testes, 502/504 sem recuo, 4 tentativas e teto de 300 s.

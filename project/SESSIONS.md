@@ -2,6 +2,13 @@
 
 Mais recente no topo.
 
+### 2026-11-08 — Sessão 36 (P-11, financiamento)
+
+- **Pedido**: "vamos de p11" (plan mode). Escolhas do dono: só princípios e restrições; vetos a partidos/candidatos/campanhas, governos e órgãos monitorados, publicidade e venda de dados, e empresas com interesse regulado; o dono banca a infraestrutura por enquanto.
+- **Feito**: ADR 0020 (vetos de saída, critério em vez de lista, independência editorial, apoio público, gatilhos de reabertura, código e dados independentes de dinheiro). P-11 movida para "Resolvidas".
+- **Não verificado**: nada medido (custo real, público, elegibilidade a editais); aspecto jurídico (forma de receber dinheiro, tributação, LGPD de doadores) segue no P-16, sem parecer; o veto d é subjetivo e não foi testado em casos reais. Os gatilhos de reabertura são proposta minha, não escolha do dono.
+- **Fica**: ADR de captação quando um gatilho disparar; plano de continuidade do projeto; o PR #51 teve `compose`, `dco`, `guard` e `tests` verdes (conferido por `gh pr checks 51`, run 42535030711 e vizinhos), sem mudança de código.
+
 ### 2026-11-08 — Sessão 35 (P-09, autenticação)
 
 - **Pedido**: "vamos de p9" (plan mode). Escolhas do dono: só admin agora, conta pública adiada; mecanismo Django auth com TOTP obrigatório (confirmação explícita do AGENTS.md §4). O PR #49 (P-08) foi mesclado antes.

@@ -9,6 +9,8 @@ Liga o cliente HTTP (`PoliteClient`), o leitor (`ZipCsvReader`), o `Dataset`, o 
   mantêm os `RawRecord`; as execuções continuam.
 - ADR 0008, decisão 5: 403, 401 e 451 pausam a `Source` (a coleta daquele host para; o dono
   reativa no admin).
+- ADR 0008, decisão 2: antes do arquivo, a licença declarada no CKAN precisa ser a registrada no
+  `Dataset`; diferente, vazia ou não confirmada vira `license` (falha fechada, sem pausar a fonte).
 - ADR 0008, decisão 6: arquivo com o mesmo SHA-256 da última carga bem-sucedida não é relido.
 
 A execução é criada antes (`running`) e fechada uma única vez no fim, fora da transação da carga
@@ -29,6 +31,7 @@ from pathlib import Path
 from django.db import transaction
 from django.utils import timezone
 
+from .ckan import CkanError, read_license_id
 from .http_client import BlockedError, DownloadError
 from .models import IngestionRun, RawRecord, Source
 from .zip_csv import DuplicateColumnError, InvalidFormatError, MissingColumnError, ZipCsvReader
@@ -89,11 +92,17 @@ def _check_gate(dataset):
 
 def _execute(dataset, client, run, destination, batch_size, keep_loads):
     try:
+        if _must_check_license(dataset):
+            declared = read_license_id(client, dataset.license_check_url, destination.parent)
+            if declared != dataset.license_id:
+                return {}, IngestionRun.ErrorCode.LICENSE
         result = client.download(dataset.url, destination)
     except BlockedError:
         return {}, IngestionRun.ErrorCode.BLOCKED
     except DownloadError:
         return {}, IngestionRun.ErrorCode.DOWNLOAD
+    except CkanError:
+        return {}, IngestionRun.ErrorCode.LICENSE
     fields = {
         "sha256_original": result.sha256,
         "size_bytes": result.size_bytes,
@@ -102,6 +111,13 @@ def _execute(dataset, client, run, destination, batch_size, keep_loads):
     if _same_as_last_load(dataset, result.sha256):
         return fields, ""
     return _load(dataset, run, destination, fields, batch_size, keep_loads)
+
+
+def _must_check_license(dataset):
+    """Só licença `declared` com endereço de checagem é comparada (ADR 0008, decisão 2)."""
+    return bool(dataset.license_check_url) and (
+        dataset.license_basis == dataset.LicenseBasis.DECLARED
+    )
 
 
 def _same_as_last_load(dataset, sha256):

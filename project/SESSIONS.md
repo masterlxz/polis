@@ -2,6 +2,15 @@
 
 Mais recente no topo.
 
+### 2026-11-07 — Sessão 28 (primeira carga real do TSE)
+
+- **Pedido**: o dono quis entender e fazer a primeira carga real; eu guiei, ele rodou cada comando.
+- **Feito**: `.env` local (ignorado pelo git), Postgres 18 e `migrate` no Docker Compose (as migrações `0002` e `0003`, escritas à mão, rodaram em banco real), `seed_sources` (3 fontes, 1 conjunto), `tse` em `integrating` e conjunto habilitado no admin, e `ingest_dataset tse/consulta-cand-2026`.
+- **Resultado**: `succeeded`, 42.034 lidas e 42.034 gravadas, ZIP de 3.286.717 bytes, 29 arquivos, cerca de 14 s, 1 requisição sem redirecionamento, 403 nem 429. Cabeçalho bateu com as 34 colunas. Nenhum registro tem as chaves do CPF, do título ou do e-mail (conferido no banco, sem imprimir valores). Hash, URL e `ETag` ficaram no `IngestionRun`.
+- **Correção de estimativa**: eu disse "dezenas de MB"; o ZIP tem 3,3 MB.
+- **Não verificado**: que o ZIP foi apagado do disco ao fim (o contêiner era descartável e não conferi); a repetição da carga (arquivo igual deve virar `succeeded` com 0 linhas); volume grande; se o texto enviado ao TSE na Sessão 27 saiu sem citar o polis e sem repetir a medição (assumi; o dono não confirmou).
+- **Fica**: resposta do TSE sobre o CPF de 2026; cliente de API JSON do CKAN e comparação da licença; agendamento; normalização para pessoa e candidatura; as outras 5 perguntas do P-16.
+
 ### 2026-11-07 — Sessão 27 (P-16: pesquisa de LGPD e LAI)
 
 - **Pedido**: avançar o P-16. Escolha do dono: pesquisa com fontes (não dossiê nem carta ao TSE); depois, registrar sem levar a advogado agora.

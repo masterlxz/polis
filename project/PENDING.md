@@ -6,7 +6,6 @@ Decisões em aberto, vindas do PRD §18 (nome e licença já decididos: ADR 0001
 
 | ID | Pendência | Observação |
 |---|---|---|
-| P-07 | Estratégia de armazenamento de documentos | |
 | P-08 | Provedores e modelos de IA, RAG, embeddings e custos | |
 | P-09 | Estratégia de autenticação | |
 | P-11 | Modelo de financiamento e sustentabilidade | |
@@ -19,6 +18,7 @@ Decisões em aberto, vindas do PRD §18 (nome e licença já decididos: ADR 0001
 | (nome) | Nome definitivo do projeto | polis, ADR 0001 |
 | (licença) | Licença e estratégia de código aberto | AGPL-3.0, ADR 0002 |
 | (repo) | Dono e visibilidade do repositório | masterlxz, público, ADR 0003 |
+| P-07 | Estratégia de armazenamento de documentos | ADR 0017 (2026-11-08), só princípios: Etapa 1 sem arquivos de terceiros; padrão link + SHA-256 sem cópia; cópia só por fonte, com licença que permita e motivo concreto; interface única de armazenamento; conteúdo externo não confiável. **Fica aberto:** backend concreto (disco ou objetos S3-compatível no Brasil, ADR próprio na primeira fonte que exigir cópia), modelo de dados, extração de texto e limites. Nenhuma fonte de documentos foi medida |
 | P-04 | Arquitetura de implantação e hospedagem | ADR 0011 (2026-11-08): VPS único com Docker Compose (Django, PostgreSQL 18, proxy), servidor e backups no Brasil, teto de cerca de US$ 20/mês. Provedor e plano ficam para a implantação, com preço conferido na página oficial. Risco aberto: o volume-alvo pode não caber no teto; o teste de carga do ADR 0010 decide |
 | P-06 | Estratégia de busca | ADR 0012 (2026-11-08) depois revisto pelo ADR 0016 (mesmo dia): busca por tokens no PostgreSQL (`tsvector` 'simple' com prefixo) com `pg_trgm` 0,5 só como reserva; medida em 2 vCPU emulados: p95 de 154 ms a 10 buscas/s, relevância de 99% com um erro de digitação. Sem cache e sem busca dedicada (Meilisearch reprovou a relevância: 64% com erro). Nome civil fora do índice e módulo com interface única continuam. **Fica aberto:** nada medido fora de dados sintéticos e de uma máquina de desenvolvimento; reavaliar com consultas reais |
 | P-10 | Necessidade e formato da API pública, política de uso e limites | ADR 0013 (2026-11-08): sem API pública na Etapa 1; lançamento previsto na Etapa 2 como leitura anônima com limite por IP, depois do P-16. Política: somente leitura, `/api/v1`, atribuição em toda resposta, mesmo filtro de dados da interface. **Fica aberto:** os números de limite (saem do teste de carga), a biblioteca da API e, se o limite por IP não bastar, a API com chave (depende do P-09) |

@@ -2,6 +2,23 @@
 
 Mais recente no topo.
 
+### 2026-11-08 — Sessão 30 (decisões: P-13, P-14, P-04, P-06, P-10, P-17, P-18)
+
+- **Pedido**: "vamos no p4 6 10 13 14 17 e 18" (plan mode). Escolhas do dono: 3 blocos por dependência (1: P-13 e P-14; 2: P-04, P-06 e P-10; 3: P-17 e P-18) e um ADR por pendência.
+- **Feito (um ADR e um PR cada, todos mesclados)**:
+  - **ADR 0009 / P-13 (#38)**: ordem das etapas do PRD §15 mantida; Etapa 1 fatiada na vertical, TSE de ponta a ponta antes de Câmara e Senado.
+  - **ADR 0010 / P-14 (#39)**: leitura pública 99,5%/mês, RPO e RTO de 24 h, p95 de página ≤ 800 ms e de busca ≤ 1,5 s, 50 req/s, 100 milhões de linhas (estimativa minha, não medida).
+  - **ADR 0011 / P-04 (#40)**: VPS único com Docker Compose, servidor e backups no Brasil, teto de cerca de US$ 20/mês; provedor e plano ficam para a implantação.
+  - **ADR 0012 / P-06 (#41)**: só PostgreSQL (`unaccent` + `pg_trgm`) atrás de um módulo com interface única; Etapa 1 busca nome público de pessoa e partido; nome civil fora do índice.
+  - **ADR 0013 / P-10 (#42)**: sem API pública na Etapa 1; política definida (somente leitura, `/api/v1`, atribuição, mesmo filtro da interface) e lançamento previsto na Etapa 2.
+  - **ADR 0014 / P-17 (#43)**: "polis" com descritor, linguagem neutra, sem cores ou símbolos partidários ou da bandeira, critérios de domínio.
+  - **ADR 0015 / P-18 (#44)**: navegação da Etapa 1 só com o que tem conteúdo, origem e data em todo dado, WCAG 2.2 AA, front-end em Next.js separado.
+- **Divergência registrada**: no P-18 o dono escolheu Next.js separado, contra a minha recomendação (Django templates na Etapa 1, com gatilho na Etapa 2). Isso substitui parcialmente a decisão 1 do ADR 0006 (nota no topo dele). Acrescentei, por minha conta, a condição de um spike de memória, latência e build no VPS único antes de implementar (ADR 0015, decisão 3); o dono pode retirá-la.
+- **CI**: os sete PRs tiveram `compose`, `dco`, `guard` e `tests` verdes antes do merge (conferido por `gh pr checks`). Os conflitos em `PENDING.md` (três PRs mexendo na mesma tabela) foram resolvidos com merge da `main` na branch, sem force push.
+- **Pesquisa**: as buscas de preço e de região de hospedagem só acharam sites de terceiros, desatualizados e conflitantes; nenhum preço virou fato. A checagem foi deixada para a implantação, na página oficial do provedor.
+- **Não verificado**: nenhuma medição de leitura (metas, memória, latência, build); volume de 100 milhões de linhas; presença de `unaccent` e `pg_trgm` na imagem `postgres:18`; versões e dependências do Next.js; proteção da API interna; disponibilidade e elegibilidade do domínio; registro de marca.
+- **Fica**: spike do front-end (condição do ADR 0015) e teste de carga do ADR 0010 antes de abrir ao público; P-07, P-08, P-09, P-11 e P-16 seguem abertas (P-16 aguardando o TSE); a Etapa 1 vertical começa pela normalização do TSE (plano próprio); o `dependabot.yml` precisará cobrir `npm` se o Next.js for adiante.
+
 ### 2026-11-08 — Sessão 29 (conector, fatia 4: checagem de licença no CKAN)
 
 - **Pedido**: "próximas fatias do conector" (plan mode). Escolhas do dono: fazer primeiro a checagem de licença (adiando agendamento e normalização); campo novo no `Dataset` em vez de mapa no código; falha fechada quando o CKAN não responde ou não traz `license_id`. Aprovou 3 suposições minhas: resposta fora do formato conta como `license`, a checagem roda também com arquivo igual, teto de 5 MiB para o JSON.

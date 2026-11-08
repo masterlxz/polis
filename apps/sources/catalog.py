@@ -106,5 +106,8 @@ DATASETS = [
         "license_basis": "declared",
         "license_id": "cc-by",
         "license_url": "http://www.opendefinition.org/licenses/cc-by",
+        "license_check_url": (
+            "https://dadosabertos.tse.jus.br/api/3/action/package_show?id=candidatos-2026"
+        ),
     },
 ]

@@ -132,6 +132,13 @@ def test_conjunto_nasce_desabilitado_com_licenca_declarada():
     assert dataset.allowed_columns == catalog.DATASETS[0]["allowed_columns"]
 
 
+def test_conjunto_do_tse_aponta_para_o_pacote_do_ckan_que_declara_a_licenca():
+    seed()
+    assert dataset_tse().license_check_url == (
+        "https://dadosabertos.tse.jus.br/api/3/action/package_show?id=candidatos-2026"
+    )
+
+
 def test_registros_criados_passam_na_validacao_do_modelo():
     seed()
     for fonte in Source.objects.all():

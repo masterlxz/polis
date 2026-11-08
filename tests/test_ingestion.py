@@ -5,6 +5,7 @@ O cliente é falso: escreve um ZIP pequeno no destino ou levanta o erro combinad
 
 import hashlib
 import io
+import json
 import zipfile
 from io import StringIO
 from pathlib import Path
@@ -308,6 +309,138 @@ def test_execucao_sem_linhas_nao_conta_na_retencao():
     assert RawRecord.objects.filter(run=repetida).count() == 0
     for run in (run_a, run_b, run_c):
         assert RawRecord.objects.filter(run=run).count() == 1
+
+
+# --- Checagem de licença no CKAN (ADR 0008, decisão 2) ---
+
+CKAN_URL = "https://dadosabertos.tse.jus.br/api/3/action/package_show?id=candidatos-2026"
+
+
+class FakeCkanClient(FakeClient):
+    """Responde o JSON do CKAN para a URL do pacote e o ZIP para as demais."""
+
+    def __init__(self, *arquivos, ckan=None, ckan_error=None, error=None):
+        super().__init__(*arquivos, error=error)
+        self.ckan = ckan
+        self.ckan_error = ckan_error
+
+    def download(self, url, destination):
+        if url != CKAN_URL:
+            return super().download(url, destination)
+        self.calls.append(url)
+        if self.ckan_error is not None:
+            raise self.ckan_error
+        dados = json.dumps(self.ckan).encode()
+        Path(destination).write_bytes(dados)
+        return DownloadResult(
+            path=Path(destination),
+            sha256=hashlib.sha256(dados).hexdigest(),
+            size_bytes=len(dados),
+            etag="",
+            last_modified="",
+        )
+
+
+def pacote_ckan(license_id):
+    return {"success": True, "result": {"license_id": license_id}}
+
+
+def dataset_com_checagem(**kwargs):
+    return make_dataset(license_check_url=CKAN_URL, **kwargs)
+
+
+def test_licenca_igual_a_habilitada_segue_e_consulta_o_ckan_antes_do_arquivo():
+    dataset = dataset_com_checagem()
+    cliente = FakeCkanClient(zip_ok("1;ANA"), ckan=pacote_ckan("cc-by"))
+    run = ingest(dataset, cliente)
+    assert run.state == IngestionRun.State.SUCCEEDED
+    assert cliente.calls == [CKAN_URL, dataset.url]
+
+
+def test_licenca_diferente_para_com_license_sem_baixar_o_arquivo():
+    dataset = dataset_com_checagem()
+    cliente = FakeCkanClient(zip_ok("1;ANA"), ckan=pacote_ckan("cc-by-nc"))
+    run = ingest(dataset, cliente)
+    assert run.state == IngestionRun.State.FAILED
+    assert run.error_code == IngestionRun.ErrorCode.LICENSE
+    assert cliente.calls == [CKAN_URL]
+    assert RawRecord.objects.count() == 0
+
+
+def test_licenca_sumida_no_ckan_para_com_license():
+    dataset = dataset_com_checagem()
+    run = ingest(dataset, FakeCkanClient(zip_ok("1;ANA"), ckan=pacote_ckan("")))
+    assert run.error_code == IngestionRun.ErrorCode.LICENSE
+    assert RawRecord.objects.count() == 0
+
+
+@pytest.mark.parametrize("ckan", [{"success": False}, [], {"success": True, "result": []}])
+def test_resposta_do_ckan_fora_do_formato_para_com_license(ckan):
+    dataset = dataset_com_checagem()
+    cliente = FakeCkanClient(zip_ok("1;ANA"), ckan=ckan)
+    run = ingest(dataset, cliente)
+    assert run.error_code == IngestionRun.ErrorCode.LICENSE
+    assert cliente.calls == [CKAN_URL]
+
+
+def test_ckan_fora_do_ar_para_com_download_sem_baixar_o_arquivo():
+    dataset = dataset_com_checagem()
+    cliente = FakeCkanClient(zip_ok("1;ANA"), ckan_error=DownloadError("rede"))
+    run = ingest(dataset, cliente)
+    assert run.error_code == IngestionRun.ErrorCode.DOWNLOAD
+    assert cliente.calls == [CKAN_URL]
+    dataset.source.refresh_from_db()
+    assert dataset.source.status == Source.Status.INTEGRATING
+
+
+def test_bloqueio_no_ckan_registra_blocked_e_pausa_a_fonte():
+    dataset = dataset_com_checagem()
+    cliente = FakeCkanClient(zip_ok("1;ANA"), ckan_error=BlockedError("403"))
+    run = ingest(dataset, cliente)
+    assert run.error_code == IngestionRun.ErrorCode.BLOCKED
+    dataset.source.refresh_from_db()
+    assert dataset.source.status == Source.Status.PAUSED
+
+
+def test_licenca_diferente_nao_pausa_a_fonte_nem_apaga_a_carga_anterior():
+    dataset = dataset_com_checagem()
+    boa = ingest(dataset, FakeCkanClient(zip_ok("1;ANA"), ckan=pacote_ckan("cc-by")))
+    ruim = ingest(dataset, FakeCkanClient(zip_ok("2;BIA"), ckan=pacote_ckan("cc-by-nc")))
+    assert ruim.error_code == IngestionRun.ErrorCode.LICENSE
+    assert RawRecord.objects.filter(run=boa).count() == 1
+    dataset.source.refresh_from_db()
+    assert dataset.source.status == Source.Status.INTEGRATING
+
+
+def test_sem_license_check_url_nao_consulta_o_ckan():
+    dataset = make_dataset()
+    cliente = FakeCkanClient(zip_ok("1;ANA"), ckan=pacote_ckan("cc-by-nc"))
+    run = ingest(dataset, cliente)
+    assert run.state == IngestionRun.State.SUCCEEDED
+    assert cliente.calls == [dataset.url]
+
+
+def test_decisao_do_dono_nao_e_comparada_com_o_ckan():
+    dataset = make_dataset(
+        license_basis=Dataset.LicenseBasis.OWNER_DECISION,
+        license_id="",
+        license_justification="Decisão do dono, 2026-11-07.",
+        license_check_url=CKAN_URL,
+    )
+    cliente = FakeCkanClient(zip_ok("1;ANA"), ckan=pacote_ckan(""))
+    run = ingest(dataset, cliente)
+    assert run.state == IngestionRun.State.SUCCEEDED
+    assert cliente.calls == [dataset.url]
+
+
+def test_arquivo_igual_ainda_passa_pela_checagem_de_licenca():
+    dataset = dataset_com_checagem()
+    arquivo = zip_ok("1;ANA")
+    ingest(dataset, FakeCkanClient(arquivo, ckan=pacote_ckan("cc-by")))
+    cliente = FakeCkanClient(arquivo, ckan=pacote_ckan("cc-by-nc"))
+    repetida = ingest(dataset, cliente)
+    assert repetida.error_code == IngestionRun.ErrorCode.LICENSE
+    assert cliente.calls == [CKAN_URL]
 
 
 # --- Comando ---

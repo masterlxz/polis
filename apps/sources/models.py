@@ -101,6 +101,16 @@ class Dataset(models.Model):
         help_text="Como a fonte declara (por exemplo, o license_id do CKAN do TSE).",
     )
     license_url = models.URLField("endereço da licença", max_length=500, blank=True)
+    license_check_url = models.URLField(
+        "endereço da checagem de licença",
+        max_length=500,
+        blank=True,
+        help_text=(
+            "Pacote do CKAN que declara a licença do conjunto (package_show). Vazio: sem "
+            "checagem. Antes de cada carga, a licença de lá precisa ser a registrada aqui "
+            "(ADR 0008, decisão 2)."
+        ),
+    )
     license_justification = models.TextField(
         "justificativa do dono",
         blank=True,

@@ -2,6 +2,15 @@
 
 Mais recente no topo.
 
+### 2026-11-08 — Sessão 29 (conector, fatia 4: checagem de licença no CKAN)
+
+- **Pedido**: "próximas fatias do conector" (plan mode). Escolhas do dono: fazer primeiro a checagem de licença (adiando agendamento e normalização); campo novo no `Dataset` em vez de mapa no código; falha fechada quando o CKAN não responde ou não traz `license_id`. Aprovou 3 suposições minhas: resposta fora do formato conta como `license`, a checagem roda também com arquivo igual, teto de 5 MiB para o JSON.
+- **Feito**: `Dataset.license_check_url` e migração `0004` (a primeira **gerada pelo Django**, no Compose); `apps/sources/ckan.py` (`read_license_id`, `CkanError`); `ingest()` compara a licença antes do arquivo e grava `license`; o catálogo aponta o `consulta-cand-2026` para `package_show?id=candidatos-2026` (o `seed_sources` atualiza o campo). 27 testes novos (`tests/test_ckan.py`, `tests/test_ingestion.py`, `tests/test_catalog.py`).
+- **Medido (1 requisição)**: o pacote `candidatos-2026` existe, tem `license_id: cc-by` e lista o ZIP que coletamos. Isso confirma o que na Sessão 26 era inferência.
+- **Provas (CI, `workflow_dispatch`)**: sem implementação, erro de importação; com ela, 230 verdes. Quatro mutações de propósito, cada uma pega por testes: `!=` trocado por `==` (5 testes), checagem desligada (vários), `license_id` vazio tratado como igual (1) e `CkanError` engolido (3). Revertidas; as branches descartáveis foram apagadas.
+- **Não verificado**: a checagem contra o CKAN real pela carga (só a consulta avulsa); o `seed_sources` rodando sobre o banco local já existente; o tamanho real do JSON do TSE (o teto de 5 MiB é palpite); a mutação 4 falhou por `NameError` e não pelo código esperado, o teste a pega, mas por motivo indireto.
+- **Fica**: agendamento (depende de fila/agendador e hospedagem, sem ADR); normalização para pessoa e candidatura (plano próprio); resposta do TSE sobre o CPF; P-16.
+
 ### 2026-11-07 — Sessão 28 (primeira carga real do TSE)
 
 - **Pedido**: o dono quis entender e fazer a primeira carga real; eu guiei, ele rodou cada comando.

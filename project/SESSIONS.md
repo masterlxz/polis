@@ -2,6 +2,13 @@
 
 Mais recente no topo.
 
+### 2026-11-08 — Sessão 35 (P-09, autenticação)
+
+- **Pedido**: "vamos de p9" (plan mode). Escolhas do dono: só admin agora, conta pública adiada; mecanismo Django auth com TOTP obrigatório (confirmação explícita do AGENTS.md §4). O PR #49 (P-08) foi mesclado antes.
+- **Feito**: ADR 0019 (público anônimo; operadores com senha e TOTP obrigatório; admin fora da superfície pública; privilégio mínimo; registro de ações; sem criptografia própria). P-09 movida para "Resolvidas".
+- **Não verificado**: nada implementado nem testado; biblioteca de TOTP, rede do admin e recuperação de conta (risco de ficar trancado fora) não foram avaliadas.
+- **Fica**: implementação do admin com TOTP (dependência nova a aprovar), runbook de recuperação na implantação, conta pública e API com chave por ADR próprio.
+
 ### 2026-11-08 — Sessão 34 (P-08, inteligência artificial)
 
 - **Pedido**: "vamos de p08" (plan mode). Escolhas do dono: ADR só com princípios e restrições; API externa permitida só com dado público.

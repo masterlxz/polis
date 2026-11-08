@@ -7,7 +7,7 @@ Mais recente no topo.
 - **Pedido**: avançar o P-16. Escolha do dono: pesquisa com fontes (não dossiê nem carta ao TSE); depois, registrar sem levar a advogado agora.
 - **Feito**: `project/lgpd-lai.md` com o que a LGPD (art. 4º, 5º II, 7º §§3º, 4º e 7º, 11, 23 a 30), a LAI art. 31 e o Decreto 8.777/2016 indicam, o efeito em ADR 0005 e 0008, e 6 perguntas abertas. `PENDING.md` aponta para ele. P-16 **continua aberto**.
 - **Não verificado**: o texto oficial de qualquer dispositivo (só espelhos e artigos), LGPD art. 18, texto literal do art. 31 e do art. 8º §3º da LAI, vigência atual do decreto, orientação da ANPD. Não é parecer jurídico.
-- **Fica**: validação por especialista quando o dono decidir; pergunta ao TSE sobre o CPF de 2026 (sem envio).
+- **Fica**: validação por especialista quando o dono decidir; resposta do TSE à pergunta sobre o CPF de 2026, **enviada em 2026-11-07** (Ouvidoria, formulário "Solicitação"; código de acompanhamento só com o dono). Texto enviado sem menção ao polis e sem repetir a medição de 2026-11-06.
 
 ### 2026-11-07 — Sessão 26 (cadastro inicial: 3 fontes e o primeiro conjunto)
 

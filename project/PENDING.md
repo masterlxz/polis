@@ -6,7 +6,6 @@ Decisões em aberto, vindas do PRD §18 (nome e licença já decididos: ADR 0001
 
 | ID | Pendência | Observação |
 |---|---|---|
-| P-09 | Estratégia de autenticação | |
 | P-11 | Modelo de financiamento e sustentabilidade | |
 | P-16 | Interpretações jurídicas que exijam validação especializada | LGPD e dados de processos judiciais. Pesquisa de apoio (sem parecer) em `lgpd-lai.md`, Sessão 27; as 6 perguntas seguem abertas e o dono decidiu não levar a advogado por ora. Pergunta sobre o CPF de 2026 enviada ao TSE em 2026-11-07, aguardando resposta |
 
@@ -17,6 +16,7 @@ Decisões em aberto, vindas do PRD §18 (nome e licença já decididos: ADR 0001
 | (nome) | Nome definitivo do projeto | polis, ADR 0001 |
 | (licença) | Licença e estratégia de código aberto | AGPL-3.0, ADR 0002 |
 | (repo) | Dono e visibilidade do repositório | masterlxz, público, ADR 0003 |
+| P-09 | Estratégia de autenticação | ADR 0019 (2026-11-08), só admin: público anônimo; operadores com `django.contrib.auth` e TOTP obrigatório; admin fora da superfície pública; privilégio mínimo; registro de ações; sem criptografia própria. Escopo e mecanismo confirmados pelo dono. **Fica aberto:** biblioteca de TOTP (dependência nova), rede do admin, recuperação de conta, política de senha, permissões, conta pública e API com chave (ADR próprio quando houver funcionalidade). Nada implementado nem testado |
 | P-08 | Provedores e modelos de IA, RAG, embeddings e custos | ADR 0018 (2026-11-08), só princípios: IA só na Etapa 4; regras do PRD §10.1 como requisitos; citação verificada por código; sem SQL livre; conteúdo externo como dado; API externa só com dado público (exceção ao "tudo no Brasil", a confirmar no P-16); interface única de provedor; limite de custo antes de abrir. **Fica aberto:** provedor, modelo, embeddings, RAG, orçamento e qualidade em português. Nada foi medido |
 | P-07 | Estratégia de armazenamento de documentos | ADR 0017 (2026-11-08), só princípios: Etapa 1 sem arquivos de terceiros; padrão link + SHA-256 sem cópia; cópia só por fonte, com licença que permita e motivo concreto; interface única de armazenamento; conteúdo externo não confiável. **Fica aberto:** backend concreto (disco ou objetos S3-compatível no Brasil, ADR próprio na primeira fonte que exigir cópia), modelo de dados, extração de texto e limites. Nenhuma fonte de documentos foi medida |
 | P-04 | Arquitetura de implantação e hospedagem | ADR 0011 (2026-11-08): VPS único com Docker Compose (Django, PostgreSQL 18, proxy), servidor e backups no Brasil, teto de cerca de US$ 20/mês. Provedor e plano ficam para a implantação, com preço conferido na página oficial. Risco aberto: o volume-alvo pode não caber no teto; o teste de carga do ADR 0010 decide |

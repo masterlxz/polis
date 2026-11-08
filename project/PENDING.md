@@ -14,7 +14,6 @@ Decisões em aberto, vindas do PRD §18 (nome e licença já decididos: ADR 0001
 | P-10 | Necessidade e formato da API pública, política de uso e limites | |
 | P-11 | Modelo de financiamento e sustentabilidade | |
 | P-13 | Priorização final dos módulos | |
-| P-14 | Metas quantitativas de desempenho e disponibilidade | |
 | P-16 | Interpretações jurídicas que exijam validação especializada | LGPD e dados de processos judiciais. Pesquisa de apoio (sem parecer) em `lgpd-lai.md`, Sessão 27; as 6 perguntas seguem abertas e o dono decidiu não levar a advogado por ora. Pergunta sobre o CPF de 2026 enviada ao TSE em 2026-11-07, aguardando resposta |
 | P-17 | Identidade visual, linguagem da marca e domínio | O nome polis tem homônimo conhecido (`pol.is`), ver ADR 0001 |
 | P-18 | Design e navegação definitivos | |
@@ -26,6 +25,7 @@ Decisões em aberto, vindas do PRD §18 (nome e licença já decididos: ADR 0001
 | (nome) | Nome definitivo do projeto | polis, ADR 0001 |
 | (licença) | Licença e estratégia de código aberto | AGPL-3.0, ADR 0002 |
 | (repo) | Dono e visibilidade do repositório | masterlxz, público, ADR 0003 |
+| P-14 | Metas quantitativas de desempenho e disponibilidade | ADR 0010 (2026-11-08), metas da Etapa 1 a validar: leitura pública 99,5%/mês, RPO e RTO de 24 h, p95 de página ≤ 800 ms e de busca ≤ 1,5 s, 50 req/s, 100 milhões de linhas (estimativa, não medida). Reavaliar com a primeira medição real |
 | P-02 | Stack e versões definitivas | Python 3.14 + Django 6.1 (migrar para o 6.2 LTS em abril de 2027), ADR 0006. Spike de ingestão atendeu o critério com folga de cerca de 6 vezes; versões conferidas em 2026-11-05 |
 | P-03 | Estrutura final do repositório | Monorepo (o próprio `polis`), ADR 0006 |
 | P-05 | Banco de dados e tecnologias complementares | PostgreSQL 18, único banco da Etapa 1, ADR 0006. Busca textual segue no P-06 |

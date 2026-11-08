@@ -2,6 +2,13 @@
 
 Mais recente no topo.
 
+### 2026-11-08 — Sessão 33 (P-07, armazenamento de documentos)
+
+- **Pedido**: "vamos de p07" (plan mode). Escolhas do dono: decisão enxuta agora (só princípios) e padrão "link + hash".
+- **Feito**: ADR 0017 (Etapa 1 sem arquivos de terceiros; link, SHA-256 e metadados por padrão; cópia só por fonte com licença e motivo; interface única de armazenamento; conteúdo externo não confiável). P-07 movida para "Resolvidas".
+- **Não verificado**: nenhuma fonte de documentos foi medida (volume, tamanho, licença, estabilidade de URL); a premissa de que o link basta para verificabilidade não foi testada; aspecto jurídico da cópia segue no P-16.
+- **Fica**: backend concreto e modelo de dados em ADR próprio, quando a primeira fonte exigir cópia (Etapa 2 em diante).
+
 ### 2026-11-08 — Sessão 32 (spike da busca, P-06 resolvida de novo)
 
 - **Pedido**: "revisar a busca (P-06) primeiro" (plan mode). Escolhas do dono: medir as quatro variantes (V1 `pg_trgm` 0,5 e `word_similarity`; V2 tokens + reserva; V3 cache; V4 busca dedicada) e o critério de relevância (pessoa certa no top 10 em ≥ 95% das consultas exatas e sem acento e ≥ 80% com um erro de digitação; percentuais propostos por mim).

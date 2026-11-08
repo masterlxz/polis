@@ -2,6 +2,8 @@
 
 **Data:** 2026-11-05
 
+> **Atualização (2026-11-08):** a decisão 1, no trecho "páginas públicas renderizadas no servidor (templates, JavaScript mínimo, sem SPA na Etapa 1)", foi substituída parcialmente pelo ADR 0015 (front-end em Next.js, sujeito a um spike). O restante deste ADR continua valendo.
+
 ## Contexto
 As três fontes do primeiro corte foram medidas (`project/fontes/`) e o ADR 0005 fixou como o polis trata dado pessoal (allowlist por nome de coluna, descarte na leitura, falha fechada). Falta escolher a stack para começar a Etapa 0 técnica. O que as medições exigem dela: ler ZIPs de até 1,36 GB em fluxo (ISO-8859-1, `;`, CRLF), descartar colunas na leitura, throttling abaixo de 10 req/s (Senado), timeout e retentativa para o 504 repetível (Câmara), reprocessar sem duplicar, páginas públicas indexáveis, API documentada e área administrativa (PRD §13).
 

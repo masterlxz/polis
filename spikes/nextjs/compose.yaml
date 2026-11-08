@@ -1,0 +1,64 @@
+# Spike do Next.js (ADR 0015). Máquina emulada = CPUSET (núcleos compartilhados por TODOS os contêineres)
+# + MEM_LIMIT por contêiner; a soma da RSS é conferida contra o total no relatório.
+# Perfil A: CPUSET=0,1 MEM_LIMIT=4g WORKERS=2   Perfil B: CPUSET=0 MEM_LIMIT=2g WORKERS=1
+# Uso: docker compose --profile base up -d   |   docker compose --profile alvo up -d
+x-limites: &limites
+  cpuset: ${CPUSET:?defina CPUSET}
+  mem_limit: ${MEM_LIMIT:?defina MEM_LIMIT}
+
+services:
+  db:
+    <<: *limites
+    image: postgres:18
+    environment:
+      POSTGRES_DB: polis
+      POSTGRES_USER: polis
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U polis -d polis"]
+      interval: 3s
+      timeout: 3s
+      retries: 60
+    profiles: [base, alvo]
+
+  # BASE: Django renderiza o HTML. Porta publicada só em 127.0.0.1.
+  django-base:
+    <<: *limites
+    build: ./django
+    depends_on:
+      db: {condition: service_healthy}
+    environment: &django-env
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?defina DJANGO_SECRET_KEY}
+      POSTGRES_HOST: db
+      POSTGRES_DB: polis
+      POSTGRES_USER: polis
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD}
+      WORKERS: ${WORKERS:-2}
+    ports:
+      - "127.0.0.1:8001:8000"
+    profiles: [base]
+
+  # ALVO: Django só com JSON interno, SEM porta publicada (só a rede do Compose), e o Next.js na frente.
+  django:
+    <<: *limites
+    build: ./django
+    depends_on:
+      db: {condition: service_healthy}
+    environment: *django-env
+    profiles: [alvo]
+
+  next:
+    <<: *limites
+    build: ./next
+    depends_on: [django]
+    environment:
+      API_URL: http://django:8000
+    ports:
+      - "127.0.0.1:3001:3000"
+    profiles: [alvo]
+
+volumes:
+  pgdata:

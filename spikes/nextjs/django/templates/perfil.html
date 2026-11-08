@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block title %}{{ p.nome_publico }}{% endblock %}
+{% block main %}
+<h1>{{ p.nome_publico }}</h1>
+<dl><dt>Cargo</dt><dd>{{ p.cargo }}</dd><dt>UF</dt><dd>{{ p.uf }}</dd><dt>Partido</dt><dd>{{ p.partido }}</dd></dl>
+{% include "origem.html" %}
+{% endblock %}

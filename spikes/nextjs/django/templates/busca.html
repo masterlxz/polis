@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block title %}Busca{% endblock %}
+{% block main %}
+<form method="get"><input name="q" value="{{ q }}"><button>Buscar</button></form>
+<ul>{% for p in itens %}
+<li><a href="/perfil/{{ p.id }}/">{{ p.nome_publico }}</a> — {{ p.cargo }} ({{ p.uf }}, {{ p.partido }}) {% include "origem.html" %}</li>
+{% endfor %}</ul>
+{% endblock %}

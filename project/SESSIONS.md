@@ -2,6 +2,15 @@
 
 Mais recente no topo.
 
+### 2026-11-08 — Sessão 31 (spike do Next.js, condição do ADR 0015)
+
+- **Pedido**: "vamos pro 2 ent" (spike do Next.js; plan mode). Escolhas do dono: dois perfis de máquina emulados (2 vCPU/4 GB e 1 vCPU/2 GB) e como critério de pronto "cabe nas metas do ADR 0010 e RAM extra ≤ ~1 GB" (o 1 GB é palpite meu).
+- **Feito**: branch `spike/nextjs` (no remoto, **sem PR para a `main`**, ADR 0006): Django base com templates contra Django JSON interno + Next.js 16.4.3, 300 mil nomes sintéticos, gerador de carga em Python puro, Compose com `cpuset`. Resultados completos no ADR 0015 ("Resultado do spike").
+- **Resultado**: página de perfil a 50 req/s em 2 vCPU: base p95 ~3,9 ms, alvo p95 ~13,4 ms, RAM +340 MiB, 0 erros (5 repetições). **A busca falhou a meta**: a 3 buscas/s a máquina satura (p95 de 1,7 a 13,8 s) nas duas pilhas, porque o `pg_trgm` custa de 0,2 a 1,6 s por consulta de nome comum. Causa: PostgreSQL, não Next.js. ADR 0012 ganhou nota de revisão e o P-06 voltou a "Em aberto".
+- **Tropeços (meus)**: (1) o gerador de dados do v1 tinha módulos correlacionados e só 180 nomes distintos; descartado (arquivo `DESCARTADO-v1...` na branch). (2) O Next.js redirecionava `/perfil/1/` para `/perfil/1` (308) e a primeira matriz mediria redirecionamentos; corrigido com `trailingSlash` e a matriz refeita inteira. (3) A primeira matriz de latência saiu ruidosa (host com load de 14 a 17 por processos fora do spike) e a segunda, limpa, a substituiu; a primeira ficou em `resultados/rodada1-ruidosa`. (4) Editei o `init.sql` por script Python, contra a regra do `CLAUDE.md` (só `Edit`/`Write`); era arquivo do spike, mas a regra vale.
+- **Não verificado**: tudo numa máquina de desenvolvimento (não um VPS); dados sintéticos enviesados; perfil de 1 vCPU só na rodada ruidosa (não reportado); tráfego misto limpo com o Next.js; tempo de build isolado; proteção da API interna; qualquer mitigação da busca.
+- **Fica**: decidir o que fazer com a busca (P-06 reaberta: testar token/prefixo/pré-filtro/cache/busca dedicada, em plano próprio); implantar o Next.js só depois de decidir isso; o `dependabot.yml` precisará cobrir `npm`.
+
 ### 2026-11-08 — Sessão 30 (decisões: P-13, P-14, P-04, P-06, P-10, P-17, P-18)
 
 - **Pedido**: "vamos no p4 6 10 13 14 17 e 18" (plan mode). Escolhas do dono: 3 blocos por dependência (1: P-13 e P-14; 2: P-04, P-06 e P-10; 3: P-17 e P-18) e um ADR por pendência.

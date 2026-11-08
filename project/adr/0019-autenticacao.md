@@ -27,3 +27,9 @@ O P-09 pede a estratégia de autenticação. O PRD pede conta de usuário só "c
 - A API com chave do ADR 0013 continua condicionada a ADR novo.
 - **Não validado:** a biblioteca de TOTP, a configuração de rede do admin e o fluxo de recuperação de conta.
 - **Fica aberto:** biblioteca, rede do admin, política de senha, níveis de permissão e conta pública.
+
+## Nota de implementação (2026-11-08, Sessão 37)
+- **Biblioteca escolhida:** `django-otp` 1.7.5 (dono aprovou a dependência). Descartada: `django-two-factor-auth` (mais dependências e última versão sem Django 6.x declarado). O admin passou a ser o `PolisAdminSite` (`config/admin.py`), que herda `OTPAdminSite`; o login exige senha, dispositivo e token, e o `has_permission` exige usuário verificado.
+- **Divergência com a decisão 6 (lida no código da biblioteca, não presumida):** o `django-otp` guarda a chave do TOTP (`TOTPDevice.key`, hex) e os códigos estáticos de recuperação (`StaticToken.token`) **em texto no banco**. Portanto o segredo **fica em claro em qualquer backup do banco**. A biblioteca sozinha não cumpre "nunca em backup em claro". Mitigação exigida na implantação: backup cifrado (o ADR 0011 ainda não exige cifra) e acesso restrito ao banco. Isso fica pendente e deve virar requisito do runbook.
+- **Limite de tentativas:** os dispositivos têm limitação exponencial de tentativas de token (ligada por padrão). Não há limite equivalente para a senha; a rede restrita do admin (decisão 3) continua sendo a defesa.
+- **Fica aberto:** comandos `create_operator` e `reset_totp` com códigos de recuperação (PR seguinte), rede do admin, política de senha, permissões, cifra do backup e conta pública.

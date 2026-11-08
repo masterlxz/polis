@@ -2,6 +2,15 @@
 
 Mais recente no topo.
 
+### 2026-11-08 — Sessão 37 (P-09, admin com TOTP)
+
+- **Pedido**: "vamos de admin com totp" (plan mode). Escolhas do dono: `django-otp` (dependência nova aprovada); inscrição por comando no servidor com códigos de recuperação (fica para o PR 2); escopo só de exigir TOTP no admin. Aprovou a tabela de 12 testes e que `is_staff` continue exigido.
+- **Feito**: `django-otp==1.7.5` (`pyproject.toml`, `uv.lock`); `config/admin.py` (`PolisAdminSite`, nome `admin`), `config/apps.py` (`PolisAdminConfig`), `config/settings.py` (apps do django-otp e `OTPMiddleware`); `tests/test_admin_totp.py` (12 testes) e `tests/conftest.py` (`admin_client` com login real por TOTP); nota no ADR 0019.
+- **Provas (CI, `workflow_dispatch`)**: sem implementação, erro de coleta (`django_otp` fora de `INSTALLED_APPS`, run 42536343563). Com a implementação, 12 novos verdes mas 6 testes antigos de `test_sources.py` vermelhos, porque o `admin_client` do pytest-django usa `force_login` (só senha) e o admin agora recusa isso (run 42536454123); corrigido sobrescrevendo o fixture, 242 verdes (run 42536577957). Mutação (`has_permission` sem exigir TOTP, branch descartável apagada): só 1 teste falhou, o do `force_login` (run 42536694420); eu esperava mais falhas e errei, porque o formulário de login já exige o token sozinho.
+- **Descobertas (lidas no código da biblioteca)**: o login exige escolher o dispositivo (`otp_device`); o `OTPAdminSite` nasce com o nome `otpadmin`, o que quebraria `admin:`; chave do TOTP e códigos estáticos ficam em texto no banco (divergência com a decisão 6 do ADR 0019, registrada no ADR).
+- **Não verificado**: login real no navegador com app autenticador; compatibilidade declarada do `django-otp` com Django 6.1 (só o CI diz, e passou); o limite de tentativas não é testado; só um teste cobre o `has_permission`.
+- **Fica**: PR 2 (`create_operator`, `reset_totp`); cifra do backup como requisito do runbook (ADR 0011); rede do admin, política de senha e permissões; teste manual com app autenticador.
+
 ### 2026-11-08 — Sessão 36 (P-11, financiamento)
 
 - **Pedido**: "vamos de p11" (plan mode). Escolhas do dono: só princípios e restrições; vetos a partidos/candidatos/campanhas, governos e órgãos monitorados, publicidade e venda de dados, e empresas com interesse regulado; o dono banca a infraestrutura por enquanto.

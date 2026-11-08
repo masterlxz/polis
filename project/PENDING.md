@@ -6,7 +6,6 @@ Decisões em aberto, vindas do PRD §18 (nome e licença já decididos: ADR 0001
 
 | ID | Pendência | Observação |
 |---|---|---|
-| P-04 | Arquitetura de implantação e hospedagem | |
 | P-07 | Estratégia de armazenamento de documentos | |
 | P-08 | Provedores e modelos de IA, RAG, embeddings e custos | |
 | P-09 | Estratégia de autenticação | |
@@ -23,6 +22,7 @@ Decisões em aberto, vindas do PRD §18 (nome e licença já decididos: ADR 0001
 | (nome) | Nome definitivo do projeto | polis, ADR 0001 |
 | (licença) | Licença e estratégia de código aberto | AGPL-3.0, ADR 0002 |
 | (repo) | Dono e visibilidade do repositório | masterlxz, público, ADR 0003 |
+| P-04 | Arquitetura de implantação e hospedagem | ADR 0011 (2026-11-08): VPS único com Docker Compose (Django, PostgreSQL 18, proxy), servidor e backups no Brasil, teto de cerca de US$ 20/mês. Provedor e plano ficam para a implantação, com preço conferido na página oficial. Risco aberto: o volume-alvo pode não caber no teto; o teste de carga do ADR 0010 decide |
 | P-06 | Estratégia de busca | ADR 0012 (2026-11-08): só PostgreSQL (`unaccent` + `pg_trgm`) atrás de um módulo com interface única; Etapa 1 busca nome público de pessoa e partido; nome civil fora do índice. Gatilho de reavaliação: p95 > 1,5 s ou relevância insuficiente |
 | P-13 | Priorização final dos módulos | ADR 0009 (2026-11-08): ordem das etapas do PRD §15 mantida; Etapa 1 fatiada na vertical, TSE de ponta a ponta (normalização, pessoa e candidatura, página de candidato, busca simples) antes de Câmara e Senado. Reavaliar da Etapa 2 em diante ao fim da Etapa 1 |
 | P-14 | Metas quantitativas de desempenho e disponibilidade | ADR 0010 (2026-11-08), metas da Etapa 1 a validar: leitura pública 99,5%/mês, RPO e RTO de 24 h, p95 de página ≤ 800 ms e de busca ≤ 1,5 s, 50 req/s, 100 milhões de linhas (estimativa, não medida). Reavaliar com a primeira medição real |

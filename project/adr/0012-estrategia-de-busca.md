@@ -2,6 +2,8 @@
 
 **Data:** 2026-11-08
 
+> **Atualização (2026-11-08):** o spike do ADR 0015 disparou o gatilho (a) da decisão 5. Com dados sintéticos enviesados, 300 mil nomes e 2 vCPU emulados, a busca por trigramas saturou a 3 buscas por segundo (p95 de 1,7 a 13,8 s) contra os 10 por segundo e 1,5 s da meta (ADR 0010). Esta decisão fica **em revisão**: a decisão 1 (só PostgreSQL com `pg_trgm` no modelo medido) não se sustenta como está; ver "Resultado do spike" no ADR 0015. A revisão (token, prefixo, pré-filtro, cache ou busca dedicada) ainda não foi decidida nem testada.
+
 ## Contexto
 O P-06 pede a estratégia de busca. Entradas: o ADR 0006 (PostgreSQL como único banco da Etapa 1, com `unaccent` e `pg_trgm` anunciados para o P-06), o ADR 0009 (a Etapa 1 inclui "busca simples por nome"), o ADR 0010 (p95 de busca ≤ 1,5 s) e o ADR 0011 (um VPS único, teto de cerca de US$ 20/mês). Duas observações do repositório:
 

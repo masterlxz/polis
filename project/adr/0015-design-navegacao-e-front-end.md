@@ -26,4 +26,40 @@ O P-18 pede design e navegação definitivos. O PRD §7 lista 11 seções de nav
 - **Duas stacks para quem contribui** no projeto aberto (ADR 0006): Python e TypeScript.
 - **Melhor base para a interatividade da Etapa 2** (filtros, comparações, alertas), que é o ganho esperado.
 - O `OVERVIEW.md` e o job de CI mudam quando o spike confirmar a decisão; até lá, nada é implementado.
-- **Não verificado:** nenhuma medição de memória, latência ou build; nenhuma versão conferida; a proteção da API interna.
+- **Não verificado:** nenhuma medição de memória, latência ou build; nenhuma versão conferida; a proteção da API interna. *(Atualizado pelo spike, abaixo.)*
+
+## Resultado do spike (2026-11-08)
+
+Código, dados sintéticos, script de carga e resultados brutos estão na branch `spike/nextjs` (`spikes/nextjs/`), que **nunca vai para a `main`** (ADR 0006, decisão 3). Dados 100% sintéticos (300 mil nomes inventados, sem CPF). Versões do teste, todas com mais de 14 dias na data: Next.js 16.4.3 (2026-10-23), React 19.3.1 (2026-10-14), Node 24.22.2, Django 6.1.3, psycopg 3.3.8, gunicorn 26.2.0, `postgres:18`.
+
+**Como mediu:** Docker Compose na máquina de desenvolvimento (8 núcleos, 15 GB), `cpuset` emulando 2 vCPU com todos os contêineres dividindo os mesmos 2 núcleos; gerador de carga em outros núcleos; taxa fixa, 10 s de aquecimento e 60 s medidos, `trailingSlash` ligado no Next.js para as URLs serem iguais às do Django. Dois cenários, porque a primeira tentativa (80% perfil, 20% busca, 50 req/s) saturou a máquina **na pilha base**, antes de o Next.js entrar.
+
+**1. Página de perfil, 50 req/s, 5 repetições, 2 vCPU (load do host entre 0,7 e 3,8):**
+
+| Pilha | p50 | p95 (mediana; máx.) | p99 | RAM total sob carga (mediana) | Erros |
+|---|---|---|---|---|---|
+| Base: Django templates | 3,1 ms | 3,9 ms; 4,4 ms | 5 a 44 ms | 188 MiB | 0 |
+| Alvo: Django JSON + Next.js | 9,1 ms | 13,4 ms; 15,9 ms | 38 a 56 ms | 527 MiB | 0 |
+
+O Next.js multiplica a latência de página por cerca de 3 (de poucos ms para poucas dezenas de ms) e acrescenta cerca de **340 MiB** (o contêiner do Next.js chegou a 351 MiB), muito abaixo do teto de ~1 GB e longe da meta de 800 ms. Imagens: Next.js 384 MB, Django 288 MB.
+
+**2. Busca por nome (pg_trgm, ADR 0012), só buscas, 2 vCPU, 3 repetições:**
+
+| Taxa | Pilha | p50 | p95 | Erros |
+|---|---|---|---|---|
+| 3 buscas/s | Base | 0,7 a 8,6 s | 2,4 a 13,8 s | 45 (timeouts) |
+| 3 buscas/s | Alvo | 0,6 a 1,7 s | 1,7 a 5,9 s | 1 |
+| 6 buscas/s | Base | 14,9 a 16,6 s | 25,7 a 29,5 s | 20 |
+| 6 buscas/s | Alvo | 14,6 a 17,7 s | 23,2 a 29,9 s | 19 |
+
+A meta do ADR 0010 (50 req/s com 20% de busca = 10 buscas/s, p95 ≤ 1,5 s) **não foi atingida**, e a causa **não é o Next.js**: base e alvo ficam parecidos, o tempo está no PostgreSQL. Uma consulta de nome comum ("Maria da Silva") custou cerca de 1,6 s com o limiar padrão do `pg_trgm` (0,3) em um só núcleo, 0,94 s com 0,5 e 0,2 s com 0,7 (que, porém, devolveu 0 resultados para "Maira da Silva", um erro de digitação). Sem o índice de trigramas, uma consulta rara passou de cerca de 0,2 s para 3,2 s, o que prova que o teste enxerga o índice. O load alto dessas rodadas é a fila nos 2 núcleos causada pela própria busca, não ruído externo.
+
+**Conclusão sobre esta decisão:**
+- O que cabe ao **Next.js** (decisão 3) **passou**: memória extra de ~340 MiB, página muito abaixo de 800 ms, sem erros. Pelo que foi medido, a condição do spike está atendida **para o Next.js**, e a decisão 1 (Next.js separado) pode seguir.
+- O critério global do spike (busca p95 ≤ 1,5 s a 50 req/s) **não passou**, por causa da busca. Isso aciona o gatilho (a) do ADR 0012 e precisa de uma revisão da busca, que é outro assunto (ver P-06 no `PENDING.md`).
+
+**O que o spike não prova:**
+- Dados sintéticos e **enviesados** (nomes comuns repetem muito, de propósito); a consulta mais cara é a de nome comum, e a distribuição real pode ser melhor ou pior. A primeira versão do gerador estava defeituosa (só 180 nomes distintos) e foi descartada.
+- Uma máquina de desenvolvimento, não um VPS: `cpuset` emula CPU, mas não a E/S de disco nem o vizinho ruidoso; os 2 vCPU/4 GB e 1 vCPU/2 GB são hipóteses minhas (nenhum plano foi verificado). O perfil de 1 vCPU/2 GB foi medido só na rodada ruidosa (host com load de 14 a 17), por isso **não é reportado**; os números ficam nos arquivos brutos da branch.
+- Não mediu o tráfego misto (perfil e busca juntos) com o Next.js em condições limpas; não mediu tempo de build isolado nem a proteção da API interna; sem tráfego real.
+- Uma mitigação da busca (token, prefixo, pré-filtro por UF, cache, busca dedicada) é **hipótese não testada**.

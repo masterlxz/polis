@@ -15,7 +15,7 @@ Decisões em aberto, vindas do PRD §18 (nome e licença já decididos: ADR 0001
 | P-11 | Modelo de financiamento e sustentabilidade | |
 | P-13 | Priorização final dos módulos | |
 | P-14 | Metas quantitativas de desempenho e disponibilidade | |
-| P-16 | Interpretações jurídicas que exijam validação especializada | LGPD e dados de processos judiciais |
+| P-16 | Interpretações jurídicas que exijam validação especializada | LGPD e dados de processos judiciais. Pesquisa de apoio (sem parecer) em `lgpd-lai.md`, Sessão 27; as 6 perguntas seguem abertas e o dono decidiu não levar a advogado por ora |
 | P-17 | Identidade visual, linguagem da marca e domínio | O nome polis tem homônimo conhecido (`pol.is`), ver ADR 0001 |
 | P-18 | Design e navegação definitivos | |
 

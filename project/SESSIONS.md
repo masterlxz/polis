@@ -2,6 +2,13 @@
 
 Mais recente no topo.
 
+### 2026-11-08 — Sessão 34 (P-08, inteligência artificial)
+
+- **Pedido**: "vamos de p08" (plan mode). Escolhas do dono: ADR só com princípios e restrições; API externa permitida só com dado público.
+- **Feito**: ADR 0018 (IA só na Etapa 4; regras do PRD §10.1 como requisitos; citação verificada por código; sem SQL livre; conteúdo externo como dado; provedor externo só com dado público; interface única de provedor; limite de custo). P-08 movida para "Resolvidas". O PR #48 da Sessão 33 (P-07) foi mesclado pelo dono antes.
+- **Não verificado**: nenhum provedor, modelo, preço, qualidade em português ou taxa de alucinação foi medido; o envio de dado público a provedor no exterior é pergunta jurídica do P-16, sem parecer.
+- **Fica**: provedor, modelo, embeddings e RAG num ADR e spike da Etapa 4.
+
 ### 2026-11-08 — Sessão 33 (P-07, armazenamento de documentos)
 
 - **Pedido**: "vamos de p07" (plan mode). Escolhas do dono: decisão enxuta agora (só princípios) e padrão "link + hash".

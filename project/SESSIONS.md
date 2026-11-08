@@ -2,6 +2,15 @@
 
 Mais recente no topo.
 
+### 2026-11-08 — Sessão 32 (spike da busca, P-06 resolvida de novo)
+
+- **Pedido**: "revisar a busca (P-06) primeiro" (plan mode). Escolhas do dono: medir as quatro variantes (V1 `pg_trgm` 0,5 e `word_similarity`; V2 tokens + reserva; V3 cache; V4 busca dedicada) e o critério de relevância (pessoa certa no top 10 em ≥ 95% das consultas exatas e sem acento e ≥ 80% com um erro de digitação; percentuais propostos por mim).
+- **Feito**: branch `spike/busca` (no remoto, **sem PR para a `main`**): rotas por variante, índice `tsvector`, Meilisearch v1.55.0 (licença conferida na fonte, MIT mais BUSL nas partes Enterprise), script de recall e de carga com tráfego uniforme e Zipf. ADR 0016 (substitui a decisão 1 do 0012), nota no ADR 0012, P-06 de volta a "Resolvidas".
+- **Resultado**: V2 passou nos dois critérios (p95 de 154 ms a 10 buscas/s; recall de 99% com erro e 88% em prefixo); V1 reprovou a latência (1,8 s); o Meilisearch foi o mais rápido (14 ms) mas reprovou a relevância (64% com erro, 2 a 4% em prefixo); o cache não foi necessário. A V2 a 20 buscas/s ficou em p95 de ~170 ms.
+- **Tropeços (meus)**: (1) `SET ... = %s` não aceita parâmetro no psycopg 3: as quatro variantes deram 500 até trocar por `set_config`; só a V4 rodou na primeira passada. (2) O primeiro recall era com n=300 e levaria cerca de uma hora nas variantes de trigramas; reduzi a n=100 por variante (a V4 também em n=300, no arquivo `recall-V4-n300.json`). (3) O teste "quebre de propósito" mostrou efeito menor que o esperado (53 para 158 ms), registrado como está.
+- **Não verificado**: dados sintéticos e enviesados; máquina de desenvolvimento, não VPS; nenhuma consulta real; o motivo exato da fraqueza do Meilisearch com erro e prefixo (hipótese, não conferida na documentação); limiar 0,5 e corte de 5 resultados na reserva não foram otimizados; tráfego Zipf é suposição.
+- **Fica**: implementar a busca (migração com `unaccent` e `tsvector` gerada só do nome público, teste de que o nome civil não aparece, módulo `buscar(consulta, filtros)`) como parte da Etapa 1; normalização do TSE; o `dependabot.yml` precisará cobrir `npm` se o Next.js for adiante.
+
 ### 2026-11-08 — Sessão 31 (spike do Next.js, condição do ADR 0015)
 
 - **Pedido**: "vamos pro 2 ent" (spike do Next.js; plan mode). Escolhas do dono: dois perfis de máquina emulados (2 vCPU/4 GB e 1 vCPU/2 GB) e como critério de pronto "cabe nas metas do ADR 0010 e RAM extra ≤ ~1 GB" (o 1 GB é palpite meu).

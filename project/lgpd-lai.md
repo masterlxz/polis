@@ -29,7 +29,7 @@
 3. Divulgar dado sensível público (candidatura e partido como opinião política; cor/raça) é permitido, e sob quais condições?
 4. Prazo e procedimento para pedidos do art. 18 (ADR 0005, decisão 10, hoje sem prazo).
 5. Uso comercial e redistribuição em massa (ADR 0008, decisão 9).
-6. O CPF de 2026 no CSV do TSE: o polis o descarta na leitura (ADR 0005); a pergunta ao TSE sobre por que ele aparece segue sem envio.
+6. O CPF de 2026 no CSV do TSE: o polis o descarta na leitura (ADR 0005); a pergunta ao TSE sobre por que ele aparece foi **enviada em 2026-11-07** pelo formulário "Solicitação" da Ouvidoria do TSE (sem menção ao polis). **Aguardando resposta.** O código de acompanhamento fica com o dono, fora do repo público. Quando o TSE responder, atualizar `fontes/tse.md` e o ADR 0005 se algo mudar.
 
 ## Conclusão provisória
 

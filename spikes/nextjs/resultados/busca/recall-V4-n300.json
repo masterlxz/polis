@@ -1,0 +1,25 @@
+{
+  "variante": "V4",
+  "extra": "",
+  "n": 300,
+  "exato": {
+    "recall_top10_pct": 100.0,
+    "lat_mediana_ms_sem_carga": 8.4,
+    "lat_p95_ms_sem_carga": 11.0
+  },
+  "sem_acento": {
+    "recall_top10_pct": 100.0,
+    "lat_mediana_ms_sem_carga": 8.4,
+    "lat_p95_ms_sem_carga": 10.5
+  },
+  "um_erro": {
+    "recall_top10_pct": 64.3,
+    "lat_mediana_ms_sem_carga": 8.0,
+    "lat_p95_ms_sem_carga": 10.0
+  },
+  "prefixo": {
+    "recall_top10_pct": 4.3,
+    "lat_mediana_ms_sem_carga": 7.8,
+    "lat_p95_ms_sem_carga": 10.2
+  }
+}

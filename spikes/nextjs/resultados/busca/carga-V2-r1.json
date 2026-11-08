@@ -1,0 +1,28 @@
+{
+  "url": "http://127.0.0.1:8001",
+  "rps_alvo": 10.0,
+  "duracao_s": 60.0,
+  "atraso_max_do_gerador_ms": 0,
+  "perfil": {
+    "n": 0,
+    "erros": 0,
+    "p50_ms": null,
+    "p95_ms": null,
+    "p99_ms": null,
+    "media_ms": null
+  },
+  "busca": {
+    "n": 600,
+    "erros": 0,
+    "p50_ms": 25.2,
+    "p95_ms": 174.5,
+    "p99_ms": 440.4,
+    "media_ms": 55.4
+  },
+  "memoria_max_mib": {
+    "nextjs-db-1": 141.3,
+    "nextjs-django-base-1": 96.9,
+    "nextjs-meili-1": 193.1
+  },
+  "memoria_soma_mib": 431.3
+}

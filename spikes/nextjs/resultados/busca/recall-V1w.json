@@ -1,0 +1,25 @@
+{
+  "variante": "V1w",
+  "extra": "",
+  "n": 100,
+  "exato": {
+    "recall_top10_pct": 100.0,
+    "lat_mediana_ms_sem_carga": 131.8,
+    "lat_p95_ms_sem_carga": 576.1
+  },
+  "sem_acento": {
+    "recall_top10_pct": 100.0,
+    "lat_mediana_ms_sem_carga": 137.4,
+    "lat_p95_ms_sem_carga": 676.3
+  },
+  "um_erro": {
+    "recall_top10_pct": 89.0,
+    "lat_mediana_ms_sem_carga": 109.8,
+    "lat_p95_ms_sem_carga": 599.1
+  },
+  "prefixo": {
+    "recall_top10_pct": 77.0,
+    "lat_mediana_ms_sem_carga": 133.5,
+    "lat_p95_ms_sem_carga": 397.6
+  }
+}

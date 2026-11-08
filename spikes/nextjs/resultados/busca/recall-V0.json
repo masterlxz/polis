@@ -1,0 +1,25 @@
+{
+  "variante": "V0",
+  "extra": "",
+  "n": 100,
+  "exato": {
+    "recall_top10_pct": 100.0,
+    "lat_mediana_ms_sem_carga": 423.7,
+    "lat_p95_ms_sem_carga": 941.4
+  },
+  "sem_acento": {
+    "recall_top10_pct": 100.0,
+    "lat_mediana_ms_sem_carga": 420.7,
+    "lat_p95_ms_sem_carga": 1002.0
+  },
+  "um_erro": {
+    "recall_top10_pct": 99.0,
+    "lat_mediana_ms_sem_carga": 342.0,
+    "lat_p95_ms_sem_carga": 834.5
+  },
+  "prefixo": {
+    "recall_top10_pct": 80.0,
+    "lat_mediana_ms_sem_carga": 312.4,
+    "lat_p95_ms_sem_carga": 945.1
+  }
+}

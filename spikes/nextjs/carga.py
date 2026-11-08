@@ -1,6 +1,6 @@
 """Gerador de carga do spike (ADR 0015). Só biblioteca padrão. Taxa fixa (aberta), mistura 80% perfil / 20% busca.
 
-Uso: python3 carga.py URL_BASE [rps=50] [duracao=60] [aquecimento=10] [semente=1] [fracao_busca=0.2]
+Uso: python3 carga.py URL_BASE [rps=50] [duracao=60] [aquecimento=10] [semente=1] [fracao_busca=0.2] [extra_query=""] [dist=uniform|zipf]
 Imprime um JSON com p50/p95/p99 por tipo, erros e a RSS máxima por contêiner (docker stats).
 """
 
@@ -23,9 +23,33 @@ NOMES = [x.strip() for x in open("consultas.txt", encoding="utf-8") if x.strip()
 _local = threading.local()
 
 
-def consulta(rnd):
+_ZIPF = None
+
+
+def _escolhe(rnd, dist):
+    """uniform: todos os nomes igualmente prováveis. zipf: peso 1/posição (SUPOSIÇÃO: tráfego real repete consultas)."""
+    global _ZIPF
+    if dist != "zipf":
+        return rnd.choice(NOMES)
+    if _ZIPF is None:
+        acc, _ZIPF = 0.0, []
+        for i in range(len(NOMES)):
+            acc += 1.0 / (i + 1)
+            _ZIPF.append(acc)
+    x = rnd.random() * _ZIPF[-1]
+    lo, hi = 0, len(_ZIPF) - 1
+    while lo < hi:
+        mid = (lo + hi) // 2
+        if _ZIPF[mid] < x:
+            lo = mid + 1
+        else:
+            hi = mid
+    return NOMES[lo]
+
+
+def consulta(rnd, dist="uniform"):
     """Nome + sobrenome, às vezes sem acento ou com uma letra a menos (erro de digitação)."""
-    partes = rnd.choice(NOMES).split()
+    partes = _escolhe(rnd, dist).split()
     q = " ".join(partes[: rnd.choice((2, 3))])  # nome e 1º sobrenome, ou nome completo
     r = rnd.random()
     if r < 0.3:
@@ -81,6 +105,8 @@ def main():
     aq = float(sys.argv[4]) if len(sys.argv) > 4 else 10
     rnd = random.Random(int(sys.argv[5]) if len(sys.argv) > 5 else 1)
     frac_busca = float(sys.argv[6]) if len(sys.argv) > 6 else 0.2
+    extra = sys.argv[7] if len(sys.argv) > 7 else ""  # ex.: "&v=V2&c=1" (variante da busca)
+    dist = sys.argv[8] if len(sys.argv) > 8 else "uniform"
 
     res = {"perfil": [], "busca": []}
     erros = {"perfil": 0, "busca": 0}
@@ -117,7 +143,7 @@ def main():
             if rnd.random() >= frac_busca:
                 ex.submit(um, "perfil", f"/perfil/{rnd.randint(1, N_PESSOAS)}/")
             else:
-                ex.submit(um, "busca", f"/busca/?q={quote(consulta(rnd))}")
+                ex.submit(um, "busca", f"/busca/?q={quote(consulta(rnd, dist))}{extra}")
             n += 1
     parar.set()
     if th:

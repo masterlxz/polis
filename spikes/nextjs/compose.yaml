@@ -37,9 +37,23 @@ services:
       POSTGRES_USER: polis
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD}
       WORKERS: ${WORKERS:-2}
+      MEILI_URL: http://meili:7700
+      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:-spike-descartavel-chave-meili-0123456789}
     ports:
       - "127.0.0.1:8001:8000"
     profiles: [base]
+
+  # V4 (spike da busca): Meilisearch v1.55.0, edição comunitária (MIT). Só na rede do Compose.
+  meili:
+    <<: *limites
+    image: getmeili/meilisearch:v1.55.0
+    environment:
+      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:-spike-descartavel-chave-meili-0123456789}
+      MEILI_ENV: production
+      MEILI_NO_ANALYTICS: "true"
+    volumes:
+      - meilidata:/meili_data
+    profiles: [meili]
 
   # ALVO: Django só com JSON interno, SEM porta publicada (só a rede do Compose), e o Next.js na frente.
   django:
@@ -62,3 +76,4 @@ services:
 
 volumes:
   pgdata:
+  meilidata:

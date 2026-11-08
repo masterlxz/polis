@@ -39,4 +39,9 @@ SELECT
 FROM generate_series(1, 300000) AS g, pn, sn;
 
 CREATE INDEX pessoa_nome_trgm ON pessoa USING gin (f_unaccent(nome_publico) gin_trgm_ops);
+
+-- V2 (spike da busca): palavras sem acento, config 'simple' (sem stemming), consulta por prefixo.
+ALTER TABLE pessoa ADD COLUMN nome_tsv tsvector
+  GENERATED ALWAYS AS (to_tsvector('simple', f_unaccent(nome_publico))) STORED;
+CREATE INDEX pessoa_nome_tsv ON pessoa USING gin (nome_tsv);
 ANALYZE pessoa;

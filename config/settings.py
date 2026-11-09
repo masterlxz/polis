@@ -32,6 +32,7 @@ INSTALLED_APPS = [
     "django_otp.plugins.otp_totp",
     "django_otp.plugins.otp_static",
     "apps.sources",
+    "apps.elections",
     "apps.operators",
 ]
 

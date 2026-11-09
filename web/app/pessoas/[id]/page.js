@@ -66,6 +66,7 @@ export default async function Pessoa({ params }) {
   return (
     <>
       <h1>{pessoa.nome}</h1>
+      <pre>{JSON.stringify(perfil)}</pre>
       <p className="identificacao">
         {`Ciclo eleitoral ${pessoa.ciclo}. Identificador no TSE (SQ_CANDIDATO): ${pessoa.id_tse}.`}
       </p>

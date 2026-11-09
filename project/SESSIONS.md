@@ -2,6 +2,17 @@
 
 Mais recente no topo.
 
+### 2026-11-09 — Sessão 45 (Next.js, PR 2 de 2: página de candidato)
+
+- **Pedido**: "sim, segue" (plan mode). Escolhas do dono: testes com `node --test` e API falsa; **omitir por ora a data de geração da fonte** (fuso do TSE não verificado). Aprovou a tabela de testes ("sim por seguir"); as respostas padrão valeram: data de coleta "07/11/2026 às 23:17" e mensagem genérica de erro.
+- **Feito**: `web/app/pessoas/[id]/page.js` e `Atribuicao.js`, `not-found.js`, `error.js`, `layout.js` (cabeçalho com descritor, rodapé, "Pular para o conteúdo", `noindex`), `globals.css`; `web/lib/api.js` (valida o id, tempo limite, `no-store`, `cache()` do React) e `formatar.js`; `Dockerfile` copia `lib`; helper de testes e `saude.test.mjs` adaptado. Nota no ADR 0015, `OVERVIEW.md`, `README.md`.
+- **Provas (CI, no PR #64)**: vermelho (run 42635877041): 24 falhas (todos os testes da página, cada um com controle de que a página ou a API falsa respondeu) e os 3 de saúde verdes; verde (run 42636924786): **27 passam**, 0 falham. **4 mutações**, cada uma num PR rascunho descartável (fechados, branches apagadas), pegas pelo teste certo: link de qualquer protocolo, 4 testes (42637357729); id sem validar, 5 (42637370218); perfil despejado na tela, 2 (42637382066); sem o `cache()` do React, a API chamada em dobro, 1 (42637395215).
+- **Conferência real (dono, Compose)**: `docker compose build front` e `up -d front`; `front` `healthy`; `404` para uma pessoa inexistente e para o id `2026-abc`; no navegador, "deu boa" (sem detalhar item por item; leitor de tela não informado).
+- **Tropeços (meus)**: (1) o plano tinha uma linha de teste com texto de exemplo mal escrito ("22/11...") que não corresponde ao dado (o certo é 07/11/2026); o teste ficou correto. (2) O caso `//evil.example.org/x` não distingue a mutação 1, porque `new URL()` já o rejeita sozinho; a proteção real contra ele é o `new URL`.
+- **Pontos fracos conhecidos**: acessibilidade só tem teste de estrutura (idioma, um `h1`, ordem de títulos); contraste não foi medido com ferramenta (estimei no CSS); o status 500 da falha da API depende de como o Next trata o erro antes de enviar a página (o CI confirmou 500, mas é comportamento do Next, não nosso código).
+- **Não verificado**: conformidade WCAG 2.2 AA (é meta); leitor de tela; desempenho com dado real; pessoa com muitas candidaturas; nome muito longo em caixa alta; a proteção da rede interna na implantação.
+- **Fica**: tornar o job `web` obrigatório no ruleset; busca; página inicial e navegação (quando houver o que listar); ligação entre ciclos (ADR próprio); lápide, quando houver retirada real para observar; fuso do `DT_GERACAO`; `spike/busca` e `spike/nextjs`; `kin/target` com 5,1 GB e `/` em 85%.
+
 ### 2026-11-09 — Sessão 44 (Next.js, PR 1 de 2: infraestrutura do front)
 
 - **Pedido**: "sim", seguir para o Next.js depois da API interna (plan mode). Escolhas do dono: **2 PRs** (infra agora, página de candidato depois) e **testes com `node --test` e API falsa**, sem ferramenta de teste nova.

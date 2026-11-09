@@ -2,6 +2,17 @@
 
 Mais recente no topo.
 
+### 2026-11-09 — Sessão 47, parte 2 (busca de pessoas, PR 2 de 2: página `/busca/`)
+
+- **Pedido**: "sim" para abrir o PR 2 em plan mode, logo depois de mesclar o #70. Escolhas do dono: **link "Buscar" no cabeçalho e a raiz `/` redirecionando para `/busca/`**; **nota fixa** sobre nomes parecidos (sem mudar a API). Aprovou a tabela de testes ("segue").
+- **Feito**: `web/lib/api.js` (`prepararConsulta` e `buscarPessoas`, que valida o formato da resposta porque o `id` vira `href`), `web/app/busca/page.js` (formulário GET renderizado no servidor, lista, contagem e nota), `web/app/page.js` (redirect 307), link "Buscar" em `<nav aria-label="Principal">` no `layout.js`, estilo em `globals.css`, `web/tests/busca.test.mjs` (21 testes). Nota no ADR 0015, `README.md` e `OVERVIEW.md`.
+- **Provas (CI, `workflow_dispatch` no `web.yml`)**: vermelho (run 42706894921): 21 falhas (20 por `404` na rota inexistente, 1 pelo `<nav>` ausente) e 27 antigos verdes; verde (run 42707272414): **48 passam**. **7 mutações**, cada uma na sua branch descartável (apagadas), todas pegas pelo teste certo: `q` sem codificar, 2 testes (42707453221); `id` sem validar, 2 (42707489224); API chamada com `q` vazio, 3 (42707525443); último `q` em vez do primeiro, 1 (42707560601); sem o corte de 100 caracteres, 1 (42707597412); nome sem escapar, 1 (42707634526); redirect permanente (308) em vez de 307, 1 (42707671420).
+- **Conferência real (dono, Compose)**: `docker compose build front` e `up -d front`; `curl` na raiz devolveu `307 Temporary Redirect` (o `location` foi cortado pelo `head`, mas o teste de CI o prova); no navegador, "funcionou" (sem detalhar item por item; teclado, zoom e leitor de tela não informados).
+- **Tropeços (meus)**: (1) o primeiro verde falhou por defeito do meu teste, que procurava "null" no HTML inteiro (o Next tem `null` legítimo nos scripts de hidratação); passei a conferir só o texto do detalhe. (2) A tabela de testes listou 16 linhas e o arquivo ficou com 21 testes (os de formato inválido e os de falha da API se desdobraram); não afeta o comportamento fixado. (3) Dois monitores de CI meus terminaram cedo por condição de loop errada; troquei por `gh run watch`.
+- **Pontos fracos conhecidos**: acessibilidade só tem teste de estrutura (idioma, um `h1`, rótulo ligado ao campo, `role="search"`, `nav` com nome); contraste dos estilos novos estimado, não medido; a nota dos nomes parecidos é um texto fixo, que aparece mesmo quando todos os resultados são exatos.
+- **Não verificado**: leitor de tela; teclado e zoom a 200% (o dono não detalhou); a página com os 20 resultados reais no navegador; se a nota dos parecidos ajuda ou confunde.
+- **Fica**: filtros de UF e partido; marcar cada resultado aproximado (campo novo na API); página inicial de verdade; ligação entre ciclos (ADR próprio); lápide; fuso do `DT_GERACAO`; carga concorrente da busca (ADR 0010); `spike/busca` e `spike/nextjs`.
+
 ### 2026-11-09 — Sessão 47 (busca de pessoas, PR 1 de 2: backend)
 
 - **Pedido**: "pode sim" para começar a busca (plan mode). Escolhas do dono: **nome social fora do índice**, **2 PRs** (backend e depois a página `/busca/`), **mínimo de 2 caracteres**, e a **migração liberada** (AGENTS.md §4). Aprovou a tabela de testes.

@@ -53,6 +53,14 @@ function qRecebido(chamadas) {
   return url.searchParams.get("q");
 }
 
+// O texto visível da linha de detalhe do primeiro resultado (o HTML inteiro tem `null` legítimo
+// nos scripts de hidratação do Next, então não dá para procurar "null" nele).
+function detalhe(html) {
+  const [, texto] = html.match(/<span class="detalhe">([^<]*)<\/span>/) ?? [];
+  assert.notEqual(texto, undefined, "não há linha de detalhe na página");
+  return texto;
+}
+
 function tagInput(html) {
   const [tag] = html.match(/<input[^>]*>/) ?? [];
   assert.ok(tag, "não há campo de busca na página");
@@ -91,13 +99,14 @@ test("com resultados: nomes como link para o perfil e o q certo na API", async (
 test("UF, partido e ciclo aparecem; UF ou partido nulos somem, sem escrever null", async () => {
   const completo = await buscar("maria", lista(resultado({ uf: "SP", partido: "XYZ" })));
   assert.equal(completo.status, 200);
-  assert.ok(completo.html.includes("SP · XYZ · ciclo 2026"));
+  assert.equal(detalhe(completo.html), "SP · XYZ · ciclo 2026");
 
-  const vazio = await buscar("maria", lista(resultado({ uf: null, partido: null })));
-  assert.equal(vazio.status, 200);
-  assert.ok(vazio.html.includes("ciclo 2026"));
-  assert.ok(!vazio.html.includes("null"));
-  assert.ok(!vazio.html.includes("SP ·"));
+  const semUf = await buscar("maria", lista(resultado({ uf: null, partido: "XYZ" })));
+  assert.equal(detalhe(semUf.html), "XYZ · ciclo 2026");
+
+  const semNada = await buscar("maria", lista(resultado({ uf: null, partido: null })));
+  assert.equal(semNada.status, 200);
+  assert.equal(detalhe(semNada.html), "ciclo 2026");
 });
 
 test("acento e símbolos vão codificados e chegam inteiros à API", async () => {

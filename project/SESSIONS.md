@@ -2,6 +2,15 @@
 
 Mais recente no topo.
 
+### 2026-11-09 — Sessão 39 (normalização do TSE, PR 1: modelos)
+
+- **Pedido**: "vamos pra normalização do TSE então" (plan mode). Escolhas do dono: uma `Person` por `SQ_CANDIDATO`, sem ligar ciclos (allowlist e ADR 0005 intactos); nome público = nome de urna, nome social guardado sem exibir; retirada pela fonte (lápide) em PR separado. Depois da medição, aprovou mudar a `Person` para única por **(ano do ciclo, `SQ_CANDIDATO`)**, e aprovou a tabela de 14 testes.
+- **Medido (passo 0, SQL somente leitura, só agregados)**: o bruto tem cada candidatura **duas vezes** (o `BRASIL.csv` repete os arquivos por UF, cópias idênticas); 21.017 candidaturas e 20.989 `SQ_CANDIDATO`; 28 `SQ` nos dois turnos; 466 nomes de urna homônimos; situação da candidatura sempre ausente; detalhes em `fontes/tse.md`. Isso mudou o modelo: com "uma `Person` por candidatura" os 28 candidatos de 2º turno virariam duas pessoas.
+- **Feito**: `apps/elections` (`Election`, `Person`, `Candidacy`, migração 0001 impressa pelo Django e gravada com `Write`, admin só leitura sem o nome social) e `tests/test_elections_models.py` (14 testes). Sem comando de normalização ainda (PR 2).
+- **Provas (CI, `workflow_dispatch`)**: sem implementação, erro de coleta, prova fraca (run 42540117328); com ela, 272 verdes (run 42540253860); mutação (unicidade `(ciclo, SQ)` da `Person` removida no modelo e na migração, branch descartável apagada): falhou só o teste de pessoa única (run 42540400534). A mutação precisou mexer na migração também, porque só no modelo o banco manteria a restrição.
+- **Não verificado**: estabilidade do `SQ_CANDIDATO` entre ciclos; se os 28 de dois turnos são a mesma pessoa (só coincidência de nome, partido, UF e cargo); fuso de `DT_GERACAO`/`HH_GERACAO`; migração aplicada num banco de desenvolvimento real (só no banco de teste do CI); tamanhos dos campos vêm de um único arquivo.
+- **Fica**: PR 2 (comando `normalize_tse`: deduplicar pela chave e **parar sem gravar se as cópias divergirem**, marcadores do TSE, idempotência, tudo ou nada); depois lápide; página de candidato; busca. O container `polis-db-1` ficou de pé no Compose do dono.
+
 ### 2026-11-08 — Sessão 38 (P-09, comandos de operador, PR 2)
 
 - **Pedido**: "vamos pro PR 2" (plano já aprovado na Sessão 37). Escolhas do dono: aprovou a tabela de 16 testes, `reset_totp` apagando também os códigos antigos e 10 códigos por padrão.

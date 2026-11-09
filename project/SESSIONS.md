@@ -2,6 +2,15 @@
 
 Mais recente no topo.
 
+### 2026-11-09 — Sessão 41 (`normalize_tse` rodado contra os dados reais)
+
+- **Pedido**: "vamos de 2", o "Para o dono rodar" da Sessão 40. Quem rodou foi o dono, no Compose; eu dei os comandos e conferi a saída (o guard-heavy também barra isso na minha sessão).
+- **Feito (pelo dono)**: `docker compose build web`, `migrate` e `normalize_tse` duas vezes, mais uma contagem por SQL de agregados.
+- **Resultado**: `migrate` aplicou `elections.0001` e as migrações do `otp_static` e do `otp_totp`, sem erro. Primeira execução: 42.034 linhas lidas, 21.017 candidaturas únicas, 21.017 criadas, sem `CommandError` (nenhuma linha inválida nem conflito entre cópias). Segunda: criadas 0, já existentes 21.017. SQL: **4 eleições, 20.989 pessoas, 21.017 candidaturas**, igual à medição da Sessão 39. O "Execução 1" na saída é o id da `IngestionRun` lida, não o número da execução do comando.
+- **Tropeço**: o primeiro `migrate` falhou com `No module named 'django_otp'`. Causa: a imagem `web` do Compose era anterior à Sessão 37 e as dependências ficam na imagem (só o código é montado). Corrigido com `docker compose build web`. Não é bug do código.
+- **Não verificado**: tempo e memória (o dono não mediu; sem sintoma relatado); fuso (Brasília) de `DT_GERACAO` e `HH_GERACAO`; estabilidade do `SQ_CANDIDATO` entre ciclos; se os 28 candidatos de dois turnos são a mesma pessoa; conteúdo dos dados (conferido só por contagens); tudo só no banco de desenvolvimento.
+- **Fica**: lápide da retirada pela fonte (PR próprio); página de candidato; busca; ligação de pessoas entre ciclos (ADR próprio); PR #56 do Dependabot (`actions/checkout` 4 para 7), com CI verde e ainda sem decisão; `kin/target` com 5,1 GB e `/` em 85% (limpeza manual, do dono).
+
 ### 2026-11-09 — Sessão 40 (normalização do TSE, PR 2: comando `normalize_tse`)
 
 - **Pedido**: "vamos pro PR 2" (plano da Sessão 39). Escolhas do dono: aprovou a tabela de testes e, nas duas perguntas, "parar o comando inteiro" em conflito entre linhas e em campo obrigatório com `NÃO DIVULGÁVEL` (a minha recomendação).

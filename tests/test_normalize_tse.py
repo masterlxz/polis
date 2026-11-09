@@ -70,21 +70,23 @@ def ana(**mudancas):
     return linha(**mudancas)
 
 
+BETO = {
+    "CD_ELEICAO": "6257",
+    "DS_ELEICAO": "Eleição Geral Federal 2026",
+    "TP_ABRANGENCIA": "FEDERAL",
+    "SG_UF": "BR",
+    "SG_UE": "BR",
+    "NM_UE": "BRASIL",
+    "CD_CARGO": "1",
+    "DS_CARGO": "PRESIDENTE",
+    "SQ_CANDIDATO": "1000000002",
+    "NR_CANDIDATO": "13",
+    "NM_URNA_CANDIDATO": "Beto da Urna",
+}
+
+
 def beto_1o_turno(**mudancas):
-    return linha(
-        CD_ELEICAO="6257",
-        DS_ELEICAO="Eleição Geral Federal 2026",
-        TP_ABRANGENCIA="FEDERAL",
-        SG_UF="BR",
-        SG_UE="BR",
-        NM_UE="BRASIL",
-        CD_CARGO="1",
-        DS_CARGO="PRESIDENTE",
-        SQ_CANDIDATO="1000000002",
-        NR_CANDIDATO="13",
-        NM_URNA_CANDIDATO="Beto da Urna",
-        **mudancas,
-    )
+    return linha(**{**BETO, **mudancas})
 
 
 def beto_2o_turno(**mudancas):

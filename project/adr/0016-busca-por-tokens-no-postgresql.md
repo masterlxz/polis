@@ -47,5 +47,11 @@ Sem o índice de tokens, uma consulta comum passou de 53 ms para 158 ms em um n�
 - Cabe no VPS único do ADR 0011 sem serviço novo; memória medida de banco e Django somada abaixo de 300 MiB sob a carga testada.
 - O caminho de reserva (consulta com erro de digitação) continua mais caro; os p99 de 430 a 520 ms vêm dele. Se o tráfego real tiver muita digitação errada, isso aparece primeiro.
 - A V2 não busca no meio de uma palavra nem corrige erro no início dela; "prefixo parcial" ficou em 88%, abaixo do 99% de erro de digitação, e é o ponto fraco restante.
-- Exige `unaccent` no índice (função envoltória imutável, como no ADR 0012); a imagem `postgres:18` as incluiu no spike (verificado ali), mas a migração de produção ainda não foi escrita.
+- Exige `unaccent` no índice (função envoltória imutável, como no ADR 0012); a imagem `postgres:18` as incluiu no spike (verificado ali).
+- **Implementado na Sessão 47 (2026-11-09):** migração `apps/elections/migrations/0002_busca_por_tokens.py` (extensões `unaccent` e `pg_trgm`, função `f_busca_normaliza` declarada `IMMUTABLE` por promessa nossa, coluna gerada `public_name_tsv`, índices GIN de tokens e de trigramas; a reversão apaga só os objetos nossos e deixa as extensões), `apps/elections/search.py` e `GET /internal/v1/busca/?q=`.
+  - **Índice e consulta tokenizam pela mesma regra** (tudo fora de `[a-z0-9]` vira espaço, nos dois lados). O parser do `to_tsvector` sozinho pode juntar `DR.JOAO` num token só; nos dados reais, 945 de 20.989 nomes têm ponto. Teste e mutação cobrem isso.
+  - **Nome social fora do índice** (decisão do dono, 2026-11-09): corrige a frase "ou social" do ADR 0012, decisão 2.
+  - **Limites da consulta:** mínimo de 2 caracteres úteis (decisão do dono), teto de 100 caracteres e 10 palavras, no máximo 20 resultados (o maior grupo de homônimos real tem 6).
+  - **`buscar(consulta)` ainda sem `filtros`:** UF e partido como filtro ficam para a fatia deles.
+  - **Não verificado:** a consulta tira acento em Python (`unicodedata`) e o índice no banco (`unaccent`); letras como `ø`, `æ` e `ß` o `unaccent` trata e o Python não, e não medi se existem nos nomes reais.
 - **Não verificado:** dados sintéticos e enviesados de propósito (nomes comuns repetem muito); máquina de desenvolvimento, não VPS; 2 vCPU/4 GB é hipótese; recall por nome ignora a ordem entre homônimos; 100 alvos por variante (a V4 também com 300); nenhuma consulta real; os limiares 0,5 e o corte de 5 resultados da reserva não foram otimizados; tráfego Zipf é suposição.

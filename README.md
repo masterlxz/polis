@@ -15,7 +15,7 @@ docker compose up -d --wait db          # PostgreSQL 18, só em 127.0.0.1:5432
 docker compose run --rm web python manage.py migrate
 docker compose up web                   # http://127.0.0.1:8000/admin/login/
 docker compose run --rm web pytest      # testes dentro do contêiner
-docker compose up -d web front          # front Next.js em http://127.0.0.1:3000/pessoas/<ciclo>-<sq>/
+docker compose up -d web front          # front Next.js em http://127.0.0.1:3000/ (busca em /busca/, perfil em /pessoas/<ciclo>-<sq>/)
 ```
 
 O front (`web/`, Next.js) chama a API interna do Django pela rede do Compose (`http://web:8000`); o build e os testes dele rodam no CI (job `web`), não na sua máquina.

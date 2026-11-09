@@ -101,3 +101,14 @@ Segunda metade da decisão 1: `GET /pessoas/<ciclo>-<sq>/` (`web/app/pessoas/[id
 - **Acessibilidade (decisão 6):** meta é WCAG 2.2 AA, **sem afirmar conformidade**. Os testes só conferem estrutura (idioma, um `h1`, ordem de títulos). Conferência manual do dono no navegador no Compose: "deu boa", sem detalhar item por item; leitor de tela não informado; contraste não medido com ferramenta.
 - **Testes:** 24 novos em `web/tests/pessoa.test.mjs`, contra o servidor de produção e uma API falsa (`node --test`, sem dependência nova); 4 mutações pegas.
 - **Não verificado:** leitor de tela e contraste medido; desempenho da página com dados reais (o spike mediu outra aplicação); a página para uma pessoa com muitas candidaturas; o caso de nome muito longo na caixa alta.
+
+## Busca e entrada do site (Sessão 47, 2026-11-09)
+
+Primeira navegação da Etapa 1 (decisão 1: só o que tem conteúdo). `GET /busca/?q=` (`web/app/busca/page.js`) renderiza no servidor o resultado da busca da API interna (ADR 0016); o formulário é um GET puro, sem JavaScript no navegador.
+
+- **Entrada:** link "Buscar" no cabeçalho de toda página e a raiz `/` redirecionando (307, provisório) para `/busca/`; a página inicial de verdade continua adiada (escolha do dono).
+- **Consulta:** só o primeiro `q` se vier repetido, sem espaços nas pontas, cortado em 100 caracteres, vazio não chama a API. O texto digitado volta escapado no campo; o título da página é fixo (não reflete o `q`). O front não repete a regra de normalização da API: consulta curta e lista vazia mostram a mesma mensagem.
+- **Resposta não confiável:** o `id` de cada resultado vira `href` e só passa se casar `^\d{4}-\d{1,12}$`; resposta fora do formato recusa tudo, como erro 500 genérico, sem o endereço da API (mesmo tratamento do perfil).
+- **Nomes parecidos (escolha do dono):** a API não distingue resultado exato de resultado da reserva por similaridade (ADR 0016), então a tela mostra uma nota fixa: "Quando há poucos resultados exatos, a lista inclui nomes parecidos com o digitado." Rotular cada item exigiria um campo novo na API.
+- **Testes:** 21 novos em `web/tests/busca.test.mjs` (`node --test`, API falsa); 7 mutações pegas.
+- **Não verificado:** leitor de tela e contraste medido; a página com 20 resultados reais; a nota dos nomes parecidos com usuários (se confunde ou ajuda).

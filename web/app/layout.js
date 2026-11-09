@@ -20,6 +20,9 @@ export default function RootLayout({ children }) {
           <p>
             <strong>polis</strong>: {DESCRITOR}
           </p>
+          <nav aria-label="Principal">
+            <a href="/busca/">Buscar</a>
+          </nav>
         </header>
         <main id="conteudo" tabIndex={-1}>
           {children}

@@ -18,6 +18,61 @@ function tempoLimiteMs() {
   return configurado > 0 ? configurado : TEMPO_LIMITE_PADRAO_MS;
 }
 
+const MAX_CARACTERES_DA_CONSULTA = 100;
+
+// O que o usuário digitou, pronto para ir à API: só o primeiro `q` se vier repetido, sem espaços
+// nas pontas e cortado em 100 caracteres (a API corta de novo; aqui evita uma URL enorme).
+// Vazio quer dizer "não busque".
+export function prepararConsulta(valor) {
+  const texto = Array.isArray(valor) ? valor[0] : valor;
+  if (typeof texto !== "string") return "";
+  return Array.from(texto.trim()).slice(0, MAX_CARACTERES_DA_CONSULTA).join("").trim();
+}
+
+function textoOuNulo(valor) {
+  return valor === null || typeof valor === "string";
+}
+
+function resultadoValido(item) {
+  return (
+    typeof item?.nome === "string" &&
+    typeof item.id === "string" &&
+    idValido(item.id) &&
+    Number.isInteger(item.ciclo) &&
+    textoOuNulo(item.uf) &&
+    textoOuNulo(item.partido)
+  );
+}
+
+// Busca pessoas pelo nome de urna (ADR 0016). O `id` de cada resultado vira `href`, então só
+// passa se tiver o formato `<ciclo>-<sq>`; qualquer coisa fora do formato recusa a resposta toda.
+export async function buscarPessoas(consulta) {
+  let resposta;
+  try {
+    const parametros = new URLSearchParams({ q: consulta });
+    resposta = await fetch(`${process.env.API_URL}/internal/v1/busca/?${parametros}`, {
+      cache: "no-store",
+      headers: { accept: "application/json" },
+      signal: AbortSignal.timeout(tempoLimiteMs()),
+    });
+  } catch {
+    throw new ErroDaApi("falha ao falar com a API");
+  }
+
+  if (!resposta.ok) throw new ErroDaApi(`a API respondeu ${resposta.status}`);
+
+  let corpo;
+  try {
+    corpo = await resposta.json();
+  } catch {
+    throw new ErroDaApi("a API devolveu algo que não é JSON");
+  }
+  if (!Array.isArray(corpo?.resultados) || !corpo.resultados.every(resultadoValido)) {
+    throw new ErroDaApi("a API devolveu uma busca fora do formato esperado");
+  }
+  return corpo.resultados;
+}
+
 // `cache` do React: o título e a página pedem o mesmo perfil, mas a API é chamada uma vez só
 // por requisição. O dado em si nunca fica em cache (`no-store`): quem a fonte retirar some na hora.
 export const buscarPerfil = cache(async (id) => {

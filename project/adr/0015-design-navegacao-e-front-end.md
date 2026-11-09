@@ -63,3 +63,14 @@ A meta do ADR 0010 (50 req/s com 20% de busca = 10 buscas/s, p95 ≤ 1,5 s) **n�
 - Uma máquina de desenvolvimento, não um VPS: `cpuset` emula CPU, mas não a E/S de disco nem o vizinho ruidoso; os 2 vCPU/4 GB e 1 vCPU/2 GB são hipóteses minhas (nenhum plano foi verificado). O perfil de 1 vCPU/2 GB foi medido só na rodada ruidosa (host com load de 14 a 17), por isso **não é reportado**; os números ficam nos arquivos brutos da branch.
 - Não mediu o tráfego misto (perfil e busca juntos) com o Next.js em condições limpas; não mediu tempo de build isolado nem a proteção da API interna; sem tráfego real.
 - Uma mitigação da busca (token, prefixo, pré-filtro por UF, cache, busca dedicada) é **hipótese não testada**.
+
+## Primeira rota da API interna (Sessão 43, 2026-11-09)
+
+Implementada a primeira rota da decisão 2: `GET /internal/v1/pessoas/<ciclo>-<sq>/` (`apps/elections/views.py`), perfil de uma pessoa com suas candidaturas, a pedido do dono (só a API agora; o Next.js fica para um PR seguinte). Pontos que o ADR não fixava:
+
+- **Identificador:** ciclo (4 dígitos) mais `SQ_CANDIDATO` (1 a 12 dígitos), a chave natural do TSE, que sobrevive a uma recarga do banco; o pk interno não é usado. Qualquer outro formato cai no 404 padrão.
+- **Saída por lista explícita de campos**, montada campo a campo (sem DRF nem biblioteca nova, ADR 0013 decisão 5): o nome social, o pk e o `IngestionRun` nunca saem, e um campo novo no modelo não vaza sem decisão. Campos sem valor (federação, coligação, situação, resultado) saem `null`.
+- **Atribuição em cada candidatura** (decisão 2 e ADR 0008, decisão 3): fonte, conjunto, `coletado_em` (início da execução), `gerado_pela_fonte_em` (da linha), link do original e licença do conjunto.
+- **Só leitura:** outros métodos dão 405; pessoa inexistente dá 404 sem repetir o valor pedido.
+- **Sem autenticação.** "Interna" é propriedade de rede (Compose), não do código: o Django não distingue o Next.js da internet. Em desenvolvimento a porta 8000 só escuta em `127.0.0.1`. **A proteção na implantação continua não verificada** (consequência já listada acima); se a rede sozinha não bastar, um token compartilhado é decisão de segurança própria.
+- **Não verificado:** o JSON contra os 21.017 registros reais (conferência por `curl` no Compose, do dono); desempenho em volume (a consulta é por chave única, 2 consultas por pedido); a ordem das candidaturas só foi testada com turnos 1 e 2.

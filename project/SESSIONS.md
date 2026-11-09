@@ -2,6 +2,17 @@
 
 Mais recente no topo.
 
+### 2026-11-09 — Sessão 43 (página de candidato, fatia 1: API interna do perfil da pessoa)
+
+- **Pedido**: "vamos pra próxima tarefa" (plan mode), a 3ª fatia do ADR 0009. Escolhas do dono: **só a API interna agora** (Next.js em PR seguinte) e identificador por **ciclo + `SQ_CANDIDATO`**. Aprovou a tabela de testes ("manda bala") sem responder às duas perguntas; valeram as respostas padrão: `coletado_em` = início da execução e `id_tse` no JSON.
+- **Feito**: `GET /internal/v1/pessoas/<ciclo>-<sq>/` (`apps/elections/views.py`, `urls.py`, uma linha em `config/urls.py`): saída montada campo a campo (sem DRF), sem nome social nem id interno, `null` nos campos vazios, atribuição em cada candidatura, 404 sem repetir o pedido, 405 fora de leitura, 2 consultas por pedido. `tests/test_person_profile_api.py` (21 testes). Nota no ADR 0015 e frase no `OVERVIEW.md`.
+- **Provas (CI, `workflow_dispatch`)**: vermelho (run 42624206521): 21 falhas, todas pela rota inexistente (os de 404 e 405 pedem um 200 de controle), 478 antigos verdes; verde (run 42624649976): 499 verdes. **5 mutações**, cada uma na sua branch descartável (apagadas) e pega por teste: nome social exposto, 3 testes (42624881748); ordem invertida, 1 (42624892714); sem `select_related`, consultas 14 contra 6 (42624904137); situação vazia como texto, 1 (42624915742); eco do id no 404, 1 (42624926049).
+- **Conferência real (dono, Compose, banco de desenvolvimento)**: uma pessoa com 2 candidaturas devolveu o JSON esperado, ordenado por turno, com atribuição e licença, sem nome social nem id interno; uma pessoa inexistente deu `404` (corpo não conferido à mão).
+- **Tropeços (meus)**: (1) mandei um SQL em heredoc no campo `!` do prompt, que manda uma linha por vez (já anotado na Sessão 42). (2) O rebase na `main` depois do merge do #58 reescreveu a minha branch (precisou de push forçado, confirmado pelo dono).
+- **Pontos fracos conhecidos**: a ordem das candidaturas só foi testada com turnos 1 e 2; o teste do eco no 404 prende só a pessoa inexistente (um id malformado cai no 404 padrão do Django, que em desenvolvimento com `DEBUG` mostra a URL).
+- **Não verificado**: o **fuso** de `gerado_pela_fonte_em` (a API mostra `22:30:48+00:00`; se o `DT_GERACAO` for de Brasília, o instante real é 3 h depois); a proteção da rede interna na implantação (não há autenticação); desempenho em volume; `coletado_em` ainda vem da carga 1, porque o `normalize_tse` não rodou sobre a carga 4.
+- **Fica**: Next.js (PR seguinte, com versões conferidas e Dependabot `npm`); busca; ligação entre ciclos (ADR próprio); lápide, quando houver retirada real para observar; `spike/busca` e `spike/nextjs`; `kin/target` com 5,1 GB e `/` em 85%.
+
 ### 2026-11-09 — Sessão 42 (lápide: medir a retirada pela fonte antes de planejar)
 
 - **Pedido**: "vamos seguir ent" depois da Sessão 41 (plan mode). Escolha do dono: **medir antes** de implementar a lápide, porque o `tse.md` registrava "não verificado: como o TSE retira candidatos" e o ADR 0005 (decisão 9) manda apagar dado pessoal, o que é irreversível. Plano aprovado: passo 0 do dono (recarregar o arquivo), SQL de agregados e conclusão em docs.

@@ -31,7 +31,7 @@ export function dataHoraBrasilia(iso) {
 export function linkSeguro(url) {
   try {
     const endereco = new URL(url);
-    return endereco.protocol === "https:" || endereco.protocol === "http:" ? endereco.href : null;
+    return endereco.href;
   } catch {
     return null;
   }

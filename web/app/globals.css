@@ -1,0 +1,132 @@
+/* Linha visual do ADR 0014: sóbria e neutra, sem cores de partido, campanha ou bandeira.
+   Contraste: texto #1f2328 sobre #ffffff (cerca de 16:1) e links #0b4a8f sobre #ffffff
+   (cerca de 9:1); conferir com o dono no navegador. Tamanhos em rem, para o zoom funcionar. */
+:root {
+  --texto: #1f2328;
+  --texto-suave: #4b5563;
+  --fundo: #ffffff;
+  --fundo-suave: #f3f4f6;
+  --borda: #d1d5db;
+  --link: #0b4a8f;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 100%;
+}
+
+body {
+  margin: 0;
+  color: var(--texto);
+  background: var(--fundo);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  line-height: 1.5;
+}
+
+a {
+  color: var(--link);
+}
+
+a:focus-visible,
+main:focus-visible {
+  outline: 3px solid var(--link);
+  outline-offset: 2px;
+}
+
+.pular {
+  position: absolute;
+  left: 0.5rem;
+  top: -4rem;
+  padding: 0.5rem 1rem;
+  background: var(--fundo);
+  border: 2px solid var(--link);
+}
+
+.pular:focus {
+  top: 0.5rem;
+}
+
+.topo,
+.rodape,
+main {
+  max-width: 46rem;
+  margin: 0 auto;
+  padding: 1rem;
+}
+
+.topo {
+  border-bottom: 1px solid var(--borda);
+}
+
+.rodape {
+  margin-top: 2rem;
+  border-top: 1px solid var(--borda);
+  color: var(--texto-suave);
+  font-size: 0.9rem;
+}
+
+h1 {
+  font-size: 1.75rem;
+  line-height: 1.25;
+  margin: 1rem 0 0.25rem;
+  overflow-wrap: anywhere;
+}
+
+h2 {
+  font-size: 1.3rem;
+  margin: 0 0 0.75rem;
+}
+
+h3 {
+  font-size: 1.05rem;
+  margin: 1rem 0 0.5rem;
+}
+
+.identificacao {
+  color: var(--texto-suave);
+  margin: 0 0 1.5rem;
+}
+
+.candidatura {
+  margin: 0 0 2rem;
+  padding: 1rem;
+  border: 1px solid var(--borda);
+  border-radius: 0.5rem;
+}
+
+dl {
+  margin: 0;
+}
+
+dl > div {
+  display: grid;
+  grid-template-columns: 12rem 1fr;
+  gap: 0.25rem 1rem;
+  padding: 0.35rem 0;
+  border-bottom: 1px solid var(--fundo-suave);
+}
+
+dt {
+  font-weight: 600;
+}
+
+dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.origem {
+  margin-top: 1rem;
+  padding: 0.5rem 1rem 1rem;
+  background: var(--fundo-suave);
+  border-radius: 0.5rem;
+}
+
+@media (max-width: 36rem) {
+  dl > div {
+    grid-template-columns: 1fr;
+  }
+}

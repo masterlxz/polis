@@ -2,6 +2,16 @@
 
 Mais recente no topo.
 
+### 2026-11-08 — Sessão 38 (P-09, comandos de operador, PR 2)
+
+- **Pedido**: "vamos pro PR 2" (plano já aprovado na Sessão 37). Escolhas do dono: aprovou a tabela de 16 testes, `reset_totp` apagando também os códigos antigos e 10 códigos por padrão.
+- **Feito**: `apps/operators` (`enrollment.py`, `create_operator`, `reset_totp`), `apps.operators` em `INSTALLED_APPS`, `OTP_TOTP_ISSUER = "polis"`; `tests/test_operators.py` (16 testes); notas no ADR 0019, PENDING e OVERVIEW.
+- **Provas (CI, `workflow_dispatch`)**: sem implementação, 16 falhas e 242 verdes (run 42537767099); os 5 testes de erro prendem a mensagem, para não passarem só porque o comando não existia. Com a implementação, 258 verdes (run 42537888573). Mutação (`create_operator` sem transação, branch descartável apagada): falhou exatamente o teste de falha ao criar o dispositivo (run 42538013285).
+- **CI do PR #53**: `compose`, `dco`, `guard` e `tests` verdes (conferido por `gh pr checks 53`, run 42538165828 e vizinhos), sobre o commit anterior a este registro.
+- **Tropeços (meus)**: (1) as asserções de `CommandError` primeiro aceitariam `Unknown command` e passariam no vermelho; corrigi com `match` antes de rodar. (2) Uma asserção com `or` no teste de `reset_totp` não provava nada; troquei por checar que o token antigo é recusado. (3) O lint barrou uma docstring de 101 caracteres e minha primeira correção não bastou. (4) Pus o link errado na atribuição do corpo do PR e corrigi com `gh pr edit`.
+- **Não verificado**: login real no navegador com app autenticador; o limite de tentativas dos códigos de recuperação não é testado; só um teste cobre a transação; a senha é digitada em terminal, e o ambiente (histórico de shell, gravação de sessão) é por conta de quem opera.
+- **Fica**: rede do admin, política de senha, permissões, cifra do backup (ADR 0011) e runbook de recuperação na implantação; teste manual com app autenticador; a Etapa 1 pela normalização do TSE.
+
 ### 2026-11-08 — Sessão 37 (P-09, admin com TOTP)
 
 - **Pedido**: "vamos de admin com totp" (plan mode). Escolhas do dono: `django-otp` (dependência nova aprovada); inscrição por comando no servidor com códigos de recuperação (fica para o PR 2); escopo só de exigir TOTP no admin. Aprovou a tabela de 12 testes e que `is_staff` continue exigido.

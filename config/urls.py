@@ -16,8 +16,10 @@ Including another URLconf
 """
 
 from django.contrib import admin
-from django.urls import path
+from django.urls import include, path
 
 urlpatterns = [
     path("admin/", admin.site.urls),
+    # API interna (ADR 0015): alcançável só pela rede privada do Compose, não é a API pública.
+    path("internal/v1/", include("apps.elections.urls")),
 ]

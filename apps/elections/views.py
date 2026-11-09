@@ -10,6 +10,7 @@ from django.http import JsonResponse
 from django.views.decorators.http import require_safe
 
 from .models import Person
+from .search import buscar
 
 
 def _or_none(value):
@@ -67,6 +68,14 @@ def _candidacy(candidacy):
         "resultado": _or_none(candidacy.result_name),
         "atribuicao": _attribution(candidacy),
     }
+
+
+@require_safe
+def person_search(request):
+    return JsonResponse(
+        {"resultados": buscar(request.GET.get("q", ""))},
+        json_dumps_params={"ensure_ascii": False},
+    )
 
 
 @require_safe

@@ -26,7 +26,8 @@ services:
     environment:
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?defina DJANGO_SECRET_KEY no .env}
       DJANGO_DEBUG: "1"
-      DJANGO_ALLOWED_HOSTS: localhost,127.0.0.1
+      # `web` é o nome do serviço: o front (Next.js) chama http://web:8000 pela rede do Compose.
+      DJANGO_ALLOWED_HOSTS: localhost,127.0.0.1,web
       POSTGRES_DB: ${POSTGRES_DB:-polis}
       POSTGRES_USER: ${POSTGRES_USER:-polis}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD no .env}
@@ -36,6 +37,21 @@ services:
       - .:/app
     ports:
       - "127.0.0.1:8000:8000"
+
+  # Front-end público (ADR 0015). Fala com a API interna do Django pela rede do Compose.
+  front:
+    build: ./web
+    depends_on:
+      - web
+    environment:
+      API_URL: http://web:8000
+    ports:
+      - "127.0.0.1:3000:3000"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/saude/').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
 volumes:
   pgdata:

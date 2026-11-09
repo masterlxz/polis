@@ -2,6 +2,16 @@
 
 Mais recente no topo.
 
+### 2026-11-09 — Sessão 42 (lápide: medir a retirada pela fonte antes de planejar)
+
+- **Pedido**: "vamos seguir ent" depois da Sessão 41 (plan mode). Escolha do dono: **medir antes** de implementar a lápide, porque o `tse.md` registrava "não verificado: como o TSE retira candidatos" e o ADR 0005 (decisão 9) manda apagar dado pessoal, o que é irreversível. Plano aprovado: passo 0 do dono (recarregar o arquivo), SQL de agregados e conclusão em docs.
+- **Feito (pelo dono)**: `ingest_dataset tse/consulta-cand-2026` (1 requisição) e um SQL somente leitura que eu escrevi (arquivo no scratchpad, não versionado), com só agregados e nomes de coluna.
+- **Resultado**: o TSE regenerou o arquivo (hash e tamanho diferentes, 42.034 linhas), mas **0 candidaturas entraram ou saíram e só `DT_GERACAO` e `HH_GERACAO` mudaram**, nas 21.017. Detalhes em `fontes/tse.md`. Não houve retirada para observar, então a regra do ADR 0005 segue sem evidência e **a lápide continua parada**.
+- **Tropeço (meu)**: mandei o SQL como heredoc no campo `!` do prompt, que manda uma linha por vez; só o `SET` chegou ao `psql`. Corrigi gravando o SQL num arquivo e usando redirecionamento. Nada foi gravado no banco.
+- **Efeito colateral a saber**: com a execução 4 (com linhas), o `normalize_tse` passa a ler a 4, não a 1. **Não rodei nem pedi para rodar.** A próxima execução dele atualizaria `source_generated_at` das 21.017 candidaturas.
+- **Não verificado**: a diferença de 1.882 bytes no ZIP; o intervalo entre as gerações (`source_generated_at` do `IngestionRun` vem vazio nas 4 execuções, e as datas de `DT_GERACAO` não foram impressas); como o TSE retira candidatos de verdade.
+- **Fica**: página de candidato; busca; ligação de pessoas entre ciclos (ADR próprio); lápide, quando houver evidência (reler o arquivo depois de eventos reais, como pedido judicial ou pós-eleição); `spike/busca` e `spike/nextjs` (decidir se saem); `kin/target` com 5,1 GB e `/` em 85% (limpeza manual, do dono).
+
 ### 2026-11-09 — Sessão 41 (`normalize_tse` rodado contra os dados reais)
 
 - **Pedido**: "vamos de 2", o "Para o dono rodar" da Sessão 40. Quem rodou foi o dono, no Compose; eu dei os comandos e conferi a saída (o guard-heavy também barra isso na minha sessão).

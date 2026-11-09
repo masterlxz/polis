@@ -2,7 +2,7 @@ name: Web
 
 # Front-end Next.js (ADR 0015): instala com o lockfile e sem scripts de instalação,
 # constrói, testa o servidor de produção e prova que a imagem do Docker constrói.
-# O job `web` ainda não é exigido no ruleset protect-main.
+# O job `web` é exigido no ruleset protect-main (Sessão 46).
 on:
   push:
     branches: [main]

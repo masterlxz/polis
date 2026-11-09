@@ -2,6 +2,15 @@
 
 Mais recente no topo.
 
+### 2026-11-09 — Sessão 46 (job `web` obrigatório no ruleset)
+
+- **Pedido**: recomendação do que fazer; o dono aprovou "limpar o `kin/target`" e depois "o ruleset com o `web` obrigatório".
+- **Feito**: `PUT` no ruleset `protect-main` (id 26285460) acrescentando o check `web` a `guard`, `dco` e `tests`; bypass, condições e demais regras conferidas iguais depois. Comentário do `web.yml` e nota do ADR 0015 atualizados. O `web.yml` roda em todo `pull_request`, sem filtro de caminho, então o check sempre aparece.
+- **Disco**: `cargo clean` no `kin` (feito pelo dono; o classificador barrou o meu): 15.146 arquivos, 5,6 GiB. O alerta do `kin` saiu; `/` segue em 86%, mas o `disk-report` mede `/home` (49%).
+- **Não verificado**: que um PR com o `web` vermelho fica de fato com o merge bloqueado (o próximo PR mostra); o `web` instável travaria todos os PRs (o teste espera o servidor por até 30 s).
+- **Reverter**: tirar `{"context":"web"}` do ruleset.
+- **Fica**: busca (com medição em dados reais como etapa 0); página inicial e navegação; ligação entre ciclos (ADR próprio); lápide; fuso do `DT_GERACAO`; `spike/busca` e `spike/nextjs`.
+
 ### 2026-11-09 — Sessão 45 (Next.js, PR 2 de 2: página de candidato)
 
 - **Pedido**: "sim, segue" (plan mode). Escolhas do dono: testes com `node --test` e API falsa; **omitir por ora a data de geração da fonte** (fuso do TSE não verificado). Aprovou a tabela de testes ("sim por seguir"); as respostas padrão valeram: data de coleta "07/11/2026 às 23:17" e mensagem genérica de erro.

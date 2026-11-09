@@ -9,6 +9,14 @@ SENHA_DO_ADMIN_DE_TESTE = "uma-senha-longa-so-de-teste-9731"
 
 
 @pytest.fixture
+def tse():
+    """O módulo de leitura do TSE, importado só ao usar (cada teste falha por si, não a coleta)."""
+    from apps.elections import tse as modulo
+
+    return modulo
+
+
+@pytest.fixture
 def admin_client(db):
     """Cliente de superusuário que passou pelo TOTP, como o admin real exige (ADR 0019).
 

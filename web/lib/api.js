@@ -21,8 +21,6 @@ function tempoLimiteMs() {
 // `cache` do React: o título e a página pedem o mesmo perfil, mas a API é chamada uma vez só
 // por requisição. O dado em si nunca fica em cache (`no-store`): quem a fonte retirar some na hora.
 export const buscarPerfil = cache(async (id) => {
-  if (!idValido(id)) return null;
-
   let resposta;
   try {
     resposta = await fetch(`${process.env.API_URL}/internal/v1/pessoas/${id}/`, {

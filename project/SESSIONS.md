@@ -2,6 +2,17 @@
 
 Mais recente no topo.
 
+### 2026-11-09 — Sessão 44 (Next.js, PR 1 de 2: infraestrutura do front)
+
+- **Pedido**: "sim", seguir para o Next.js depois da API interna (plan mode). Escolhas do dono: **2 PRs** (infra agora, página de candidato depois) e **testes com `node --test` e API falsa**, sem ferramenta de teste nova.
+- **Feito**: `web/` (Next.js 16.4.3, React 19.3.1, Node 24, versões exatas, `package-lock.json` gerado com `npm install --package-lock-only --ignore-scripts`: 54 pacotes só do registry oficial, com integridade, sem script de instalação), rota `/saude/`, `Dockerfile` multi-stage com `output: "standalone"`; `.github/workflows/web.yml`; serviço `front` no `compose.yaml` e `web` em `DJANGO_ALLOWED_HOSTS`; Dependabot `npm` (major de `next`, `react` e `react-dom` ignorado); `README.md`, ADR 0015 e `OVERVIEW.md`.
+- **Provas (CI, no PR #60)**: vermelho: o job `web` falhou no `npm run build` com "Couldn't find any `pages` or `app` directory" (o `npm ci` com o lockfile já passava); verde: `web`, `compose`, `tests`, `guard`, `dco` e a validação do `dependabot.yml`. **2 mutações**, cada uma num PR rascunho descartável (fechados e branches apagadas), pegas pelos testes: `/saude/` respondendo 500, os 3 testes (run 42628956277); sem `output: "standalone"`, falha o `spawn` do servidor (run 42628968965).
+- **Conferência real (dono, Compose)**: `docker compose build front` e `up -d web front`; `front` `healthy`, portas só em `127.0.0.1`, `curl /saude/` devolve `{"status":"ok"}` e, de dentro do contêiner `front`, `http://web:8000/internal/v1/pessoas/...` responde 200 (prova do `ALLOWED_HOSTS`).
+- **Tropeços (meus)**: (1) o `web.yml` é workflow novo e o `workflow_dispatch` só vale para workflow que já está na `main`; a rodada vermelha e as mutações foram por PR (rascunho), não por `dispatch` como nas fatias anteriores. (2) A primeira versão do plano dizia que o red seria "sem `web/`", mas isso faria o `npm ci` falhar por outro motivo; coloquei `package.json` e lockfile no commit dos testes para o vermelho ser o build sem app.
+- **Pontos fracos conhecidos**: os 3 testes dependem do servidor subir no CI (espera de até 30 s); o 405 do POST é comportamento do Next para método não exportado, não código nosso.
+- **Não verificado**: o job `web` ainda **não é obrigatório** no ruleset; a rede interna na implantação; imagem base por tag móvel (sem digest); memória do `front` num VPS; `.next/standalone` copiado sem o `public/` (não existe ainda).
+- **Fica**: PR 2 (página `/pessoas/<ciclo>-<sq>/` com componente de atribuição, WCAG 2.2 AA, linha visual do ADR 0014 e recusa de URL que não seja `http(s)`); tornar `web` obrigatório no ruleset; busca; ligação entre ciclos; lápide; `spike/busca` e `spike/nextjs`; `kin/target` e `/` em 85%.
+
 ### 2026-11-09 — Sessão 43 (página de candidato, fatia 1: API interna do perfil da pessoa)
 
 - **Pedido**: "vamos pra próxima tarefa" (plan mode), a 3ª fatia do ADR 0009. Escolhas do dono: **só a API interna agora** (Next.js em PR seguinte) e identificador por **ciclo + `SQ_CANDIDATO`**. Aprovou a tabela de testes ("manda bala") sem responder às duas perguntas; valeram as respostas padrão: `coletado_em` = início da execução e `id_tse` no JSON.

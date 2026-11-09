@@ -12,7 +12,7 @@ O P-06 pede a estratégia de busca. Entradas: o ADR 0006 (PostgreSQL como único
 
 ## Decisão
 1. **Busca dentro do PostgreSQL**, sem serviço novo: `unaccent` (ignora acento) e `pg_trgm` (tolera erro de digitação) sobre o nome público, com índice GIN/GiST para o `pg_trgm`. Detalhes de índice e consulta ficam para a implementação, medidos no teste de carga do ADR 0010.
-2. **Escopo da Etapa 1:** nome de pessoa (nome de urna, parlamentar ou social) e partido, com UF e partido como filtros. Proposições e ementas (busca de texto em português) entram quando Câmara e Senado entrarem, em decisão própria.
+2. **Escopo da Etapa 1:** nome de pessoa (nome de urna, parlamentar ou social; **o social ficou fora do índice**, ver ADR 0016) e partido, com UF e partido como filtros. Proposições e ementas (busca de texto em português) entram quando Câmara e Senado entrarem, em decisão própria.
 3. **O que entra no índice:** só o nome público (ADR 0005, decisão 8). **O nome civil, a data de nascimento e qualquer campo interno ficam fora do índice**, e um teste deve provar que a busca por um nome civil não encontra a pessoa.
 4. **Módulo com interface única:** a busca fica atrás de uma função como `buscar(consulta, filtros)` em um app próprio, para que trocar o motor (busca dedicada) não toque o resto do sistema.
 5. **Gatilho de reavaliação:** abrir ADR novo se (a) o teste de carga mostrar p95 de busca acima de 1,5 s com o volume real, ou (b) um conjunto de consultas de referência (nomes com acento, apelidos, homônimos, erro de digitação), definido junto com os testes, não atingir relevância aceitável.

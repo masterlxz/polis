@@ -85,4 +85,19 @@ Primeira metade da implementação da decisão 1, a pedido do dono (2 PRs: infra
 - **Dependabot `npm` em `/web`:** semanal, um PR agrupado, **major de `next`, `react` e `react-dom` ignorado** (decisão manual, como o Django).
 - **Compose:** serviço `front` com a porta só em `127.0.0.1:3000`, `API_URL=http://web:8000` e healthcheck; o `web` passou a aceitar o host `web` em `DJANGO_ALLOWED_HOSTS` (sem isso o Django recusa o pedido do front com 400). O Django continua com a porta 8000 em `127.0.0.1` em desenvolvimento, para o admin.
 - **Conferência real (dono, Compose):** `front` saudável, `/saude/` responde `ok` e, de dentro do contêiner `front`, a API interna do Django responde 200.
-- **Não verificado:** a proteção real da rede interna na implantação (o Django ainda não tem autenticação, e a porta 8000 segue publicada em `127.0.0.1` em desenvolvimento); imagem base por tag móvel, não por digest; o consumo de memória do `front` no ambiente de teste do ADR 0011 (o spike mediu ~340 MiB com outra aplicação); a primeira página só vem no PR seguinte.
+- **Não verificado:** a proteção real da rede interna na implantação (o Django ainda não tem autenticação, e a porta 8000 segue publicada em `127.0.0.1` em desenvolvimento); imagem base por tag móvel, não por digest; o consumo de memória do `front` no ambiente de teste do ADR 0011 (o spike mediu ~340 MiB com outra aplicação); a primeira página só vem no PR seguinte. *(Atualização da Sessão 45: a primeira página existe, ver abaixo.)*
+
+## Primeira página: perfil da pessoa (Sessão 45, 2026-11-09)
+
+Segunda metade da decisão 1: `GET /pessoas/<ciclo>-<sq>/` (`web/app/pessoas/[id]/`) renderiza no servidor o perfil da API interna (primeira rota, acima). Pontos que o ADR não fixava:
+
+- **Atribuição (decisão 5):** cada candidatura mostra fonte, conjunto, data de coleta em horário de Brasília, link do arquivo original e licença. **A data de geração pela fonte não é mostrada** (escolha do dono): o fuso do `DT_GERACAO` do TSE segue não verificado e a API a devolve em UTC.
+- **Só o que a página conhece:** a tela é montada campo a campo; chave desconhecida da API nunca chega ao HTML. Campo nulo (federação, coligação, situação, resultado) some, sem "—" nem "null".
+- **Link vindo da fonte só se for `http(s)`:** `javascript:`, `data:`, `vbscript:`, `ftp:` e endereço sem esquema viram texto, nunca `href` (a fonte é conteúdo externo não confiável, ADR 0017). O nome é escapado pelo React.
+- **Sem cache do dado** (`no-store`, página dinâmica): quem a fonte retirar (lápide, ADR 0005) precisa sumir na hora. O `cache()` do React só evita chamar a API duas vezes na mesma requisição.
+- **Id validado antes da API** (`^\d{4}-\d{1,12}$`): outro formato dá 404 sem chamar a API. Falha da API (fora do ar, lenta, 5xx) dá erro 500 com mensagem genérica, sem o endereço da API; tempo limite de 5 s (`API_TIMEOUT_MS`).
+- **`noindex` em todas as páginas** (decisão 6 do ADR 0005 e PRD §11): nada é público antes do P-16. Abrir para os buscadores (PRD §12) é decisão explícita, na abertura.
+- **Visual (ADR 0014):** CSS puro, sem dependência, paleta neutra, tema claro, tamanhos em `rem`; título com o descritor; nome como a fonte entrega (em caixa alta, sem tentar capitalizar). Link "Pular para o conteúdo".
+- **Acessibilidade (decisão 6):** meta é WCAG 2.2 AA, **sem afirmar conformidade**. Os testes só conferem estrutura (idioma, um `h1`, ordem de títulos). Conferência manual do dono no navegador no Compose: "deu boa", sem detalhar item por item; leitor de tela não informado; contraste não medido com ferramenta.
+- **Testes:** 24 novos em `web/tests/pessoa.test.mjs`, contra o servidor de produção e uma API falsa (`node --test`, sem dependência nova); 4 mutações pegas.
+- **Não verificado:** leitor de tela e contraste medido; desempenho da página com dados reais (o spike mediu outra aplicação); a página para uma pessoa com muitas candidaturas; o caso de nome muito longo na caixa alta.

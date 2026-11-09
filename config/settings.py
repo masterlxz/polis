@@ -32,6 +32,7 @@ INSTALLED_APPS = [
     "django_otp.plugins.otp_totp",
     "django_otp.plugins.otp_static",
     "apps.sources",
+    "apps.operators",
 ]
 
 MIDDLEWARE = [
@@ -81,6 +82,9 @@ AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
+
+# Nome que o app autenticador mostra para o TOTP (ADR 0019).
+OTP_TOTP_ISSUER = "polis"
 
 LANGUAGE_CODE = "pt-br"
 TIME_ZONE = "America/Sao_Paulo"

@@ -22,7 +22,7 @@ pytestmark = pytest.mark.django_db
 
 URL = "/internal/v1/busca/"
 NOME_SOCIAL_SECRETO = "Zz Social Interno"
-CHAVES_RESULTADO = {"id", "nome", "ciclo", "uf", "partido"}
+CHAVES_RESULTADO = {"id", "nome", "ciclo", "uf", "partido", "aproximado"}
 
 _sq = itertools.count(2_000_000_001)
 
@@ -192,6 +192,46 @@ def test_erro_de_digitacao_cai_na_reserva_de_trigramas(client):
     assert _nomes(client, "marai silva") == ["MARIA SILVA"]
 
 
+def _aproximados(client, q):
+    return {r["nome"]: r["aproximado"] for r in _buscar(client, q)}
+
+
+def test_achado_pelo_indice_nao_e_aproximado(client):
+    _pessoa("MARIA SILVA")
+
+    assert _aproximados(client, "maria silva") == {"MARIA SILVA": False}
+
+
+def test_achado_so_pela_reserva_e_aproximado(client):
+    _pessoa("MARIA SILVA")
+
+    assert _aproximados(client, "marai silva") == {"MARIA SILVA": True}
+
+
+def test_prefixo_nao_e_aproximado(client):
+    _pessoa("JOAO SILVA")
+
+    assert _aproximados(client, "jo sil") == {"JOAO SILVA": False}
+
+
+def test_mistura_exatos_sem_marca_e_parecidos_com_marca(client):
+    _pessoa("MARIA SILVA")
+    _pessoa("MARCIA SILVA")
+
+    assert _aproximados(client, "maria silva") == {"MARIA SILVA": False, "MARCIA SILVA": True}
+
+
+def test_com_5_exatos_a_reserva_nao_entra_e_nenhum_e_aproximado(client):
+    for i in range(5):
+        _pessoa(f"MARIA SILVA {i}")
+    _pessoa("MARCIA SILVA")
+
+    resultado = _aproximados(client, "maria silva")
+
+    assert len(resultado) == 5
+    assert not any(resultado.values())
+
+
 # --- o que nunca entra --------------------------------------------------------------------------
 
 
@@ -297,6 +337,7 @@ def test_formato_do_resultado(client, run):
         "ciclo": 2026,
         "uf": "SP",
         "partido": "XYZ",
+        "aproximado": False,
     }
 
 

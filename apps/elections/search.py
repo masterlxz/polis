@@ -72,9 +72,16 @@ def _executar(sql, params):
         return cursor.fetchall()
 
 
-def _resultado(linha):
+def _resultado(linha, *, aproximado):
     ciclo, sq, nome, uf, partido = linha
-    return {"id": f"{ciclo}-{sq}", "nome": nome, "ciclo": ciclo, "uf": uf, "partido": partido}
+    return {
+        "id": f"{ciclo}-{sq}",
+        "nome": nome,
+        "ciclo": ciclo,
+        "uf": uf,
+        "partido": partido,
+        "aproximado": aproximado,
+    }
 
 
 def buscar(consulta):
@@ -84,12 +91,17 @@ def buscar(consulta):
     frase = " ".join(tokens)
     tsquery = " & ".join(f"{token}:*" for token in tokens)
 
-    linhas = _executar(_POR_TOKENS, [tsquery, frase, MAX_RESULTADOS])
-    if len(linhas) < MINIMO_DE_RESULTADOS:
-        ja_vistos = {(linha[0], linha[1]) for linha in linhas}
+    exatos = _executar(_POR_TOKENS, [tsquery, frase, MAX_RESULTADOS])
+    resultados = [_resultado(linha, aproximado=False) for linha in exatos]
+    if len(exatos) < MINIMO_DE_RESULTADOS:
+        ja_vistos = {(linha[0], linha[1]) for linha in exatos}
         similares = _executar(
             _POR_SIMILARIDADE,
             [frase, frase, LIMIAR_DE_SIMILARIDADE, frase, MAX_RESULTADOS],
         )
-        linhas += [linha for linha in similares if (linha[0], linha[1]) not in ja_vistos]
-    return [_resultado(linha) for linha in linhas[:MAX_RESULTADOS]]
+        resultados += [
+            _resultado(linha, aproximado=True)
+            for linha in similares
+            if (linha[0], linha[1]) not in ja_vistos
+        ]
+    return resultados[:MAX_RESULTADOS]

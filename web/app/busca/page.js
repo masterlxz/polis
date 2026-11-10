@@ -13,6 +13,10 @@ function Detalhe({ resultado }) {
   return <span className="detalhe">{[...partes, `ciclo ${resultado.ciclo}`].join(" · ")}</span>;
 }
 
+function Parecido({ resultado }) {
+  return resultado.aproximado ? <span className="detalhe">nome parecido</span> : null;
+}
+
 function Resultados({ resultados }) {
   if (resultados.length === 0) {
     return (
@@ -23,14 +27,17 @@ function Resultados({ resultados }) {
   return (
     <section aria-labelledby="resultados">
       <h2 id="resultados">{contagem}</h2>
-      <p className="nota">
-        Quando há poucos resultados exatos, a lista inclui nomes parecidos com o digitado.
-      </p>
+      {resultados.some((resultado) => resultado.aproximado) && (
+        <p className="nota">
+          Quando há poucos resultados exatos, a lista inclui nomes parecidos com o digitado.
+        </p>
+      )}
       <ol className="resultados">
         {resultados.map((resultado) => (
           <li key={resultado.id}>
             <a href={`/pessoas/${resultado.id}/`}>{resultado.nome}</a>
             <Detalhe resultado={resultado} />
+            <Parecido resultado={resultado} />
           </li>
         ))}
       </ol>

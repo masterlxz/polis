@@ -39,6 +39,7 @@ function resultadoValido(item) {
     typeof item.id === "string" &&
     idValido(item.id) &&
     Number.isInteger(item.ciclo) &&
+    typeof item.aproximado === "boolean" &&
     textoOuNulo(item.uf) &&
     textoOuNulo(item.partido)
   );

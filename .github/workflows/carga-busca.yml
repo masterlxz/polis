@@ -1,0 +1,97 @@
+name: Carga da busca
+
+# Medição de carga da busca de pessoas (ADR 0010, 0016): dados SINTÉTICOS, 10 buscas/s a taxa fixa,
+# 3 repetições por volume. Roda num runner de CI (2 vCPU compartilhados, não é o VPS do ADR 0011):
+# serve para comparar antes e depois e dar a ordem de grandeza, não para provar o p95 de produção.
+# Build e carga só no CI (ADR 0009 do workspace). Não é exigido no ruleset.
+on:
+  pull_request:
+    paths:
+      - scripts/carga_busca/**
+      - .github/workflows/carga-busca.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  carga:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        linhas: [300000, 3000000]
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_DB: polis
+          POSTGRES_USER: polis
+          POSTGRES_PASSWORD: ci-descartavel
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U polis -d polis"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DJANGO_SECRET_KEY: ci-chave-descartavel-sem-valor
+      DJANGO_ALLOWED_HOSTS: localhost,127.0.0.1
+      POSTGRES_DB: polis
+      POSTGRES_USER: polis
+      POSTGRES_PASSWORD: ci-descartavel
+      POSTGRES_HOST: localhost
+      POSTGRES_PORT: "5432"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Instala o uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          version: "0.13.6"
+
+      - name: Instala as dependências (lock respeitado)
+        run: uv sync --locked
+
+      - name: Migra
+        run: uv run --locked python manage.py migrate --noinput
+
+      - name: Semeia ${{ matrix.linhas }} pessoas sintéticas
+        env:
+          PYTHONPATH: .
+        run: uv run --locked python scripts/carga_busca/semear.py ${{ matrix.linhas }} "$RUNNER_TEMP/consultas.txt"
+
+      - name: Planos de execução (EXPLAIN ANALYZE) das duas consultas
+        env:
+          PYTHONPATH: .
+        run: uv run --locked python scripts/carga_busca/plano.py "$RUNNER_TEMP/consultas.txt"
+
+      - name: Sobe a API (DEBUG desligado)
+        run: |
+          uv run --locked python manage.py runserver 127.0.0.1:8000 --noreload > "$RUNNER_TEMP/api.log" 2>&1 &
+          for _ in $(seq 1 30); do
+            curl -fs "http://127.0.0.1:8000/internal/v1/busca/?q=ma" > /dev/null && exit 0
+            sleep 1
+          done
+          cat "$RUNNER_TEMP/api.log"
+          exit 1
+
+      - name: Carga, 3 repetições
+        run: |
+          for r in 1 2 3; do
+            echo "### ${{ matrix.linhas }} linhas, repetição $r" | tee -a "$GITHUB_STEP_SUMMARY"
+            echo '```json' >> "$GITHUB_STEP_SUMMARY"
+            python3 scripts/carga_busca/carga.py http://127.0.0.1:8000 "$RUNNER_TEMP/consultas.txt" 10 60 10 "$r" | tee -a "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+          done
+
+      - name: Log da API (códigos de erro das respostas)
+        if: always()
+        run: |
+          echo "respostas por status:"
+          grep -oE '" [0-9]{3} ' "$RUNNER_TEMP/api.log" | sort | uniq -c || true
+          echo "tracebacks e erros (primeiras 60 linhas):"
+          grep -E -A6 'Traceback|Error' "$RUNNER_TEMP/api.log" | head -60 || true

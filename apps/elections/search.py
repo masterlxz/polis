@@ -13,7 +13,7 @@ a reserva por similaridade de trigramas (`pg_trgm`, limiar `LIMIAR_DE_SIMILARIDA
 import re
 import unicodedata
 
-from django.db import connection
+from django.db import connection, transaction
 
 MAX_CARACTERES = 100
 MAX_PALAVRAS = 10
@@ -72,6 +72,23 @@ def _executar(sql, params):
         return cursor.fetchall()
 
 
+def _executar_reserva(params):
+    """A reserva com o limiar do índice igual ao do código.
+
+    O `%` do `pg_trgm` usa `pg_trgm.similarity_threshold` (padrão 0,3), não o nosso 0,5: com 0,3
+    o índice devolve dezenas de milhares de candidatos que o `similarity >= 0,5` descarta depois
+    (3 milhões de linhas: cerca de 820 ms por consulta). `set_config(..., true)` vale só até o fim
+    da transação, que o `atomic()` abre aqui (em autocommit valeria só para o próprio comando de
+    ajuste), então nada vaza para a conexão.
+    """
+    with transaction.atomic():
+        _executar(
+            "SELECT set_config('pg_trgm.similarity_threshold', %s, true)",
+            [str(LIMIAR_DE_SIMILARIDADE)],
+        )
+        return _executar(_POR_SIMILARIDADE, params)
+
+
 def _resultado(linha, *, aproximado):
     ciclo, sq, nome, uf, partido = linha
     return {
@@ -95,10 +112,7 @@ def buscar(consulta):
     resultados = [_resultado(linha, aproximado=False) for linha in exatos]
     if len(exatos) < MINIMO_DE_RESULTADOS:
         ja_vistos = {(linha[0], linha[1]) for linha in exatos}
-        similares = _executar(
-            _POR_SIMILARIDADE,
-            [frase, frase, LIMIAR_DE_SIMILARIDADE, frase, MAX_RESULTADOS],
-        )
+        similares = _executar_reserva([frase, frase, LIMIAR_DE_SIMILARIDADE, frase, MAX_RESULTADOS])
         resultados += [
             _resultado(linha, aproximado=True)
             for linha in similares

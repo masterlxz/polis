@@ -15,6 +15,7 @@ from django.db import connection
 from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
 
+from apps.elections import search
 from apps.elections.models import Candidacy, Election, Person
 from apps.sources.models import Dataset, IngestionRun, Source
 
@@ -219,6 +220,45 @@ def test_mistura_exatos_sem_marca_e_parecidos_com_marca(client):
     _pessoa("MARCIA SILVA")
 
     assert _aproximados(client, "maria silva") == {"MARIA SILVA": False, "MARCIA SILVA": True}
+
+
+def _limiar_do_banco():
+    # `show_limit()` (do pg_trgm) lê o limiar e carrega a biblioteca na conexão. O `SHOW` direto
+    # falha com "unrecognized configuration parameter" se o pg_trgm ainda não foi usado nela.
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT show_limit()")
+        return cursor.fetchone()[0]
+
+
+@pytest.mark.django_db(transaction=True)  # sem a transação do pytest-django: autocommit de verdade
+def test_a_reserva_roda_com_o_limiar_do_indice_igual_ao_do_codigo(client, monkeypatch):
+    # O `%` do pg_trgm usa `pg_trgm.similarity_threshold` (padrão 0,3), não o nosso 0,5: com 0,3 o
+    # índice devolve dezenas de milhares de candidatos que o `similarity >= 0,5` descarta depois
+    # (medido em 3 milhões de linhas: 820 ms por consulta).
+    _pessoa("MARIA SILVA")
+    vistos = {}
+    executar_de_verdade = search._executar
+
+    def espiao(sql, params):
+        vistos["limiar_na_reserva" if sql == search._POR_SIMILARIDADE else "outro"] = (
+            _limiar_do_banco()
+        )
+        return executar_de_verdade(sql, params)
+
+    monkeypatch.setattr(search, "_executar", espiao)
+
+    assert _aproximados(client, "marai silva") == {"MARIA SILVA": True}, "controle: caiu na reserva"
+    assert vistos["limiar_na_reserva"] == search.LIMIAR_DE_SIMILARIDADE
+
+
+@pytest.mark.django_db(transaction=True)
+def test_o_limiar_nao_vaza_para_a_conexao_depois_da_busca(client):
+    padrao = _limiar_do_banco()
+    _pessoa("MARIA SILVA")
+
+    assert _aproximados(client, "marai silva") == {"MARIA SILVA": True}, "controle: usou a reserva"
+
+    assert _limiar_do_banco() == padrao
 
 
 def test_com_5_exatos_a_reserva_nao_entra_e_nenhum_e_aproximado(client):

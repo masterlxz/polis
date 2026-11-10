@@ -370,14 +370,18 @@ def test_a_reserva_tambem_respeita_o_filtro(client, run):
 
 def test_o_filtro_entra_antes_da_contagem_do_minimo_de_5(client, run):
     # 5 exatos do RJ NÃO podem contar como "já há 5 resultados": para quem filtra SP eles não
-    # existem, e a reserva precisa entrar para completar com quem é de SP.
+    # existem, e a reserva precisa entrar. A pessoa de SP só é alcançável pela reserva (o nome
+    # dela está com a grafia trocada), então filtrar depois da contagem a perderia.
     for i in range(5):
-        _candidatura(run, _pessoa(f"MARIA EXATA {i}"), uf="RJ")
-    _candidatura(run, _pessoa("MARIA SILVA"), uf="SP")
+        _candidatura(run, _pessoa(f"MARIA SILVA {i}"), uf="RJ")
+    _candidatura(run, _pessoa("MARAI SILVA"), uf="SP")
+    assert len(_filtrar(client, "maria silva")) == 5, "controle: sem filtro há 5 exatos"
 
-    resposta = client.get(URL, {"q": "marai silva", "uf": "SP"}).json()["resultados"]
+    resposta = client.get(URL, {"q": "maria silva", "uf": "SP"}).json()["resultados"]
 
-    assert [(r["nome"], r["uf"]) for r in resposta] == [("MARIA SILVA", "SP")]
+    assert [(r["nome"], r["uf"], r["aproximado"]) for r in resposta] == [
+        ("MARAI SILVA", "SP", True)
+    ]
 
 
 def test_o_filtro_entra_antes_do_teto_de_20(client, run):

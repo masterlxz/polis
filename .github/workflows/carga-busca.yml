@@ -60,6 +60,8 @@ jobs:
         run: uv run --locked python manage.py migrate --noinput
 
       - name: Semeia ${{ matrix.linhas }} pessoas sintéticas
+        env:
+          PYTHONPATH: .
         run: uv run --locked python scripts/carga_busca/semear.py ${{ matrix.linhas }} "$RUNNER_TEMP/consultas.txt"
 
       - name: Sobe a API (DEBUG desligado)

@@ -141,13 +141,28 @@ dd {
   margin: 1rem 0 1.5rem;
 }
 
+.busca .campo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  flex: 0 1 9rem;
+}
+
+.busca .campo-nome {
+  flex: 1 1 14rem;
+}
+
 .busca label {
-  flex-basis: 100%;
   font-weight: 600;
 }
 
-.busca input {
-  flex: 1 1 14rem;
+.dica {
+  color: var(--texto-suave);
+  font-size: 0.85rem;
+}
+
+.busca input,
+.busca select {
   min-width: 0;
   padding: 0.5rem 0.75rem;
   font: inherit;
@@ -169,6 +184,7 @@ dd {
 }
 
 .busca input:focus-visible,
+.busca select:focus-visible,
 .busca button:focus-visible {
   outline: 3px solid var(--link);
   outline-offset: 2px;

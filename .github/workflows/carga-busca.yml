@@ -93,5 +93,5 @@ jobs:
         run: |
           echo "respostas por status:"
           grep -oE '" [0-9]{3} ' "$RUNNER_TEMP/api.log" | sort | uniq -c || true
-          echo "linhas que não são resposta 200 (primeiras 40):"
-          grep -vE '" 200 ' "$RUNNER_TEMP/api.log" | head -40 || true
+          echo "tracebacks e erros (primeiras 60 linhas):"
+          grep -E -A6 'Traceback|Error' "$RUNNER_TEMP/api.log" | head -60 || true

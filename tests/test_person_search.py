@@ -223,8 +223,10 @@ def test_mistura_exatos_sem_marca_e_parecidos_com_marca(client):
 
 
 def _limiar_do_banco():
+    # `show_limit()` (do pg_trgm) lê o limiar e carrega a biblioteca na conexão. O `SHOW` direto
+    # falha com "unrecognized configuration parameter" se o pg_trgm ainda não foi usado nela.
     with connection.cursor() as cursor:
-        cursor.execute("SHOW pg_trgm.similarity_threshold")
+        cursor.execute("SELECT show_limit()")
         return cursor.fetchone()[0]
 
 
@@ -246,7 +248,7 @@ def test_a_reserva_roda_com_o_limiar_do_indice_igual_ao_do_codigo(client, monkey
     monkeypatch.setattr(search, "_executar", espiao)
 
     assert _aproximados(client, "marai silva") == {"MARIA SILVA": True}, "controle: caiu na reserva"
-    assert vistos["limiar_na_reserva"] == str(search.LIMIAR_DE_SIMILARIDADE)
+    assert vistos["limiar_na_reserva"] == search.LIMIAR_DE_SIMILARIDADE
 
 
 @pytest.mark.django_db(transaction=True)

@@ -296,6 +296,243 @@ for (const [descricao, corpo] of [
   });
 }
 
+// --- filtros de UF e partido (PR 2 de 2; a API é a do PR #74) -------------------------------------
+
+const SIGLAS = "AC AL AP AM BA CE DF ES GO MA MT MS MG PA PB PR PE PI RJ RN RS RO RR SC SP SE TO".split(
+  " ",
+);
+
+// Como `buscar`, mas com a query string inteira à mão (para repetir parâmetros, mandar lixo etc.).
+async function buscarUrl(query, resposta = lista(resultado())) {
+  api.resposta = () => resposta;
+  api.chamadas.length = 0;
+  const retorno = await fetch(`${front.base}/busca/?${query}`);
+  return { status: retorno.status, html: limpo(await retorno.text()), chamadas: [...api.chamadas] };
+}
+
+// Os parâmetros da primeira chamada à API, na ordem em que chegaram.
+function paramsRecebidos(chamadas) {
+  assert.ok(chamadas.length >= 1, "a API não foi chamada");
+  const [, caminho] = chamadas[0].split(" ");
+  return [...new URL(caminho, "http://api.teste").searchParams.entries()];
+}
+
+function tagDoCampo(html, id) {
+  const [tag] = html.match(new RegExp(`<(?:input|select)[^>]*id="${id}"[^>]*>`)) ?? [];
+  assert.ok(tag, `não há campo #${id} na página`);
+  return tag;
+}
+
+// O `value` das `<option>` marcadas como selecionadas no `select#uf`.
+function ufsSelecionadas(html) {
+  const [select] = html.match(/<select[^>]*id="uf"[\s\S]*?<\/select>/) ?? [];
+  assert.ok(select, "não há select#uf na página");
+  return [...select.matchAll(/<option([^>]*)>/g)]
+    .filter(([, atributos]) => /\bselected\b/.test(atributos))
+    .map(([, atributos]) => /value="([^"]*)"/.exec(atributos)?.[1]);
+}
+
+function valorDoPartido(html) {
+  return /value="([^"]*)"/.exec(tagDoCampo(html, "partido"))?.[1];
+}
+
+test("formulário tem UF (select com Todas + 27) e partido, cada um com rótulo, dentro do form de busca", async () => {
+  const { status, html, chamadas } = await buscar(undefined);
+
+  assert.equal(status, 200);
+  assert.deepEqual(chamadas, []);
+  const [form] = html.match(/<form[^>]*role="search"[\s\S]*?<\/form>/) ?? [];
+  assert.ok(form, "não há form role=search");
+  assert.match(form, /<label[^>]*for="uf"[^>]*>UF<\/label>/);
+  assert.match(form, /<label[^>]*for="partido"[^>]*>Partido \(sigla\)<\/label>/);
+  assert.match(tagDoCampo(form, "uf"), /<select[^>]*name="uf"/);
+  assert.match(tagDoCampo(form, "partido"), /name="partido"/);
+  const valores = [...form.matchAll(/<option[^>]*value="([^"]*)"/g)].map((m) => m[1]);
+  assert.deepEqual(valores, ["", ...SIGLAS]);
+  assert.match(form, /Todas as UFs/);
+});
+
+test("sem filtros: a chamada à API continua só com o q", async () => {
+  const { status, chamadas } = await buscarUrl("q=maria");
+
+  assert.equal(status, 200);
+  assert.deepEqual(chamadas, ["GET /internal/v1/busca/?q=maria"]);
+});
+
+test("uf=SP: vai à API depois do q e vem selecionada", async () => {
+  const { status, html, chamadas } = await buscarUrl("q=maria&uf=SP");
+
+  assert.equal(status, 200);
+  assert.deepEqual(paramsRecebidos(chamadas), [
+    ["q", "maria"],
+    ["uf", "SP"],
+  ]);
+  assert.deepEqual(ufsSelecionadas(html), ["SP"]);
+});
+
+test("uf em minúsculas e com espaços vai como SP", async () => {
+  const { status, html, chamadas } = await buscarUrl("q=maria&uf=%20sp%20");
+
+  assert.equal(status, 200);
+  assert.deepEqual(paramsRecebidos(chamadas), [
+    ["q", "maria"],
+    ["uf", "SP"],
+  ]);
+  assert.deepEqual(ufsSelecionadas(html), ["SP"]);
+});
+
+test("uf que não existe (XX) não vai à API e o select volta a Todas", async () => {
+  const controle = await buscarUrl("q=maria&uf=SP");
+  assert.equal(controle.status, 200, "controle: uf válida funciona");
+
+  const { status, html, chamadas } = await buscarUrl("q=maria&uf=XX");
+
+  assert.equal(status, 200);
+  assert.deepEqual(paramsRecebidos(chamadas), [["q", "maria"]]);
+  assert.deepEqual(ufsSelecionadas(html), [""]);
+});
+
+test("partido=PT: vai à API e o campo mostra PT", async () => {
+  const { status, html, chamadas } = await buscarUrl("q=maria&partido=PT");
+
+  assert.equal(status, 200);
+  assert.deepEqual(paramsRecebidos(chamadas), [
+    ["q", "maria"],
+    ["partido", "PT"],
+  ]);
+  assert.equal(valorDoPartido(html), "PT");
+});
+
+test("uf e partido juntos: q, uf, partido, nessa ordem", async () => {
+  const { status, chamadas } = await buscarUrl("partido=PT&uf=SP&q=maria");
+
+  assert.equal(status, 200);
+  assert.deepEqual(paramsRecebidos(chamadas), [
+    ["q", "maria"],
+    ["uf", "SP"],
+    ["partido", "PT"],
+  ]);
+});
+
+test("partido com acento e símbolo chega inteiro à API e volta no campo", async () => {
+  const { status, html, chamadas } = await buscarUrl(
+    `q=maria&partido=${encodeURIComponent("união & cia")}`,
+  );
+
+  assert.equal(status, 200);
+  assert.deepEqual(paramsRecebidos(chamadas), [
+    ["q", "maria"],
+    ["partido", "união & cia"],
+  ]);
+  assert.match(html, /value="união &amp; cia"/);
+});
+
+test("HTML em partido e em uf aparece escapado, sem tag ativa", async () => {
+  const lixo = '"><script>alert(1)</script>';
+
+  const noPartido = await buscarUrl(`q=maria&partido=${encodeURIComponent(lixo)}`);
+  assert.equal(noPartido.status, 200, "controle: a página precisa existir");
+  assert.ok(!noPartido.html.includes("<script>alert(1)</script>"));
+  assert.ok(!noPartido.html.includes('value=""><script'));
+
+  const naUf = await buscarUrl(`q=maria&uf=${encodeURIComponent(lixo)}`);
+  assert.equal(naUf.status, 200);
+  assert.ok(!naUf.html.includes("<script>alert(1)</script>"));
+  assert.deepEqual(paramsRecebidos(naUf.chamadas), [["q", "maria"]], "uf inválida não vai à API");
+});
+
+test("uf e partido repetidos na URL: vale o primeiro", async () => {
+  const { status, chamadas } = await buscarUrl("q=maria&uf=SP&uf=RJ&partido=PT&partido=PL");
+
+  assert.equal(status, 200);
+  assert.deepEqual(paramsRecebidos(chamadas), [
+    ["q", "maria"],
+    ["uf", "SP"],
+    ["partido", "PT"],
+  ]);
+});
+
+test("partido de 10 mil caracteres: a API e o campo recebem no máximo 20", async () => {
+  const { status, html, chamadas } = await buscarUrl(`q=maria&partido=${"A".repeat(10_000)}`);
+
+  assert.equal(status, 200);
+  const partido = paramsRecebidos(chamadas).find(([nome]) => nome === "partido")?.[1];
+  assert.equal(partido?.length, 20);
+  assert.equal(valorDoPartido(html)?.length, 20);
+});
+
+test("partido só com espaços não vai à API", async () => {
+  const controle = await buscarUrl("q=maria&partido=PT");
+  assert.equal(controle.status, 200, "controle: partido preenchido funciona");
+
+  const { status, html, chamadas } = await buscarUrl("q=maria&partido=%20%20%20");
+
+  assert.equal(status, 200);
+  assert.deepEqual(paramsRecebidos(chamadas), [["q", "maria"]]);
+  assert.ok(!valorDoPartido(html), "o campo volta vazio");
+});
+
+test("só filtro, sem nome: não chama a API, avisa e mantém a UF escolhida", async () => {
+  const { status, html, chamadas } = await buscarUrl("uf=SP&partido=PT");
+
+  assert.equal(status, 200);
+  assert.deepEqual(chamadas, []);
+  assert.ok(html.includes("Digite um nome para buscar. UF e partido só refinam a busca."));
+  assert.deepEqual(ufsSelecionadas(html), ["SP"]);
+  assert.equal(valorDoPartido(html), "PT");
+});
+
+test("sem nome e sem filtro: nenhum aviso", async () => {
+  const { status, html } = await buscarUrl("uf=SP");
+  assert.equal(status, 200, "controle: com filtro o aviso aparece");
+  assert.ok(html.includes("Digite um nome para buscar."));
+
+  const vazio = await buscarUrl("");
+
+  assert.equal(vazio.status, 200);
+  assert.ok(!vazio.html.includes("Digite um nome para buscar."));
+});
+
+test("filtro ativo e lista vazia: a mensagem cita os filtros; sem filtro, o texto de sempre", async () => {
+  const comFiltro = await buscarUrl("q=zzzz&uf=SP", lista());
+  assert.equal(comFiltro.status, 200);
+  assert.ok(
+    comFiltro.html.includes(
+      "Nenhuma pessoa encontrada com esses filtros. Tente tirar a UF ou o partido.",
+    ),
+  );
+
+  const semFiltro = await buscarUrl("q=zzzz", lista());
+  assert.ok(semFiltro.html.includes("Nenhuma pessoa encontrada. Digite pelo menos 2 letras ou números."));
+  assert.ok(!semFiltro.html.includes("com esses filtros"));
+});
+
+test("API falha com filtro ativo: erro 500 genérico, sem o endereço da API", async () => {
+  const controle = await buscarUrl("q=maria&uf=SP");
+  assert.equal(controle.status, 200, "controle: a página precisa existir");
+
+  const { status, html } = await buscarUrl("q=maria&uf=SP", { status: 500, corpo: { erro: "boom" } });
+
+  assert.equal(status, 500);
+  assert.ok(!html.includes(api.url));
+});
+
+test("com filtro e resultados: links, contagem e marca de nome parecido como sem filtro", async () => {
+  const { status, html } = await buscarUrl(
+    "q=maria&uf=SP",
+    lista(
+      resultado({ id: "2026-123", nome: "MARIA SILVA" }),
+      resultado({ id: "2026-456", nome: "MARCIA SILVA", aproximado: true }),
+    ),
+  );
+
+  assert.equal(status, 200);
+  assert.match(html, /<a[^>]*href="\/pessoas\/2026-123\/"[^>]*>MARIA SILVA<\/a>/);
+  assert.match(html, /\b2 resultados\b/);
+  assert.equal(html.match(/>nome parecido</g)?.length, 1);
+  assert.ok(!html.includes("com esses filtros"));
+});
+
 test("a raiz redireciona (307) para /busca/", async () => {
   const controle = await buscar(undefined);
   assert.equal(controle.status, 200, "controle: /busca/ precisa existir");

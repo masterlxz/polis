@@ -29,6 +29,33 @@ export function prepararConsulta(valor) {
   return Array.from(texto.trim()).slice(0, MAX_CARACTERES_DA_CONSULTA).join("").trim();
 }
 
+// As 27 unidades da federação, as mesmas que a API aceita (`apps/elections/search.py`).
+export const UFS = "AC AL AP AM BA CE DF ES GO MA MT MS MG PA PB PR PE PI RJ RN RS RO RR SC SP SE TO".split(
+  " ",
+);
+const MAX_CARACTERES_DO_PARTIDO = 20; // tamanho do campo `party_acronym` na API
+
+function primeiroTexto(valor) {
+  const texto = Array.isArray(valor) ? valor[0] : valor;
+  return typeof texto === "string" ? texto : "";
+}
+
+// A UF que vai à API: só uma das 27, em caixa alta. Qualquer outra coisa vira "" (sem filtro) para o
+// `select` e a lista dizerem a mesma verdade na tela; a API, por sua vez, devolve vazio para UF
+// inválida (contrato do PR #74), que é o que um cliente qualquer dela vê.
+export function prepararUf(valor) {
+  const uf = primeiroTexto(valor).trim().toUpperCase();
+  return UFS.includes(uf) ? uf : "";
+}
+
+// A sigla do partido que vai à API: primeiro valor, sem espaços nas pontas, cortada em 20.
+export function prepararPartido(valor) {
+  return Array.from(primeiroTexto(valor).trim())
+    .slice(0, MAX_CARACTERES_DO_PARTIDO)
+    .join("")
+    .trim();
+}
+
 function textoOuNulo(valor) {
   return valor === null || typeof valor === "string";
 }
@@ -47,10 +74,13 @@ function resultadoValido(item) {
 
 // Busca pessoas pelo nome de urna (ADR 0016). O `id` de cada resultado vira `href`, então só
 // passa se tiver o formato `<ciclo>-<sq>`; qualquer coisa fora do formato recusa a resposta toda.
-export async function buscarPessoas(consulta) {
+export async function buscarPessoas(consulta, { uf = "", partido = "" } = {}) {
   let resposta;
   try {
+    // Só o que está preenchido, sempre nesta ordem: sem filtro a chamada é a de antes dos filtros.
     const parametros = new URLSearchParams({ q: consulta });
+    if (uf) parametros.set("uf", uf);
+    if (partido) parametros.set("partido", partido);
     resposta = await fetch(`${process.env.API_URL}/internal/v1/busca/?${parametros}`, {
       cache: "no-store",
       headers: { accept: "application/json" },

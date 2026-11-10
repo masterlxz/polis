@@ -64,6 +64,11 @@ jobs:
           PYTHONPATH: .
         run: uv run --locked python scripts/carga_busca/semear.py ${{ matrix.linhas }} "$RUNNER_TEMP/consultas.txt"
 
+      - name: Planos de execução (EXPLAIN ANALYZE) das duas consultas
+        env:
+          PYTHONPATH: .
+        run: uv run --locked python scripts/carga_busca/plano.py "$RUNNER_TEMP/consultas.txt"
+
       - name: Sobe a API (DEBUG desligado)
         run: |
           uv run --locked python manage.py runserver 127.0.0.1:8000 --noreload > "$RUNNER_TEMP/api.log" 2>&1 &
@@ -82,3 +87,11 @@ jobs:
             python3 scripts/carga_busca/carga.py http://127.0.0.1:8000 "$RUNNER_TEMP/consultas.txt" 10 60 10 "$r" | tee -a "$GITHUB_STEP_SUMMARY"
             echo '```' >> "$GITHUB_STEP_SUMMARY"
           done
+
+      - name: Log da API (códigos de erro das respostas)
+        if: always()
+        run: |
+          echo "respostas por status:"
+          grep -oE '" [0-9]{3} ' "$RUNNER_TEMP/api.log" | sort | uniq -c || true
+          echo "linhas que não são resposta 200 (primeiras 40):"
+          grep -vE '" 200 ' "$RUNNER_TEMP/api.log" | head -40 || true

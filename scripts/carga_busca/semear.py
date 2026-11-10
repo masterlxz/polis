@@ -38,17 +38,37 @@ SOBRENOMES = (
 UFS = "AC AL AP AM BA CE DF ES GO MA MT MS MG PA PB PR PE PI RJ RN RS RO RR SC SP SE TO".split()
 PARTIDOS = [f"P{i:02d}" for i in range(20)]
 
-PESSOAS = """
-INSERT INTO elections_person (cycle_year, tse_candidate_id, public_name, social_name)
-SELECT 2026, g,
-       upper(
-         (%(nomes)s::text[])[1 + floor(random() * %(nn)s)::int] || ' ' ||
-         (%(sobre)s::text[])[1 + floor(random() * %(ns)s)::int] ||
-         CASE WHEN random() < 0.5
-              THEN ' ' || (%(sobre)s::text[])[1 + floor(random() * %(ns)s)::int]
-              ELSE '' END),
-       ''
-FROM generate_series(1, %(n)s) AS g
+SILABAS = (
+    "ba be bi bo bu ca ce ci co cu da de di do du fa fe fi fo ga ge gi go la le li lo lu "
+    "ma me mi mo mu na ne ni no nu pa pe pi po ra re ri ro ru sa se si so ta te ti to va ve vi vo"
+).split()
+
+
+def _sorteia(lista, tamanho):
+    return f"(%({lista})s::text[])[1 + floor(random() * %({tamanho})s)::int]"
+
+
+# Palavra rara: 2 ou 3 sílabas sorteadas (~100 mil palavras possíveis). A mistura de palavras
+# comuns (da lista) com raras dá homonímia bem menor que a do primeiro teste (3 mil combinações
+# para 3 milhões de pessoas), mais perto dos nomes reais (maior grupo medido: 6 em 21 mil).
+_RARA = (
+    f"{_sorteia('sil', 'nsil')} || {_sorteia('sil', 'nsil')} || "
+    f"CASE WHEN random() < 0.5 THEN {_sorteia('sil', 'nsil')} ELSE '' END"
+)
+_PRIMEIRO = f"CASE WHEN random() < 0.7 THEN {_sorteia('nomes', 'nn')} ELSE {_RARA} END"
+_SOBRENOME = f"CASE WHEN random() < 0.5 THEN {_sorteia('sobre', 'ns')} ELSE {_RARA} END"
+
+PESSOAS = (
+    "INSERT INTO elections_person (cycle_year, tse_candidate_id, public_name, social_name) "
+    f"SELECT 2026, g, upper({_PRIMEIRO} || ' ' || {_SOBRENOME} || "
+    f"CASE WHEN random() < 0.5 THEN ' ' || {_SOBRENOME} ELSE '' END), '' "
+    "FROM generate_series(1, %(n)s) AS g"
+)
+
+HOMONIMIA = """
+SELECT count(*), count(DISTINCT public_name), max(c) FROM (
+    SELECT public_name, count(*) OVER (PARTITION BY public_name) AS c FROM elections_person
+) t
 """
 
 CANDIDATURAS = """
@@ -103,6 +123,8 @@ def main(total, caminho_consultas):
                 "nn": len(NOMES),
                 "sobre": SOBRENOMES,
                 "ns": len(SOBRENOMES),
+                "sil": SILABAS,
+                "nsil": len(SILABAS),
                 "n": total,
             },
         )
@@ -121,11 +143,14 @@ def main(total, caminho_consultas):
         cursor.execute("ANALYZE elections_candidacy")
         cursor.execute("SELECT public_name FROM elections_person ORDER BY random() LIMIT 3000")
         nomes = [linha[0] for linha in cursor.fetchall()]
-        cursor.execute("SELECT count(*) FROM elections_person")
-        (pessoas,) = cursor.fetchone()
+        cursor.execute(HOMONIMIA)
+        pessoas, distintos, maior_grupo = cursor.fetchone()
     with open(caminho_consultas, "w", encoding="utf-8") as saida:
         saida.write("\n".join(nomes) + "\n")
-    print(f"semeadas {pessoas} pessoas; {len(nomes)} nomes exportados para {caminho_consultas}")
+    print(
+        f"semeadas {pessoas} pessoas, {distintos} nomes distintos, maior grupo de homônimos "
+        f"{maior_grupo}; {len(nomes)} nomes exportados para {caminho_consultas}"
+    )
 
 
 if __name__ == "__main__":

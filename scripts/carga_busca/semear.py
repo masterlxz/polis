@@ -59,11 +59,11 @@ _PRIMEIRO = f"CASE WHEN random() < 0.7 THEN {_sorteia('nomes', 'nn')} ELSE {_RAR
 _SOBRENOME = f"CASE WHEN random() < 0.5 THEN {_sorteia('sobre', 'ns')} ELSE {_RARA} END"
 
 PESSOAS = (
-    "INSERT INTO elections_person (cycle_year, tse_candidate_id, public_name, social_name) "
+    "INSERT INTO elections_person (cycle_year, tse_candidate_id, public_name, social_name) "  # noqa: S608
     f"SELECT 2026, g, upper({_PRIMEIRO} || ' ' || {_SOBRENOME} || "
     f"CASE WHEN random() < 0.5 THEN ' ' || {_SOBRENOME} ELSE '' END), '' "
     "FROM generate_series(1, %(n)s) AS g"
-)
+)  # fragmentos são constantes do arquivo; só `n` e as listas viajam como parâmetro
 
 HOMONIMIA = """
 SELECT count(*), count(DISTINCT public_name), max(c) FROM (

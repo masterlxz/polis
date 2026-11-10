@@ -272,6 +272,180 @@ def test_com_5_exatos_a_reserva_nao_entra_e_nenhum_e_aproximado(client):
     assert not any(resultado.values())
 
 
+# --- filtros de UF e partido (refinam uma busca por nome; sem nome não há busca) -----------------
+
+
+def _filtrar(client, q, **filtros):
+    """Nomes devolvidos para `q` com os filtros `uf` e `partido` (valores de texto ou lista)."""
+    resposta = client.get(URL, {"q": q, **filtros})
+    assert resposta.status_code == 200, (
+        f"esperava 200 para {filtros!r}, veio {resposta.status_code}"
+    )
+    return [r["nome"] for r in resposta.json()["resultados"]]
+
+
+def _duas_marias(run, uf_a="SP", partido_a="PT", uf_b="RJ", partido_b="PL"):
+    _candidatura(run, _pessoa("MARIA A"), uf=uf_a, sigla=partido_a)
+    _candidatura(run, _pessoa("MARIA B"), uf=uf_b, sigla=partido_b)
+
+
+def test_filtro_de_uf_deixa_so_quem_e_da_uf(client, run):
+    _duas_marias(run)
+
+    assert _filtrar(client, "maria", uf="SP") == ["MARIA A"]
+    assert _filtrar(client, "maria", uf="RJ") == ["MARIA B"]
+
+
+def test_uf_ignora_caixa_e_espacos(client, run):
+    _duas_marias(run)
+
+    assert _filtrar(client, "maria", uf="sp") == ["MARIA A"]
+    assert _filtrar(client, "maria", uf=" Sp ") == ["MARIA A"]
+
+
+@pytest.mark.parametrize("uf", ["XX", "S", "SPP", "SP;DROP TABLE x", "' OR 1=1 --", "S P", "1"])
+def test_uf_invalida_devolve_lista_vazia_e_nao_ignora_o_filtro(client, run, uf):
+    _duas_marias(run)
+    assert _filtrar(client, "maria", uf="SP") == ["MARIA A"], "controle: o filtro válido funciona"
+
+    assert _filtrar(client, "maria", uf=uf) == []
+
+
+def test_filtro_de_partido_deixa_so_quem_e_do_partido(client, run):
+    _duas_marias(run)
+
+    assert _filtrar(client, "maria", partido="PT") == ["MARIA A"]
+    assert _filtrar(client, "maria", partido="PL") == ["MARIA B"]
+
+
+def test_partido_ignora_caixa_acento_pontuacao_e_espacos(client, run):
+    _candidatura(run, _pessoa("MARIA UNIAO"), sigla="UNIÃO")
+    _candidatura(run, _pessoa("MARIA PCDOB"), sigla="PC do B")
+    _candidatura(run, _pessoa("MARIA OUTRA"), sigla="PT")
+
+    for escrito in ("união", "UNIAO", " Uniao "):
+        assert _filtrar(client, "maria", partido=escrito) == ["MARIA UNIAO"], escrito
+    for escrito in ("PC DO B", "pc do b", "pc-do-b", "PC. do B"):
+        assert _filtrar(client, "maria", partido=escrito) == ["MARIA PCDOB"], escrito
+
+
+def test_partido_e_igualdade_exata_nao_prefixo(client, run):
+    _candidatura(run, _pessoa("MARIA PT"), sigla="PT")
+    _candidatura(run, _pessoa("MARIA PTB"), sigla="PTB")
+
+    assert _filtrar(client, "maria", partido="PT") == ["MARIA PT"]
+
+
+def test_uf_e_partido_juntos_sao_E(client, run):
+    _candidatura(run, _pessoa("MARIA SP PT"), uf="SP", sigla="PT")
+    _candidatura(run, _pessoa("MARIA SP PL"), uf="SP", sigla="PL")
+    _candidatura(run, _pessoa("MARIA RJ PT"), uf="RJ", sigla="PT")
+
+    assert _filtrar(client, "maria", uf="SP", partido="PT") == ["MARIA SP PT"]
+
+
+def test_filtro_vale_para_a_candidatura_mais_recente_a_que_aparece(client, run):
+    pessoa = _pessoa("MARIA DOIS TURNOS")
+    _candidatura(run, pessoa, turno=1, data=date(2026, 10, 4), uf="SP", sigla="PT")
+    _candidatura(run, pessoa, turno=2, data=date(2026, 10, 25), uf="RJ", sigla="PL")
+
+    [item] = _buscar(client, "maria dois")
+    assert (item["uf"], item["partido"]) == ("RJ", "PL"), "controle: é a mais recente que aparece"
+
+    assert _filtrar(client, "maria", uf="RJ", partido="PL") == ["MARIA DOIS TURNOS"]
+    assert _filtrar(client, "maria", uf="SP") == []
+    assert _filtrar(client, "maria", partido="PT") == []
+
+
+def test_a_reserva_tambem_respeita_o_filtro(client, run):
+    _candidatura(run, _pessoa("MARIA SILVA"), uf="SP")
+    _candidatura(run, _pessoa("MARIA SILVA"), uf="RJ")
+
+    resposta = client.get(URL, {"q": "marai silva", "uf": "SP"}).json()["resultados"]
+
+    assert [(r["nome"], r["uf"], r["aproximado"]) for r in resposta] == [
+        ("MARIA SILVA", "SP", True)
+    ]
+
+
+def test_o_filtro_entra_antes_da_contagem_do_minimo_de_5(client, run):
+    # 5 exatos do RJ NÃO podem contar como "já há 5 resultados": para quem filtra SP eles não
+    # existem, e a reserva precisa entrar. A pessoa de SP só é alcançável pela reserva (o nome
+    # dela está com a grafia trocada), então filtrar depois da contagem a perderia.
+    for i in range(5):
+        _candidatura(run, _pessoa(f"MARIA SILVA {i}"), uf="RJ")
+    _candidatura(run, _pessoa("MARAI SILVA"), uf="SP")
+    assert len(_filtrar(client, "maria silva")) == 5, "controle: sem filtro há 5 exatos"
+
+    resposta = client.get(URL, {"q": "maria silva", "uf": "SP"}).json()["resultados"]
+
+    assert [(r["nome"], r["uf"], r["aproximado"]) for r in resposta] == [
+        ("MARAI SILVA", "SP", True)
+    ]
+
+
+def test_o_filtro_entra_antes_do_teto_de_20(client, run):
+    for i in range(25):
+        _candidatura(run, _pessoa(f"MARIA RJ {i:02d}"), uf="RJ")
+    _candidatura(run, _pessoa("MARIA SP LONGE DEMAIS NO FIM"), uf="SP")
+
+    assert _filtrar(client, "maria", uf="SP") == ["MARIA SP LONGE DEMAIS NO FIM"]
+
+
+def test_filtros_vazios_ou_ausentes_dao_o_mesmo_que_antes(client, run):
+    _duas_marias(run)
+    sem_filtro = _nomes(client, "maria")
+
+    assert sorted(sem_filtro) == ["MARIA A", "MARIA B"]
+    assert _filtrar(client, "maria", uf="", partido="") == sem_filtro
+    assert _filtrar(client, "maria", uf="  ", partido="  ") == sem_filtro
+    assert _filtrar(client, "maria", partido="!!!") == sem_filtro, "só pontuação = sem filtro"
+
+
+def test_so_filtro_sem_texto_nao_busca(client, run):
+    _duas_marias(run)
+
+    assert _filtrar(client, "", uf="SP") == []
+    assert _filtrar(client, "", uf="SP", partido="PT") == []
+    assert client.get(URL, {"uf": "SP"}).json() == {"resultados": []}
+
+
+def test_filtro_repetido_na_url_usa_um_valor_so_sem_erro(client, run):
+    _duas_marias(run)
+
+    nomes = _filtrar(client, "maria", uf=["SP", "RJ"])
+
+    assert nomes in (["MARIA A"], ["MARIA B"]), "nunca a união dos dois"
+
+
+@pytest.mark.parametrize("campo", ["uf", "partido"])
+def test_filtro_gigante_nao_da_erro(client, run, campo):
+    _duas_marias(run)
+
+    assert _filtrar(client, "maria", **{campo: "A" * 10_000}) == []
+    assert _filtrar(client, "maria", **{campo: "é" * 10_000}) == []
+
+
+def test_filtro_nao_traz_o_nome_social_nem_muda_o_formato(client, run):
+    pessoa = _pessoa("MARIA A", social_name=NOME_SOCIAL_SECRETO)
+    _candidatura(run, pessoa, uf="SP", sigla="PT")
+
+    [item] = client.get(URL, {"q": "maria", "uf": "SP", "partido": "PT"}).json()["resultados"]
+
+    assert set(item) == CHAVES_RESULTADO
+    assert NOME_SOCIAL_SECRETO not in str(item)
+
+
+def test_no_maximo_2_consultas_ao_banco_com_filtro(client, run):
+    for i in range(20):
+        _candidatura(run, _pessoa(f"MARIA NUMERO {i}"), uf="SP", sigla="PT")
+
+    with CaptureQueriesContext(connection) as capturadas:
+        assert len(_filtrar(client, "maria", uf="SP", partido="PT")) == 20
+
+    assert len(capturadas) <= 2, [q["sql"] for q in capturadas]
+
+
 # --- o que nunca entra --------------------------------------------------------------------------
 
 

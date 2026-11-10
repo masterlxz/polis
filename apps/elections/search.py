@@ -38,10 +38,20 @@ LEFT JOIN LATERAL (
 ) c ON true
 """
 
+# Filtros opcionais sobre a candidatura que a página mostra (a do LATERAL). Parâmetro nulo apaga a
+# condição; o psycopg embute o literal, então o planner resolve o `IS NULL`. A UF vem validada
+# contra as 27 siglas e o partido normalizado como o texto: nada da entrada vira SQL.
+_FILTROS = """
+  AND (%s::text IS NULL OR c.state = %s)
+  AND (%s::text IS NULL OR btrim(f_busca_normaliza(c.party_acronym)) = %s)
+"""
+
 _POR_TOKENS = (
     _SELECT
     + """
-WHERE p.public_name_tsv @@ to_tsquery('simple', %s)
+WHERE p.public_name_tsv @@ to_tsquery('simple', %s)"""
+    + _FILTROS
+    + """
 ORDER BY (btrim(regexp_replace(f_busca_normaliza(p.public_name), ' +', ' ', 'g')) = %s) DESC,
          length(p.public_name), p.id
 LIMIT %s
@@ -52,7 +62,9 @@ _POR_SIMILARIDADE = (
     _SELECT
     + """
 WHERE f_busca_normaliza(p.public_name) %% %s
-  AND similarity(f_busca_normaliza(p.public_name), %s) >= %s
+  AND similarity(f_busca_normaliza(p.public_name), %s) >= %s"""
+    + _FILTROS
+    + """
 ORDER BY similarity(f_busca_normaliza(p.public_name), %s) DESC, p.id
 LIMIT %s
 """
@@ -64,6 +76,33 @@ def normalizar_consulta(consulta):
     texto = unicodedata.normalize("NFKD", (consulta or "")[:MAX_CARACTERES])
     texto = "".join(c for c in texto if not unicodedata.combining(c)).lower()
     return _TOKEN.findall(texto)[:MAX_PALAVRAS]
+
+
+_UFS = frozenset(
+    "AC AL AP AM BA CE DF ES GO MA MT MS MG PA PB PR PE PI RJ RN RS RO RR SC SP SE TO".split()
+)
+MAX_CARACTERES_DO_PARTIDO = 20  # tamanho do campo `party_acronym`
+
+# Filtro presente mas que nenhuma pessoa pode ter (UF que não existe, sigla longa demais): a busca
+# devolve lista vazia, em vez de ignorar o filtro (que mostraria o que o usuário excluiu).
+_NADA = object()
+
+
+def normalizar_uf(valor):
+    """None sem filtro; a sigla em caixa alta se for uma das 27; `_NADA` se for outra coisa."""
+    texto = (valor or "").strip()[:MAX_CARACTERES].upper()
+    if not texto:
+        return None
+    return texto if texto in _UFS else _NADA
+
+
+def normalizar_partido(valor):
+    """None se não há filtro; a sigla normalizada como o texto da busca (sem caixa, acento nem
+    pontuação); `_NADA` se passar do tamanho do campo."""
+    sigla = " ".join(normalizar_consulta(valor))
+    if not sigla:
+        return None
+    return sigla if len(sigla) <= MAX_CARACTERES_DO_PARTIDO else _NADA
 
 
 def _executar(sql, params):
@@ -101,18 +140,26 @@ def _resultado(linha, *, aproximado):
     }
 
 
-def buscar(consulta):
+def buscar(consulta, uf=None, partido=None):
+    """Pessoas pelo nome de urna; `uf` e `partido` só refinam (sem nome não há busca)."""
     tokens = normalizar_consulta(consulta)
     if sum(len(token) for token in tokens) < MIN_CARACTERES_UTEIS:
         return []
+    uf = normalizar_uf(uf)
+    partido = normalizar_partido(partido)
+    if uf is _NADA or partido is _NADA:
+        return []
     frase = " ".join(tokens)
     tsquery = " & ".join(f"{token}:*" for token in tokens)
+    filtros = [uf, uf, partido, partido]
 
-    exatos = _executar(_POR_TOKENS, [tsquery, frase, MAX_RESULTADOS])
+    exatos = _executar(_POR_TOKENS, [tsquery, *filtros, frase, MAX_RESULTADOS])
     resultados = [_resultado(linha, aproximado=False) for linha in exatos]
     if len(exatos) < MINIMO_DE_RESULTADOS:
         ja_vistos = {(linha[0], linha[1]) for linha in exatos}
-        similares = _executar_reserva([frase, frase, LIMIAR_DE_SIMILARIDADE, frase, MAX_RESULTADOS])
+        similares = _executar_reserva(
+            [frase, frase, LIMIAR_DE_SIMILARIDADE, *filtros, frase, MAX_RESULTADOS]
+        )
         resultados += [
             _resultado(linha, aproximado=True)
             for linha in similares

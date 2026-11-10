@@ -13,13 +13,16 @@ import django
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
 django.setup()
 
-from django.db import connection  # noqa: E402
+from django.db import connection, transaction  # noqa: E402
 
 from apps.elections import search  # noqa: E402
 
 
-def explicar(titulo, sql, params):
-    with connection.cursor() as cursor:
+def explicar(titulo, sql, params, limiar=None):
+    # `limiar`: o mesmo ajuste que `search._executar_reserva` faz (set_config local à transação).
+    with transaction.atomic(), connection.cursor() as cursor:
+        if limiar is not None:
+            cursor.execute("SELECT set_config('pg_trgm.similarity_threshold', %s, true)", [limiar])
         for _ in range(2):
             cursor.execute("EXPLAIN (ANALYZE, BUFFERS) " + sql, params)
             linhas = [linha[0] for linha in cursor.fetchall()]
@@ -50,6 +53,7 @@ def main(caminho):
             f"{classe}: reserva por trigramas",
             search._POR_SIMILARIDADE,
             [frase, frase, search.LIMIAR_DE_SIMILARIDADE, frase, search.MAX_RESULTADOS],
+            limiar=str(search.LIMIAR_DE_SIMILARIDADE),
         )
 
 

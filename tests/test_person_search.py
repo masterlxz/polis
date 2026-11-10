@@ -228,6 +228,7 @@ def _limiar_do_banco():
         return cursor.fetchone()[0]
 
 
+@pytest.mark.django_db(transaction=True)  # sem a transação do pytest-django: autocommit de verdade
 def test_a_reserva_roda_com_o_limiar_do_indice_igual_ao_do_codigo(client, monkeypatch):
     # O `%` do pg_trgm usa `pg_trgm.similarity_threshold` (padrão 0,3), não o nosso 0,5: com 0,3 o
     # índice devolve dezenas de milhares de candidatos que o `similarity >= 0,5` descarta depois

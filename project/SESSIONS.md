@@ -2,6 +2,16 @@
 
 Mais recente no topo.
 
+### 2026-11-10 — Sessão 48 (busca: marcar resultado aproximado)
+
+- **Pedido**: "vamos seguir"; entre as frentes do "Fica" da 47, o dono escolheu **marcar resultado aproximado** (recomendada, plan mode). Aprovou o plano e a tabela de testes ("sim, segue"); as respostas padrão valeram: texto da marca "nome parecido" e nota mantida com o mesmo texto, agora condicional.
+- **Feito**: `apps/elections/search.py` (cada resultado ganha `aproximado`: `false` no caminho por tokens, `true` só na reserva por trigramas), `web/lib/api.js` (`resultadoValido` exige booleano), `web/app/busca/page.js` (marca "nome parecido" só nos aproximados; nota só se houver algum). Sem migração. ADR 0015 com nota de atualização.
+- **Provas (CI, `workflow_dispatch` na branch)**: vermelho: backend run 42902241497 com 6 falhas (5 `KeyError: 'aproximado'` e o formato do item), web run 42902247585 com 4 falhas e 49 verdes; verde: backend run 42902554150 com **540 passam**, web run 42902560121 com **53 passam**. **4 mutações**, cada uma na sua branch descartável (apagadas), todas pegas: flag invertido (5 falhas no backend), nota sempre visível, marca em todos os itens, sem a checagem de booleano no front.
+- **Conferência real (dono, Compose)**: `docker compose build front web` e `up -d`; no navegador, "deu boa" (sem detalhar item por item; teclado, zoom e leitor de tela não informados).
+- **Pontos fracos conhecidos**: "exato" inclui o casamento por prefixo (`jo sil` acha "JOAO SILVA"), então o rótulo só distingue "veio da reserva" e não "nome idêntico"; contrato interno mudou, então o front novo recusa a API antiga (deploy conjunto); a marca é texto, sem teste de contraste medido.
+- **Não verificado**: leitor de tela; teclado e zoom a 200%; a qualidade da reserva com consultas reais; se a marca ajuda ou confunde.
+- **Fica**: filtros de UF e partido; página inicial de verdade; ligação entre ciclos (ADR próprio); lápide; fuso do `DT_GERACAO`; carga concorrente da busca (ADR 0010); `spike/busca` e `spike/nextjs`.
+
 ### 2026-11-09 — Sessão 47, parte 2 (busca de pessoas, PR 2 de 2: página `/busca/`)
 
 - **Pedido**: "sim" para abrir o PR 2 em plan mode, logo depois de mesclar o #70. Escolhas do dono: **link "Buscar" no cabeçalho e a raiz `/` redirecionando para `/busca/`**; **nota fixa** sobre nomes parecidos (sem mudar a API). Aprovou a tabela de testes ("segue").

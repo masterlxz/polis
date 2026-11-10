@@ -21,8 +21,14 @@ after(() => {
   api?.parar();
 });
 
-function resultado({ id = "2026-123", nome = "MARIA SILVA", uf = "SP", partido = "XYZ" } = {}) {
-  return { id, nome, ciclo: 2026, uf, partido };
+function resultado({
+  id = "2026-123",
+  nome = "MARIA SILVA",
+  uf = "SP",
+  partido = "XYZ",
+  aproximado = false,
+} = {}) {
+  return { id, nome, ciclo: 2026, uf, partido, aproximado };
 }
 
 function lista(...resultados) {
@@ -174,18 +180,52 @@ test("q de 1 caractere ainda chama a API e, sem resultado, mostra a mesma mensag
   assert.ok(html.includes("Nenhuma pessoa encontrada. Digite pelo menos 2 letras ou números."));
 });
 
-test("contagem no singular e no plural, e a nota dos nomes parecidos só com resultados", async () => {
+test("contagem no singular e no plural", async () => {
   const um = await buscar("maria", lista(resultado()));
   assert.equal(um.status, 200);
   assert.match(um.html, /\b1 resultado\b(?!s)/);
 
   const dois = await buscar("maria", lista(resultado(), resultado({ id: "2026-456" })));
   assert.match(dois.html, /\b2 resultados\b/);
-  assert.match(dois.html, /nomes parecidos com o digitado/);
+});
 
-  const nenhum = await buscar("maria", lista());
-  assert.equal(nenhum.status, 200);
-  assert.ok(!/nomes parecidos com o digitado/.test(nenhum.html));
+const NOTA = /nomes parecidos com o digitado/;
+const MARCA = />nome parecido</;
+
+test("todos exatos: nem a marca nem a nota aparecem", async () => {
+  const { status, html } = await buscar(
+    "maria",
+    lista(resultado(), resultado({ id: "2026-456", nome: "MARIA DA SILVA" })),
+  );
+
+  assert.equal(status, 200);
+  assert.ok(!MARCA.test(html), "marca em resultado exato");
+  assert.ok(!NOTA.test(html), "nota sem nenhum aproximado");
+});
+
+test("com aproximado: marca só nele e a nota aparece", async () => {
+  const { status, html } = await buscar(
+    "maria silva",
+    lista(
+      resultado({ id: "2026-123", nome: "MARIA SILVA" }),
+      resultado({ id: "2026-456", nome: "MARCIA SILVA", aproximado: true }),
+    ),
+  );
+
+  assert.equal(status, 200);
+  assert.equal(html.match(/>nome parecido</g)?.length, 1, "a marca deve aparecer uma vez só");
+  const [exato, parecido] = html.split("</li>");
+  assert.ok(!MARCA.test(exato), "marca no item exato");
+  assert.ok(MARCA.test(parecido), "falta a marca no item aproximado");
+  assert.match(html, NOTA);
+});
+
+test("lista vazia: sem nota e sem marca", async () => {
+  const { status, html } = await buscar("maria", lista());
+
+  assert.equal(status, 200);
+  assert.ok(!NOTA.test(html));
+  assert.ok(!MARCA.test(html));
 });
 
 test("API responde 500: erro 500 genérico, sem o endereço da API", async () => {
@@ -237,6 +277,11 @@ for (const [descricao, corpo] of [
   ["id com esquema perigoso", { resultados: [resultado({ id: "javascript:alert(1)" })] }],
   ["id fora do formato", { resultados: [resultado({ id: "2026-abc" })] }],
   ["item sem nome", { resultados: [{ id: "2026-123", ciclo: 2026, uf: "SP", partido: "XYZ" }] }],
+  [
+    "item sem o campo aproximado",
+    { resultados: [{ id: "2026-123", nome: "MARIA", ciclo: 2026, uf: "SP", partido: "XYZ" }] },
+  ],
+  ["aproximado que não é booleano", { resultados: [resultado({ aproximado: "sim" })] }],
   ["corpo sem a lista", { outra: [] }],
 ]) {
   test(`API devolve formato inválido (${descricao}): erro 500 e nenhum link com o valor`, async () => {

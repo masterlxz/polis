@@ -47,12 +47,22 @@ def main(caminho):
         explicar(
             f"{classe}: caminho por tokens",
             search._POR_TOKENS,
-            [tsquery, frase, search.MAX_RESULTADOS],
+            [tsquery, None, None, None, None, frase, search.MAX_RESULTADOS],
         )
         explicar(
             f"{classe}: reserva por trigramas",
             search._POR_SIMILARIDADE,
-            [frase, frase, search.LIMIAR_DE_SIMILARIDADE, frase, search.MAX_RESULTADOS],
+            [
+                frase,
+                frase,
+                search.LIMIAR_DE_SIMILARIDADE,
+                None,
+                None,
+                None,
+                None,
+                frase,
+                search.MAX_RESULTADOS,
+            ],
             limiar=str(search.LIMIAR_DE_SIMILARIDADE),
         )
 

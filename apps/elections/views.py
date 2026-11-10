@@ -73,7 +73,13 @@ def _candidacy(candidacy):
 @require_safe
 def person_search(request):
     return JsonResponse(
-        {"resultados": buscar(request.GET.get("q", ""))},
+        {
+            "resultados": buscar(
+                request.GET.get("q", ""),
+                uf=request.GET.get("uf"),
+                partido=request.GET.get("partido"),
+            )
+        },
         json_dumps_params={"ensure_ascii": False},
     )
 

@@ -2,10 +2,11 @@
 
 Uso: `python carga.py URL_BASE consultas.txt [rps=10] [duracao=60] [aquecimento=10] [semente=1]`.
 Dispara `rps` buscas por segundo mesmo que as respostas demorem (como usuários reais; numa carga
-fechada o sistema "se protege" e o p95 sai bonito demais). Cada consulta é de uma de 4 classes,
+fechada o sistema "se protege" e o p95 sai bonito demais). Cada consulta é de uma de 5 classes,
 para separar o caminho dos tokens do da reserva por trigramas:
   exata (nome ou nome e sobrenome, caixa alta), minuscula (sem caixa alta), erro (uma letra a
-  menos no meio: cai na reserva), prefixo (3 primeiras letras de cada palavra).
+  menos no meio: cai na reserva), prefixo (3 primeiras letras de cada palavra), filtro (como a
+  exata, mais `uf` e, na metade das vezes, `partido`).
 Imprime um JSON com p50/p95/p99 por classe e no total, erros e o atraso máximo do gerador.
 """
 
@@ -19,8 +20,11 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from urllib.parse import quote, urlparse
 
-CLASSES = ("exata", "minuscula", "erro", "prefixo")
-PESOS = (0.4, 0.2, 0.2, 0.2)
+CLASSES = ("exata", "minuscula", "erro", "prefixo", "filtro")
+PESOS = (0.3, 0.15, 0.2, 0.15, 0.2)
+# O semeador dá a UF `UFS[id % 27]` e o partido `P00` a `P19`: filtrar por uma UF aleatória e, na
+# metade das vezes, por um partido, mantém uma fração pequena dos achados do texto.
+UFS = "AC AL AP AM BA CE DF ES GO MA MT MS MG PA PB PR PE PI RJ RN RS RO RR SC SP SE TO".split()
 
 _local = threading.local()
 
@@ -111,7 +115,12 @@ def main():
                 medindo.set()
             classe = rnd.choices(CLASSES, PESOS)[0]
             consulta = montar_consulta(rnd, rnd.choice(nomes), classe)
-            pool.submit(uma, classe, f"/internal/v1/busca/?q={quote(consulta)}")
+            caminho = f"/internal/v1/busca/?q={quote(consulta)}"
+            if classe == "filtro":
+                caminho += f"&uf={rnd.choice(UFS)}"
+                if rnd.random() < 0.5:
+                    caminho += f"&partido=P{rnd.randrange(20):02d}"
+            pool.submit(uma, classe, caminho)
 
     todos = [t for c in CLASSES for t in tempos[c]]
     saida = {

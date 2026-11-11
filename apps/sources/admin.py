@@ -12,7 +12,7 @@ class SourceAdmin(admin.ModelAdmin):
 
 @admin.register(Dataset)
 class DatasetAdmin(admin.ModelAdmin):
-    list_display = ["__str__", "format", "license_basis", "enabled"]
+    list_display = ["__str__", "format", "license_basis", "enabled", "next_collection_at"]
     list_filter = ["enabled", "license_basis", "format", "source"]
     search_fields = ["slug", "name"]
 

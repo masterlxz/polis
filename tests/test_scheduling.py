@@ -414,15 +414,13 @@ def test_seed_cadastra_tse_e_camara_com_24_horas_e_a_janela_da_camara():
 
 def test_seed_nao_sobrescreve_o_agendamento_que_o_dono_mudou():
     call_command("seed_sources", stdout=StringIO())
-    camara = Dataset.objects.get(source__slug="camara", slug="deputados")
-    camara.schedule_interval_hours = 12
-    camara.earliest_hour_utc = 10
-    camara.next_collection_at = NOW
-    camara.save()
+    Dataset.objects.filter(source__slug="camara", slug="deputados").update(
+        schedule_interval_hours=12, earliest_hour_utc=10, next_collection_at=NOW
+    )
 
     call_command("seed_sources", stdout=StringIO())
 
-    camara.refresh_from_db()
+    camara = Dataset.objects.get(source__slug="camara", slug="deputados")
     assert (camara.schedule_interval_hours, camara.earliest_hour_utc) == (12, 10)
     assert camara.next_collection_at == NOW
 

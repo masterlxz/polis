@@ -21,7 +21,13 @@ DATASET_DESCRIPTIVE = (
     "internal_columns",
     "license_check_url",
 )
-DATASET_ON_CREATION = ("license_basis", "license_id", "license_url")
+DATASET_ON_CREATION = (
+    "license_basis",
+    "license_id",
+    "license_url",
+    "schedule_interval_hours",
+    "earliest_hour_utc",
+)
 
 
 class Command(BaseCommand):

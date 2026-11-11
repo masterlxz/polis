@@ -257,3 +257,74 @@ def test_nao_faz_nenhuma_requisicao_de_rede(dataset, monkeypatch):
     monkeypatch.setattr(socket, "create_connection", proibido)
     normalizar()
     assert Deputy().objects.count() == 1
+
+
+# --- `normalize_latest`: o passo que o agendador chama depois de cada coleta ---
+
+
+def normalize_latest(dataset):
+    from apps.legislature import normalization
+
+    return normalization.normalize_latest(dataset)
+
+
+def test_normalize_latest_normaliza_a_carga_mais_recente(dataset):
+    carga(dataset, [ANA, BETO])
+
+    resultado = normalize_latest(dataset)
+
+    assert Deputy().objects.count() == 2
+    assert (resultado.rows_read, resultado.created, resultado.existing) == (2, 2, 0)
+
+
+def test_normalize_latest_de_carga_ja_normalizada_devolve_none_sem_regravar(dataset):
+    carga(dataset, [ANA])
+    normalize_latest(dataset)
+    Deputy().objects.update(name="ALTERADO-DEPOIS")
+
+    resultado = normalize_latest(dataset)
+
+    assert resultado is None
+    assert Deputy().objects.get().name == "ALTERADO-DEPOIS"
+
+
+def test_normalize_latest_sem_carga_com_linhas_devolve_none(dataset):
+    carga(dataset, [], rows_read=0, rows_loaded=0)
+
+    assert normalize_latest(dataset) is None
+    assert Deputy().objects.count() == 0
+
+
+def test_normalize_latest_ignora_execucao_mais_nova_de_arquivo_igual(dataset):
+    carga(dataset, [ANA], started_at=timezone.now() - timedelta(days=1))
+    normalize_latest(dataset)
+    carga(dataset, [], rows_read=0, rows_loaded=0)  # arquivo igual: 0 linhas, mais nova
+    Deputy().objects.update(name="ALTERADO-DEPOIS")
+
+    assert normalize_latest(dataset) is None
+    assert Deputy().objects.get().name == "ALTERADO-DEPOIS"
+
+
+def test_normalize_latest_com_bruto_invalido_levanta_a_excecao_base_sem_valores(dataset):
+    from apps.sources.normalization import NormalizationRefused
+
+    carga(dataset, [{**ANA, "nome": "VALOR-RUIM-XYZ" * 20}])
+
+    with pytest.raises(NormalizationRefused) as erro:
+        normalize_latest(dataset)
+
+    assert "VALOR-RUIM-XYZ" not in str(erro.value)
+    assert Deputy().objects.count() == 0
+
+
+def test_normalize_latest_retenta_a_carga_que_recusou_quando_vem_uma_valida(dataset):
+    from apps.sources.normalization import NormalizationRefused
+
+    ruim = {**ANA, "nome": "VALOR-RUIM-XYZ" * 20}
+    carga(dataset, [ruim], started_at=timezone.now() - timedelta(days=1))
+    with pytest.raises(NormalizationRefused):
+        normalize_latest(dataset)
+
+    carga(dataset, [ANA])
+
+    assert normalize_latest(dataset).created == 1

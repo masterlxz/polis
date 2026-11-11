@@ -17,7 +17,10 @@ class Command(BaseCommand):
             self.stdout.write(line)
         if not result.lines:
             self.stdout.write("nada vencido")
+        problems = []
         if result.unexpected:
-            raise CommandError(
-                f"{result.unexpected} conjunto(s) falharam de forma inesperada; veja a saída."
-            )
+            problems.append(f"{result.unexpected} coleta(s) falharam de forma inesperada")
+        if result.normalization_failed:
+            problems.append(f"{result.normalization_failed} normalização(ões) não concluída(s)")
+        if problems:
+            raise CommandError("; ".join(problems) + "; veja a saída.")

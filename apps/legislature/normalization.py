@@ -19,6 +19,7 @@ from dataclasses import dataclass
 from django.db import transaction
 
 from apps.sources.models import Dataset, IngestionRun, RawRecord
+from apps.sources.normalization import NormalizationRefused as SharedRefused
 
 from .models import Deputy
 from .parsing import RowError, parse_row
@@ -31,7 +32,7 @@ KEY = ("legislature_id", "camara_id")
 UPDATABLE = ["name", "party_acronym", "state", "ingestion_run"]
 
 
-class NormalizationRefused(Exception):
+class NormalizationRefused(SharedRefused):
     """A normalização parou antes de gravar. A mensagem é segura: sem valores de linha."""
 
 
@@ -78,6 +79,18 @@ def latest_run(dataset):
 def normalize(run):
     rows_read, deputies = _collect(run)
     return _write(run, rows_read, deputies)
+
+
+def normalize_latest(dataset):
+    """O passo que o agendador encadeia: normaliza a carga mais recente que ainda não foi.
+
+    Devolve `None` se não há carga com linhas ou se ela já foi normalizada (algum deputado
+    aponta para ela; a gravação é uma transação só, então ou todos apontam ou nenhum).
+    """
+    run = latest_run(dataset)
+    if run is None or Deputy.objects.filter(ingestion_run=run).exists():
+        return None
+    return normalize(run)
 
 
 def _collect(run):

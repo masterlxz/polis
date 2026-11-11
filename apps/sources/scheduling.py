@@ -12,6 +12,10 @@ minuto) e o estado todo vive em `Dataset.next_collection_at`. Regras (plano da S
   o conjunto, e um processo que morre no meio volta a tentar em `RETRY_HOURS`.
 - Falha esperada, portão recusado e erro inesperado voltam a tentar em `RETRY_HOURS`; só o
   erro inesperado faz o comando terminar com erro.
+- Depois de uma coleta `succeeded` (inclusive "arquivo igual"), o conjunto é normalizado se
+  tiver normalizador em `settings.NORMALIZERS`. Recusa ou erro na normalização não desfazem a
+  coleta nem pausam o conjunto: o bruto fica, o comando termina com erro e a normalização é
+  retentada na próxima coleta bem-sucedida.
 
 Atenção: o minuto sorteado só vale se o disparo for a cada minuto; num disparo mais espaçado a
 coleta cai no minuto do disparo. Uma coleta manual (`ingest_dataset`) ao mesmo tempo não é barrada.
@@ -21,10 +25,13 @@ import random
 from dataclasses import dataclass, field
 from datetime import UTC, timedelta
 
+from django.conf import settings
 from django.utils import timezone
+from django.utils.module_loading import import_string
 
 from .ingestion import IngestionError, ingest
 from .models import Dataset, IngestionRun, Source
+from .normalization import NormalizationRefused
 
 RETRY_HOURS = 6
 ALLOWED_MINUTES = [minute for minute in range(1, 60) if minute % 5]
@@ -35,6 +42,7 @@ SCHEDULABLE_STATUSES = (Source.Status.INTEGRATING, Source.Status.ACTIVE)
 class Result:
     lines: list = field(default_factory=list)
     unexpected: int = 0
+    normalization_failed: int = 0
 
 
 def draw_next(now, hours, earliest_hour, rng):
@@ -101,7 +109,8 @@ def _handle(dataset, client, now, rng, result):
         result.lines.append(f"{name}: erro inesperado, próxima {_stamp(retry)}")
         return
 
-    if run.state == IngestionRun.State.SUCCEEDED:
+    succeeded = run.state == IngestionRun.State.SUCCEEDED
+    if succeeded:
         following = draw_next(now, dataset.schedule_interval_hours, earliest, rng)
         Dataset.objects.filter(pk=dataset.pk).update(next_collection_at=following)
     else:
@@ -109,3 +118,34 @@ def _handle(dataset, client, now, rng, result):
     result.lines.append(
         f"{name}: {run.state}, erro {run.error_code or '-'}, próxima {_stamp(following)}"
     )
+    if succeeded:
+        _normalize(dataset, name, result)
+
+
+def _normalize(dataset, name, result):
+    """Normaliza o bruto de `dataset` se ele tiver normalizador registrado.
+
+    Recusa (falha fechada) mostra a mensagem, que é segura por contrato; qualquer outra exceção
+    vira uma linha genérica, porque a mensagem de um erro do banco cita valores da linha.
+    """
+    path = settings.NORMALIZERS.get(name)
+    if path is None:
+        return
+    failed = False
+    try:
+        summary = import_string(path)(dataset)
+    except NormalizationRefused as error:
+        result.lines.append(f"{name}: normalização recusada: {error}")
+        result.normalization_failed += 1
+        return
+    except Exception:
+        failed = True
+    if failed:
+        result.lines.append(f"{name}: normalização falhou de forma inesperada")
+        result.normalization_failed += 1
+        return
+    if summary is not None:
+        result.lines.append(
+            f"{name}: normalizado, linhas lidas {summary.rows_read}, "
+            f"criadas {summary.created}, já existentes {summary.existing}"
+        )

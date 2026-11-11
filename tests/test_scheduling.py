@@ -8,13 +8,15 @@ Relógio e sorteio entram por parâmetro (`now`, `rng`).
 import socket
 from datetime import UTC, datetime, timedelta
 from io import StringIO
+from types import SimpleNamespace
 
 import pytest
 from django.core.management import CommandError, call_command
 from django.db import IntegrityError, transaction
+from django.utils.module_loading import import_string
 
 from apps.sources.ingestion import IngestionError
-from apps.sources.models import Dataset, IngestionRun, Source
+from apps.sources.models import Dataset, IngestionRun, RawRecord, Source
 
 pytestmark = pytest.mark.django_db
 
@@ -48,6 +50,7 @@ class FakeIngest:
         self.calls = []
         self.modos = {}
         self.ao_chamar = None
+        self.linhas = None  # bruto que uma execução `ok` grava; None: arquivo igual, 0 linhas
 
     def __call__(self, dataset, client):
         self.calls.append((dataset.slug, client))
@@ -63,13 +66,20 @@ class FakeIngest:
             gancho, self.ao_chamar = self.ao_chamar, None  # uso único: sem recursão
             gancho()
         if modo == "ok":
-            return IngestionRun.objects.create(
+            linhas = self.linhas or []
+            run = IngestionRun.objects.create(
                 dataset=dataset,
                 source_url=dataset.url,
                 state=IngestionRun.State.SUCCEEDED,
                 finished_at=NOW,
                 sha256_original=HASH,
+                rows_read=len(linhas),
+                rows_loaded=len(linhas),
             )
+            RawRecord.objects.bulk_create(
+                [RawRecord(run=run, item_name="deputados.json", values=v) for v in linhas]
+            )
+            return run
         code = IngestionRun.ErrorCode.BLOCKED if modo == "blocked" else "download"
         if modo == "blocked":
             dataset.source.status = Source.Status.PAUSED
@@ -396,6 +406,214 @@ def test_o_comando_nao_abre_conexao_de_rede_por_conta_propria(comando, ingest, m
     rodar_comando()
 
     assert len(ingest.calls) == 1
+
+
+# --- Normalização depois da coleta ---
+
+RESUMO = SimpleNamespace(rows_read=3, created=3, existing=0)
+
+
+class FakeNormalizador:
+    def __init__(self, resultado=RESUMO, erro=None):
+        self.resultado = resultado
+        self.erro = erro
+        self.chamadas = []
+
+    def __call__(self, dataset):
+        self.chamadas.append(str(dataset))
+        if self.erro is not None:
+            raise self.erro
+        return self.resultado
+
+
+@pytest.fixture
+def registrar_normalizador(agendador, settings, monkeypatch):
+    """Registra um normalizador falso para "fonte/conjunto", sem tocar nos reais."""
+    registro = {}
+    settings.NORMALIZERS = {}
+    monkeypatch.setattr(agendador, "import_string", lambda caminho: registro[caminho])
+
+    def registrar(conjunto, funcao):
+        registro[conjunto] = funcao
+        settings.NORMALIZERS = {**settings.NORMALIZERS, conjunto: conjunto}
+
+    return registrar
+
+
+def deputado_bruto(id=1, **extra):
+    return {
+        "id": id,
+        "uri": f"https://example.org/deputados/{id}",
+        "nome": f"Deputado {id}",
+        "siglaPartido": "XYZ",
+        "siglaUf": "SP",
+        "idLegislatura": 57,
+        **extra,
+    }
+
+
+def test_coleta_bem_sucedida_chama_o_normalizador_e_conta_o_que_entrou(
+    agendador, ingest, registrar_normalizador
+):
+    normalizador = FakeNormalizador()
+    registrar_normalizador("camara/deputados", normalizador)
+    make_dataset()
+
+    resultado = coletar(agendador)
+
+    assert normalizador.chamadas == ["camara/deputados"]
+    assert (
+        "camara/deputados: normalizado, linhas lidas 3, criadas 3, já existentes 0"
+        in resultado.lines
+    )
+    assert resultado.normalization_failed == 0
+
+
+def test_coleta_que_falhou_nao_normaliza(agendador, ingest, registrar_normalizador):
+    normalizador = FakeNormalizador()
+    registrar_normalizador("camara/deputados", normalizador)
+    ingest.modos["deputados"] = "failed"
+    make_dataset()
+
+    coletar(agendador)
+
+    assert normalizador.chamadas == []
+
+
+def test_conjunto_sem_normalizador_so_coleta(agendador, ingest, registrar_normalizador):
+    make_dataset()
+
+    resultado = coletar(agendador)
+
+    assert len(ingest.calls) == 1
+    assert resultado.normalization_failed == 0
+
+
+def test_carga_ja_normalizada_nao_gera_linha_nem_erro(agendador, ingest, registrar_normalizador):
+    registrar_normalizador("camara/deputados", FakeNormalizador(resultado=None))
+    make_dataset()
+
+    resultado = coletar(agendador)
+
+    assert not any("normaliza" in linha for linha in resultado.lines)
+    assert resultado.normalization_failed == 0
+
+
+def test_normalizacao_recusada_mantem_a_coleta_avisa_e_nao_pausa(
+    agendador, ingest, registrar_normalizador
+):
+    from apps.sources.normalization import NormalizationRefused
+
+    mensagem = "Normalização recusada: linhas inválidas: 2; colunas: id (2). Nada foi gravado."
+    recusa = FakeNormalizador(erro=NormalizationRefused(mensagem))
+    registrar_normalizador("camara/deputados", recusa)
+    dataset = make_dataset()
+
+    resultado = coletar(agendador)
+
+    assert resultado.normalization_failed == 1
+    assert any("recusada" in linha and "colunas: id (2)" in linha for linha in resultado.lines)
+    run = IngestionRun.objects.get(dataset=dataset)
+    assert run.state == IngestionRun.State.SUCCEEDED
+    dataset.refresh_from_db()
+    assert dataset.next_collection_at.date() == (NOW + timedelta(hours=24)).date()
+
+
+def test_erro_inesperado_na_normalizacao_nao_vaza_a_mensagem(
+    agendador, ingest, registrar_normalizador
+):
+    segredo = "SEGREDO-DE-TESTE-NAO-PODE-APARECER"
+    erro = RuntimeError(f"DETAIL: Failing row contains ({segredo})")
+    registrar_normalizador("camara/deputados", FakeNormalizador(erro=erro))
+    make_dataset()
+
+    resultado = coletar(agendador)
+
+    assert resultado.normalization_failed == 1
+    assert segredo not in "\n".join(resultado.lines)
+    assert any("inesperad" in linha for linha in resultado.lines)
+
+
+def test_um_conjunto_que_recusa_nao_impede_o_outro(agendador, ingest, registrar_normalizador):
+    from apps.sources.normalization import NormalizationRefused
+
+    fonte = make_source()
+    make_dataset(fonte=fonte, slug="a-ruim")
+    make_dataset(fonte=fonte, slug="b-bom")
+    bom = FakeNormalizador()
+    registrar_normalizador("camara/a-ruim", FakeNormalizador(erro=NormalizationRefused("recusada")))
+    registrar_normalizador("camara/b-bom", bom)
+
+    resultado = coletar(agendador)
+
+    assert [slug for slug, _ in ingest.calls] == ["a-ruim", "b-bom"]
+    assert bom.chamadas == ["camara/b-bom"]
+    assert resultado.normalization_failed == 1
+
+
+def test_o_comando_termina_com_erro_quando_a_normalizacao_recusa(
+    comando, ingest, registrar_normalizador
+):
+    from apps.sources.normalization import NormalizationRefused
+
+    registrar_normalizador(
+        "camara/deputados", FakeNormalizador(erro=NormalizationRefused("Normalização recusada."))
+    )
+    make_dataset()
+
+    with pytest.raises(CommandError, match="normaliza"):
+        rodar_comando()
+
+
+def test_ponta_a_ponta_da_camara_o_bruto_coletado_vira_deputados(agendador, ingest):
+    from apps.legislature.models import Deputy
+
+    ingest.linhas = [deputado_bruto(1), deputado_bruto(2), deputado_bruto(3)]
+    make_dataset()
+
+    resultado = coletar(agendador)
+
+    assert Deputy.objects.count() == 3
+    assert resultado.normalization_failed == 0
+    assert any("normalizado, linhas lidas 3, criadas 3" in linha for linha in resultado.lines)
+
+
+def test_segunda_coleta_de_arquivo_igual_nao_renormaliza(agendador, ingest):
+    from apps.legislature.models import Deputy
+
+    ingest.linhas = [deputado_bruto(1)]
+    dataset = make_dataset()
+    coletar(agendador)
+    primeira = Deputy.objects.get().ingestion_run
+    ingest.linhas = None  # arquivo igual: execução `succeeded` com 0 linhas
+
+    coletar(agendador, now=NOW + timedelta(hours=26))
+
+    assert IngestionRun.objects.filter(dataset=dataset).count() == 2
+    assert Deputy.objects.get().ingestion_run == primeira
+
+
+def test_bruto_invalido_recusa_e_a_coleta_seguinte_valida_cura_sozinha(agendador, ingest):
+    from apps.legislature.models import Deputy
+
+    ingest.linhas = [deputado_bruto(1), deputado_bruto(2, siglaUf="sp")]
+    make_dataset()
+    primeiro = coletar(agendador)
+    assert primeiro.normalization_failed == 1
+    assert Deputy.objects.count() == 0
+
+    ingest.linhas = [deputado_bruto(1), deputado_bruto(2)]
+    segundo = coletar(agendador, now=NOW + timedelta(hours=26))
+
+    assert segundo.normalization_failed == 0
+    assert Deputy.objects.count() == 2
+
+
+@pytest.mark.parametrize("conjunto", ["tse/consulta-cand-2026", "camara/deputados"])
+def test_o_registro_real_aponta_para_funcoes_que_existem(conjunto):
+    from django.conf import settings
+
+    assert callable(import_string(settings.NORMALIZERS[conjunto]))
 
 
 # --- Cadastro e modelo ---

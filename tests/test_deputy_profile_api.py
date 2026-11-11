@@ -97,6 +97,7 @@ def test_so_saem_as_chaves_da_lista_explicita(client, deputado):
 
 
 def test_nada_de_uri_nem_id_interno_no_corpo(client, deputado):
+    _perfil(client)  # controle: sem o 200, um 404 também "não tem uri"
     texto = client.get(URL).content.decode()
 
     assert "uri" not in texto

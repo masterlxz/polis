@@ -15,10 +15,13 @@ Liga o cliente HTTP (`PoliteClient`), o leitor (`ZipCsvReader`), o `Dataset`, o 
 
 A execução é criada antes (`running`) e fechada uma única vez no fim, fora da transação da carga
 (o `IngestionRun` é imutável depois de concluído, e o rollback não pode levar o registro da
-falha junto). A falha vira só `error_code`, nunca texto.
+falha junto). A falha vira `error_code`; o texto só é guardado (`error_detail`, até 200
+caracteres) nos erros de download e bloqueio, cuja mensagem o `PoliteClient` escreve citando só
+host e status.
 
-Segurança dos erros: um erro inesperado vira `other` e `IngestionError` sem causa nem contexto,
-porque a mensagem de um erro do banco cita valores da linha (ADR 0005, decisões 7 e 8).
+Segurança dos erros: os demais, e todo erro inesperado, não guardam texto: um erro inesperado
+vira `other` e `IngestionError` sem causa nem contexto, porque a mensagem de um erro do banco
+cita valores da linha (ADR 0005, decisões 7 e 8).
 
 Atenção para quem consome:
 - Duas cargas simultâneas do mesmo `Dataset` não são barradas (falta o agendador).
@@ -39,6 +42,7 @@ from .zip_csv import DuplicateColumnError, InvalidFormatError, MissingColumnErro
 
 KEEP_LOADS = 3
 BATCH_SIZE = 1000
+ERROR_DETAIL_MAX = 200
 
 
 class IngestionError(Exception):
@@ -101,10 +105,10 @@ def _execute(dataset, client, run, destination, batch_size, keep_loads):
             result = fetch_pages(client, dataset.url, destination)
         else:
             result = client.download(dataset.url, destination)
-    except BlockedError:
-        return {}, IngestionRun.ErrorCode.BLOCKED
-    except DownloadError:
-        return {}, IngestionRun.ErrorCode.DOWNLOAD
+    except BlockedError as error:
+        return _detail(error), IngestionRun.ErrorCode.BLOCKED
+    except DownloadError as error:
+        return _detail(error), IngestionRun.ErrorCode.DOWNLOAD
     except CkanError:
         return {}, IngestionRun.ErrorCode.LICENSE
     except JsonListError:
@@ -117,6 +121,11 @@ def _execute(dataset, client, run, destination, batch_size, keep_loads):
     if _same_as_last_load(dataset, result.sha256):
         return fields, ""
     return _load(dataset, run, destination, fields, batch_size, keep_loads)
+
+
+def _detail(error):
+    """Mensagem do cliente HTTP, a única que se guarda: ela cita só host e status."""
+    return {"error_detail": str(error)[:ERROR_DETAIL_MAX]}
 
 
 def _must_check_license(dataset):

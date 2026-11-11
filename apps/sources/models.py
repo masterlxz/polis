@@ -210,6 +210,7 @@ class IngestionRun(models.Model):
         verbose_name="colunas descartadas (só nomes)",
     )
     error_code = models.CharField("código do erro", max_length=20, choices=ErrorCode, blank=True)
+    error_detail = models.CharField("detalhe do erro", max_length=200, blank=True)
 
     class Meta:
         verbose_name = "execução de coleta"

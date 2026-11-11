@@ -2,6 +2,15 @@
 
 Mais recente no topo.
 
+### 2026-11-11 — Sessão 55 (Câmara, fatia 3, PR 1 de 2: API interna do deputado)
+
+- **Pedido**: "vamos de fatia 3" (plan mode). Escolha do dono: **2 PRs, API agora e página depois** (descartado: um PR com API e página). Aprovou o plano e a tabela de testes.
+- **Feito**: `apps/legislature/views.py` (`deputy_profile`), `urls.py` e a inclusão em `config/urls.py`: `GET /internal/v1/deputados/<legislatura>-<id>/`. Saída montada campo a campo: `deputado` (legislatura, id_camara, nome, partido, uf) e `atribuicao` (fonte, conjunto, `coletado_em` = início da execução que viu o deputado, `url_origem`, `licenca` com `id` e `url` nulos, porque a Câmara não declara licença). `partido` vazio sai `null`. Sem `uri`, id interno nem a execução; sem `gerado_pela_fonte_em` (a Câmara não informa). Uma consulta só (`select_related`). 404 JSON e 405 como no perfil de pessoa. Sem migração.
+- **Provas (CI, `workflow_dispatch`)**: vermelho (run 43106745180): 22 falhas e 673 passam; **um teste novo passava sem implementação** (`nada de uri nem id interno`, porque um 404 também não tem `uri`), então foi reforçado com o 200 de controle antes de implementar. Verde (run 43106976800): **695 passam**, lint ok. **5 mutações**, cada uma na sua branch descartável (apagadas), todas pegas: expor o id interno (3 falhas), `partido` vazio sem `null` (1), buscar só pelo id da Câmara sem a legislatura (2), tirar a atribuição (3) e tirar o `select_related` (1).
+- **Tropeços (meus)**: (1) o teste de "sem uri" nasceu fraco (acima). (2) A primeira versão da mutação 5 parou no `ruff format`, não nos testes (sem o `select_related` o código cabia numa linha), então não provava nada; refeita já formatada e pega pelo teste de uma consulta só.
+- **Não verificado**: a rota com dados reais dos 513 (depende do `normalize_camara` rodado pelo dono no Compose); o proxy do Compose (a rota é interna, mas nenhum teste confere que ela não é publicada); `coletado_em` de um deputado que saiu da lista mostra a última coleta que o viu, sem aviso de que saiu.
+- **Fica**: PR 2 (página `/deputados/<legislatura>-<id>/` no Next.js, `noindex`, com a atribuição); fatia 4 (lista e busca de deputados, ligação com a pessoa do TSE com revisão humana); agendador; lápide e saída do exercício; Senado; `_attribution` já tem duas cópias (eleições e legislativo), refatorar quando o Senado entrar.
+
 ### 2026-11-11 — Sessão 54 (Câmara, fatia 2: normalização dos deputados)
 
 - **Pedido**: "fatia 2" (plan mode). Escolhas do dono: **app novo `apps/legislature` com `Deputy` separada de `Person`** (descartadas: generalizar `Person` e pôr em `apps/elections`) e **chave única (legislatura, id da Câmara)**. Aprovou o plano e a tabela de testes, o ADR 0022 e a migração.

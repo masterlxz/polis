@@ -8,7 +8,6 @@ Relógio e sorteio entram por parâmetro (`now`, `rng`).
 import socket
 from datetime import UTC, datetime, timedelta
 from io import StringIO
-from random import Random
 
 import pytest
 from django.core.management import CommandError, call_command
@@ -28,6 +27,18 @@ def agendador():
     from apps.sources import scheduling
 
     return scheduling
+
+
+class SorteioEmRodizio:
+    """Sorteio determinístico: devolve as opções em rodízio, então 500 sorteios cobrem todas."""
+
+    def __init__(self, inicio=0):
+        self.posicao = inicio
+
+    def choice(self, opcoes):
+        escolhida = opcoes[self.posicao % len(opcoes)]
+        self.posicao += 1
+        return escolhida
 
 
 class FakeIngest:
@@ -117,7 +128,7 @@ def make_dataset(
 
 
 def coletar(agendador, now=NOW, client=None):
-    return agendador.collect_due(client or object(), now=now, rng=Random(7))
+    return agendador.collect_due(client or object(), now=now, rng=SorteioEmRodizio(7))
 
 
 def minuto_permitido(momento):
@@ -222,7 +233,7 @@ def test_ao_armar_a_proxima_nunca_cai_antes_da_janela(agendador, ingest, hora_lo
 
 
 def test_500_sorteios_nunca_caem_em_minuto_redondo_e_mantem_a_hora(agendador):
-    rng = Random(11)
+    rng = SorteioEmRodizio()
     for _ in range(500):
         proxima = agendador.draw_next(NOW, 24, 0, rng)
         assert minuto_permitido(proxima)
@@ -231,7 +242,7 @@ def test_500_sorteios_nunca_caem_em_minuto_redondo_e_mantem_a_hora(agendador):
 
 
 def test_sorteio_com_hora_antes_da_janela_sobe_para_a_hora_da_janela(agendador):
-    proxima = agendador.draw_next(NOW, 1, 12, Random(3))  # agora + 1 h = 10h, janela 12h
+    proxima = agendador.draw_next(NOW, 1, 12, SorteioEmRodizio(3))  # agora + 1 h = 10h, janela 12h
 
     assert proxima.hour == 12
     assert proxima.date() == NOW.date()

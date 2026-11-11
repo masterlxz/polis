@@ -480,3 +480,75 @@ def test_comando_repassa_a_recusa_do_portao_como_erro_de_comando(cliente_falso):
     with pytest.raises(CommandError, match="habilitado"):
         call_command("ingest_dataset", "tse/consulta-cand")
     assert cliente_falso.calls == []
+
+
+# --- Detalhe do erro de download (só a mensagem do cliente, que cita host e status) ---
+
+
+def test_falha_de_download_grava_a_mensagem_do_cliente_no_detalhe():
+    mensagem = "dadosabertos.camara.leg.br respondeu 503 (tentativa 4)."
+    run = ingest(make_dataset(), FakeClient(error=DownloadError(mensagem)))
+    assert run.error_code == IngestionRun.ErrorCode.DOWNLOAD
+    assert run.error_detail == mensagem
+    run.refresh_from_db()
+    assert run.error_detail == mensagem
+
+
+def test_bloqueio_grava_a_mensagem_do_cliente_no_detalhe():
+    mensagem = "cdn.example.org respondeu 403; a coleta deste host parou."
+    run = ingest(make_dataset(), FakeClient(error=BlockedError(mensagem)))
+    assert run.error_code == IngestionRun.ErrorCode.BLOCKED
+    assert run.error_detail == mensagem
+
+
+def test_detalhe_do_erro_e_cortado_em_200_caracteres():
+    run = ingest(make_dataset(), FakeClient(error=DownloadError("x" * 500)))
+    assert run.error_detail == "x" * 200
+
+
+def test_ckan_fora_do_ar_grava_o_detalhe_do_download():
+    dataset = dataset_com_checagem()
+    mensagem = "dados.gov.br respondeu 502 (tentativa 4)."
+    cliente = FakeCkanClient(zip_ok("1;ANA"), ckan_error=DownloadError(mensagem))
+    run = ingest(dataset, cliente)
+    assert run.error_code == IngestionRun.ErrorCode.DOWNLOAD
+    assert run.error_detail == mensagem
+
+
+def test_carga_com_sucesso_deixa_o_detalhe_vazio():
+    run = ingest(make_dataset(), FakeClient(zip_ok("1;ANA")))
+    assert run.state == IngestionRun.State.SUCCEEDED
+    assert run.error_detail == ""
+
+
+def test_esquema_diferente_deixa_o_detalhe_vazio():
+    cliente = FakeClient(make_zip({"cand_AC.csv": "SQ_CANDIDATO\n1\n"}))
+    run = ingest(make_dataset(), cliente)
+    assert run.error_code == IngestionRun.ErrorCode.SCHEMA
+    assert run.error_detail == ""
+
+
+def test_linha_rejeitada_deixa_o_detalhe_vazio():
+    dados = make_zip({"cand_AC.csv": f"{CABECALHO}\n1;ANA;sobra-com-CPF-12345678909\n"})
+    run = ingest(make_dataset(), FakeClient(dados))
+    assert run.error_code == IngestionRun.ErrorCode.MALFORMED_ROW
+    assert run.error_detail == ""
+
+
+def test_resposta_invalida_do_ckan_deixa_o_detalhe_vazio():
+    dataset = dataset_com_checagem()
+    run = ingest(dataset, FakeCkanClient(zip_ok("1;ANA"), ckan={"success": False}))
+    assert run.error_code == IngestionRun.ErrorCode.LICENSE
+    assert run.error_detail == ""
+
+
+def test_erro_inesperado_deixa_o_detalhe_vazio(monkeypatch):
+    def explode(*args, **kwargs):
+        raise RuntimeError("falha na linha com CPF 123.456.789-09")
+
+    monkeypatch.setattr(RawRecord.objects, "bulk_create", explode)
+    with pytest.raises(IngestionError):
+        ingest(make_dataset(), FakeClient(zip_ok("1;ANA")))
+    run = IngestionRun.objects.get()
+    assert run.error_code == IngestionRun.ErrorCode.OTHER
+    assert run.error_detail == ""

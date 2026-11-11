@@ -110,4 +110,22 @@ DATASETS = [
             "https://dadosabertos.tse.jus.br/api/3/action/package_show?id=candidatos-2026"
         ),
     },
+    {
+        # Lista dos deputados em exercício (legislatura atual), pela API paginada. Sem licença
+        # declarada: a base é a decisão do dono (ADR 0008, decisão 1; ADR 0021). O cadastro
+        # nunca habilita nem copia a justificativa: o dono faz isso no admin, com o texto do ADR.
+        # Fora da allowlist e descartados na leitura: `email`, `urlFoto` e `uriPartido`; nunca
+        # `cpf`, nome civil nem data de nascimento (ADR 0005).
+        "source": "camara",
+        "slug": "deputados",
+        "name": "Deputados em exercício (legislatura atual)",
+        "url": "https://dadosabertos.camara.leg.br/api/v2/deputados?itens=100&ordem=ASC&ordenarPor=id",
+        "format": "json",
+        "allowed_columns": ["id", "uri", "nome", "siglaPartido", "siglaUf", "idLegislatura"],
+        "internal_columns": [],
+        "license_basis": "owner_decision",
+        "license_id": "",
+        "license_url": "",
+        "license_check_url": "",
+    },
 ]

@@ -33,6 +33,7 @@ from django.utils import timezone
 
 from .ckan import CkanError, read_license_id
 from .http_client import BlockedError, DownloadError
+from .json_list import JsonListError, JsonListReader, fetch_pages
 from .models import IngestionRun, RawRecord, Source
 from .zip_csv import DuplicateColumnError, InvalidFormatError, MissingColumnError, ZipCsvReader
 
@@ -96,13 +97,18 @@ def _execute(dataset, client, run, destination, batch_size, keep_loads):
             declared = read_license_id(client, dataset.license_check_url, destination.parent)
             if declared != dataset.license_id:
                 return {}, IngestionRun.ErrorCode.LICENSE
-        result = client.download(dataset.url, destination)
+        if dataset.format == dataset.Format.JSON:
+            result = fetch_pages(client, dataset.url, destination)
+        else:
+            result = client.download(dataset.url, destination)
     except BlockedError:
         return {}, IngestionRun.ErrorCode.BLOCKED
     except DownloadError:
         return {}, IngestionRun.ErrorCode.DOWNLOAD
     except CkanError:
         return {}, IngestionRun.ErrorCode.LICENSE
+    except JsonListError:
+        return {}, IngestionRun.ErrorCode.SCHEMA
     fields = {
         "sha256_original": result.sha256,
         "size_bytes": result.size_bytes,
@@ -131,7 +137,10 @@ def _same_as_last_load(dataset, sha256):
 
 
 def _load(dataset, run, path, fields, batch_size, keep_loads):
-    reader = ZipCsvReader(path, dataset.allowed_columns)
+    if dataset.format == dataset.Format.JSON:
+        reader = JsonListReader(path, dataset.allowed_columns)
+    else:
+        reader = ZipCsvReader(path, dataset.allowed_columns)
     loaded = 0
     error_code = ""
     try:
@@ -142,7 +151,7 @@ def _load(dataset, run, path, fields, batch_size, keep_loads):
             _apply_retention(dataset, run, keep_loads)
     except _MalformedRows:
         error_code = IngestionRun.ErrorCode.MALFORMED_ROW
-    except MissingColumnError, DuplicateColumnError, InvalidFormatError:
+    except MissingColumnError, DuplicateColumnError, InvalidFormatError, JsonListError:
         error_code = IngestionRun.ErrorCode.SCHEMA
     fields["rows_read"] = reader.rows_read
     fields["dropped_columns"] = sorted(reader.ignored_columns)

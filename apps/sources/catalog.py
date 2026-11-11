@@ -109,6 +109,9 @@ DATASETS = [
         "license_check_url": (
             "https://dadosabertos.tse.jus.br/api/3/action/package_show?id=candidatos-2026"
         ),
+        # Agendamento (ADR 0008, decisão 6): uma vez por dia; o SHA-256 evita recarga inútil.
+        "schedule_interval_hours": 24,
+        "earliest_hour_utc": 0,
     },
     {
         # Lista dos deputados em exercício (legislatura atual), pela API paginada. Sem licença
@@ -127,5 +130,8 @@ DATASETS = [
         "license_id": "",
         "license_url": "",
         "license_check_url": "",
+        # Agendamento: uma vez por dia, só depois das 08:00 GMT (regeneração de madrugada).
+        "schedule_interval_hours": 24,
+        "earliest_hour_utc": 8,
     },
 ]

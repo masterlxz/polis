@@ -24,7 +24,9 @@ vira `other` e `IngestionError` sem causa nem contexto, porque a mensagem de um 
 cita valores da linha (ADR 0005, decisões 7 e 8).
 
 Atenção para quem consome:
-- Duas cargas simultâneas do mesmo `Dataset` não são barradas (falta o agendador).
+- Duas cargas simultâneas do mesmo `Dataset` não são barradas aqui: o agendador
+  (`apps/sources/scheduling.py`) reserva o conjunto antes de chamar `ingest`, mas uma coleta
+  manual (`ingest_dataset`) ao mesmo tempo continua possível.
 - O ZIP baixado não é guardado; só a camada filtrada.
 """
 

@@ -121,6 +121,26 @@ class Dataset(models.Model):
         default=False,
         help_text="Só pode ser habilitado com colunas permitidas e base de licença.",
     )
+    schedule_interval_hours = models.PositiveSmallIntegerField(
+        "intervalo da coleta (horas)",
+        null=True,
+        blank=True,
+        help_text="Vazio: o agendador não coleta este conjunto (ADR 0008, decisão 6).",
+    )
+    earliest_hour_utc = models.PositiveSmallIntegerField(
+        "hora mínima da coleta (UTC)",
+        default=0,
+        help_text="O agendador só coleta a partir desta hora (0 a 23, UTC).",
+    )
+    next_collection_at = models.DateTimeField(
+        "próxima coleta",
+        null=True,
+        blank=True,
+        help_text=(
+            "Vazio: o agendador sorteia na próxima passada. Para forçar uma coleta, ponha "
+            "uma data e hora já passadas."
+        ),
+    )
 
     class Meta:
         verbose_name = "conjunto de dados"
@@ -139,6 +159,16 @@ class Dataset(models.Model):
                 | (Q(license_basis="declared") & ~Q(license_id=""))
                 | (Q(license_basis="owner_decision") & ~Q(license_justification="")),
                 name="dataset_enabled_requires_license_basis",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    Q(schedule_interval_hours__isnull=True) | Q(schedule_interval_hours__gte=1)
+                ),
+                name="dataset_schedule_interval_positive",
+            ),
+            models.CheckConstraint(
+                condition=Q(earliest_hour_utc__lte=23),
+                name="dataset_earliest_hour_utc_range",
             ),
         ]
 

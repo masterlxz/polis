@@ -2,6 +2,15 @@
 
 Mais recente no topo.
 
+### 2026-11-11 — Sessão 56 (Câmara, fatia 3, PR 2 de 2: página do deputado)
+
+- **Pedido**: "pr 2". Tarefa que repete a receita da página de pessoa, então **sem plan mode**: apresentei o plano curto e a tabela de comportamentos, e o dono aprovou ("sim") antes de eu commitar os testes.
+- **Feito**: `web/app/deputados/[id]/page.js` (`/deputados/<legislatura>-<id>/`: `h1` com o nome, identificador na Câmara, seção com legislatura, UF e partido, e a atribuição); `web/lib/api.js` (`idDeDeputadoValido`, `buscarDeputado`, com validação do formato da resposta e a mesma disciplina de `buscarPerfil`: `no-store`, tempo limite, erro sem endereço da API). **Reuso**: `Atribuicao` e `Campo` vêm do padrão da página de pessoa (`Atribuicao` importado de `pessoas/[id]/`, sem mover; `Campo` copiado). Licença nula não aparece; partido nulo some. `noindex` vem do `layout.js`.
+- **Provas (CI, `workflow_dispatch` no `web.yml`)**: vermelho (run 43109567804): 96 testes, 70 passam (os antigos) e **26 falham** (os 26 novos); verde (run 43109747878): **96 de 96**, build e imagem do Docker ok. **5 mutações**, cada uma na sua branch descartável (apagadas), todas pegas: id aceita qualquer texto (7 falhas), partido nulo virando "null" na tela (1), nome sem escape via `dangerouslySetInnerHTML` (1), validação da resposta removida (1) e 404 da API virando 500 (1).
+- **Tropeços (meus)**: nenhum no CI. Uma escolha que deixo registrada: o box da página reaproveita a classe CSS `candidatura` (sem mudar o CSS), nome que não combina com deputado; renomear fica para quando houver uma terceira página com o mesmo box.
+- **Não verificado**: a página com dados reais dos 513 (depende do `normalize_camara` no Compose); leitor de tela, teclado, zoom e celular (testes só de estrutura); a rota não está no menu nem em nenhuma lista (só se chega por URL, até a fatia 4); contraste não medido.
+- **Fica**: fatia 4 (lista e busca de deputados, ligação com a pessoa do TSE com revisão humana); agendador; lápide e saída do exercício; Senado; renomear `.candidatura`; mover `Atribuicao` para um lugar neutro.
+
 ### 2026-11-11 — Sessão 55 (Câmara, fatia 3, PR 1 de 2: API interna do deputado)
 
 - **Pedido**: "vamos de fatia 3" (plan mode). Escolha do dono: **2 PRs, API agora e página depois** (descartado: um PR com API e página). Aprovou o plano e a tabela de testes.

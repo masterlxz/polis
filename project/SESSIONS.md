@@ -2,6 +2,15 @@
 
 Mais recente no topo.
 
+### 2026-11-11 — Sessão 54 (Câmara, fatia 2: normalização dos deputados)
+
+- **Pedido**: "fatia 2" (plan mode). Escolhas do dono: **app novo `apps/legislature` com `Deputy` separada de `Person`** (descartadas: generalizar `Person` e pôr em `apps/elections`) e **chave única (legislatura, id da Câmara)**. Aprovou o plano e a tabela de testes, o ADR 0022 e a migração.
+- **Feito**: `apps/legislature` (`Deputy`, migração `0001` **escrita à mão**, `parsing.py` sem banco, `normalization.py`, comando `normalize_camara`, admin só leitura); `apps.legislature` em `INSTALLED_APPS`; ADR 0022. Regras: lê a execução mais recente com linhas, sem rede; falha fechada e uma transação; upsert; nunca apaga (quem some da lista fica com a execução antiga); erros só com nome de coluna e contagem; `siglaPartido` vazia é aceita, `siglaUf` e `nome` não.
+- **Provas (CI, `workflow_dispatch`)**: vermelho (run 43103259172): 26 falhas e 37 erros, todos `ModuleNotFoundError: No module named 'apps.legislature'`, e 609 passam (os 608 antigos mais o teste de migração pendente, que é controle); verde (run 43103625844): **672 passam**, lint ok, migração à mão conferida. **5 mutações**, cada uma na sua branch descartável (apagadas), todas pegas: chave só no id (10 falhas), `True` aceito como id (3), apagar quem sumiu da lista (1), UF minúscula aceita (2) e gravar mesmo com linha inválida (6).
+- **Tropeços**: nenhum no CI. O `ruff` não existe local; uma linha de 101 caracteres foi pega à mão antes do push.
+- **Não verificado**: nenhuma normalização com os 513 reais (o dono roda `normalize_camara` no Compose; esperado 513 criadas e, na segunda rodada, 0 criadas e 513 existentes); se algum deputado real vem com partido ou UF nulos (a normalização recusa e cita a coluna); a migração só rodou em banco vazio; nenhum teste de volume.
+- **Fica**: fatia 3 (API interna e página com atribuição, nada público antes do P-16); fatia 4 (busca de deputados e ligação com a pessoa do TSE, com revisão humana); agendador; lápide e saída do exercício; histórico de partido; Senado; `OVERVIEW.md` com a tabela de etapas defasada.
+
 ### 2026-11-11 — Sessão 53 (detalhe do erro de download na execução)
 
 - **Pedido**: "por onde continuamos?"; o dono deixou a escolha comigo ("pode ser do seu jeito"). Escolhi o item pequeno da Sessão 52 (a primeira coleta real da Câmara falhou com `download` e a causa não foi confirmada) antes do agendador, que vai rodar sem ninguém olhando. Plan mode; aprovou o plano e a tabela de testes.

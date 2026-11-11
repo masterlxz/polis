@@ -19,6 +19,7 @@ from dataclasses import dataclass
 from django.db import transaction
 
 from apps.sources.models import Dataset, IngestionRun, RawRecord
+from apps.sources.normalization import NormalizationRefused as SharedRefused
 
 from .models import Candidacy, Election, Person
 from .tse import RowError, parse_row
@@ -35,7 +36,7 @@ def _updatable(model, *keys):
     return [field.name for field in model._meta.concrete_fields if field.name not in skip]
 
 
-class NormalizationRefused(Exception):
+class NormalizationRefused(SharedRefused):
     """A normalização parou antes de gravar. A mensagem é segura: sem valores de linha."""
 
 
@@ -90,6 +91,18 @@ def latest_run(dataset):
 
 def normalize(run):
     return _write(run, _collect(run))
+
+
+def normalize_latest(dataset):
+    """O passo que o agendador encadeia: normaliza a carga mais recente que ainda não foi.
+
+    Devolve `None` se não há carga com linhas ou se ela já foi normalizada (alguma candidatura
+    aponta para ela; a gravação é uma transação só, então ou todas apontam ou nenhuma).
+    """
+    run = latest_run(dataset)
+    if run is None or Candidacy.objects.filter(ingestion_run=run).exists():
+        return None
+    return normalize(run)
 
 
 def _register(table, key, value, conflicts, name):

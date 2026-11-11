@@ -88,6 +88,14 @@ AUTH_PASSWORD_VALIDATORS = [
 # Nome que o app autenticador mostra para o TOTP (ADR 0019).
 OTP_TOTP_ISSUER = "polis"
 
+# Normalizador de cada conjunto coletado, que o agendador chama depois de cada coleta
+# bem-sucedida (ADR 0023): "fonte/conjunto" -> caminho da função `normalize_latest(dataset)`.
+# Fica aqui para `apps.sources` não importar os apps que normalizam.
+NORMALIZERS = {
+    "tse/consulta-cand-2026": "apps.elections.normalization.normalize_latest",
+    "camara/deputados": "apps.legislature.normalization.normalize_latest",
+}
+
 LANGUAGE_CODE = "pt-br"
 TIME_ZONE = "America/Sao_Paulo"
 USE_I18N = True

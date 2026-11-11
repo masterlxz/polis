@@ -140,6 +140,12 @@ curl -sS -H 'Accept: application/json' https://dadosabertos.camara.leg.br/api/v2
 
 **Não verificado nesta rodada:** os campos de todos os deputados no detalhe (o CPF em mais de um); votos nominais pela API; `orientacoes`; a lista completa de valores de `voto`; discursos e despesas (despesas pertencem à Etapa 3, ADR 0005).
 
+## Remedição de `/deputados` (2026-11-10, Sessão 52)
+Duas requisições GET identificadas (página 1 e página 6, `itens=100&ordem=ASC&ordenarPor=id`, pausa de 4 s), só agregados:
+- **Página 1:** HTTP 200, 35.246 bytes, 2,1 s; `X-Total-Count: 513` (5 páginas de 100 e uma de 13: a página 6 trouxe 13 itens, 5.000 bytes, 3,2 s); `content-type: application/json`; `cache-control: public, max-age=1800`; `retry-after: 30` de novo (sem 429).
+- **Corpo:** `{"dados": [...], "links": [...]}`; 9 chaves por item, as mesmas de 2026-11-05 (`id, uri, nome, siglaPartido, uriPartido, siglaUf, idLegislatura, urlFoto, email`); todos os valores escalares (`id` e `idLegislatura` inteiros, o resto texto), nenhum vazio nas 113 linhas lidas; `idLegislatura` 57 em todas; maior valor com 61 caracteres; ids distintos dentro de cada página.
+- **Não verificado:** páginas 2 a 5, ids repetidos entre páginas, o comportamento da API com `pagina` fora do intervalo (a coleta só pede até a primeira página incompleta).
+
 ## Reproduzir as medições
 Use um `User-Agent` genérico e espere alguns segundos entre as requisições.
 ```bash

@@ -103,16 +103,23 @@ def test_o_leitor_aceita_a_allowlist_do_catalogo():
 # --- O que o seed cria ---
 
 
-def test_seed_cria_as_tres_fontes_e_o_conjunto_do_tse():
+def test_seed_cria_as_tres_fontes_e_os_conjuntos_do_tse_e_da_camara():
     seed()
     assert set(Source.objects.values_list("slug", flat=True)) == {"camara", "senado", "tse"}
-    assert Dataset.objects.count() == 1
+    assert {str(d) for d in Dataset.objects.all()} == {
+        "tse/consulta-cand-2026",
+        "camara/deputados",
+    }
     assert str(dataset_tse()) == "tse/consulta-cand-2026"
 
 
-def test_camara_e_senado_ficam_sem_conjunto():
+def test_so_o_senado_fica_sem_conjunto_e_o_da_camara_nasce_desabilitado():
     seed()
-    assert not Dataset.objects.filter(source__slug__in=["camara", "senado"]).exists()
+    assert not Dataset.objects.filter(source__slug="senado").exists()
+    deputados = Dataset.objects.get(source__slug="camara")
+    assert deputados.enabled is False
+    assert deputados.license_basis == Dataset.LicenseBasis.OWNER_DECISION
+    assert deputados.license_justification == "", "a justificativa é do dono, no admin"
 
 
 def test_fontes_nascem_medidas_e_sem_integracao():
@@ -158,7 +165,7 @@ def test_toda_fonte_tem_termos_em_https_e_nota_de_licenca():
 def test_seed_resume_so_com_contagens():
     texto = seed()
     assert "3" in texto
-    assert "1" in texto
+    assert "2" in texto
     assert "NR_CPF" not in texto
 
 
@@ -169,14 +176,14 @@ def test_segunda_execucao_nao_duplica_nem_cria():
     seed()
     texto = seed()
     assert Source.objects.count() == 3
-    assert Dataset.objects.count() == 1
+    assert Dataset.objects.count() == 2
     assert "0 criad" in texto
 
 
 def test_seed_nao_sobrescreve_status_nem_habilitacao_do_dono():
     seed()
     Source.objects.filter(slug="tse").update(status=Source.Status.PAUSED)
-    Dataset.objects.update(enabled=True)
+    Dataset.objects.filter(source__slug="tse").update(enabled=True)
     seed()
     assert Source.objects.get(slug="tse").status == Source.Status.PAUSED
     assert dataset_tse().enabled is True

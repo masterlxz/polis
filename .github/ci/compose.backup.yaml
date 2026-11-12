@@ -4,7 +4,7 @@
 services:
   s3:
     image: polis-backup
-    entrypoint: ["sh", "-c", "mkdir -p /dados/polis-backups && exec rclone serve s3 /dados --addr :9000 --auth-key chave-ci,segredo-ci-descartavel"]
+    entrypoint: ["sh", "-c", "mkdir -p /tmp/dados/polis-backups && exec rclone serve s3 /tmp/dados --addr :9000 --auth-key chave-ci,segredo-ci-descartavel"]
 
   backup:
     volumes:

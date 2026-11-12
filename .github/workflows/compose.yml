@@ -218,8 +218,8 @@ jobs:
           POSTGRES_DB: polis
         run: |
           docker compose build backup
-          docker compose up -d --wait s3
-          bash .github/scripts/teste-backup.sh
+          docker compose up -d --wait s3 || { docker compose logs --no-color s3; exit 1; }
+          bash .github/scripts/teste-backup.sh || { docker compose logs --no-color --tail=40 s3 backup; exit 1; }
 
       - name: Logs em caso de falha
         if: failure()

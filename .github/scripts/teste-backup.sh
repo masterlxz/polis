@@ -17,7 +17,7 @@ ok() { echo "ok: $*"; }
 falha() { echo "::error::$*"; exit 1; }
 
 MARCA="TOTP-CHAVE-DE-TESTE-9f3a1c7e5b2d"
-PREFIXO="${BACKUP_S3_BUCKET}/polis"
+PREFIX="${BACKUP_S3_BUCKET}/polis"
 
 # O diretório das chaves precisa existir ANTES de qualquer contêiner: se não existir, o Docker o
 # cria como root ao montar o volume e o runner não consegue gravar nele.

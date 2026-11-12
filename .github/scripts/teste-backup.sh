@@ -19,6 +19,10 @@ falha() { echo "::error::$*"; exit 1; }
 MARCA="TOTP-CHAVE-DE-TESTE-9f3a1c7e5b2d"
 PREFIXO="${BACKUP_S3_BUCKET}/polis"
 
+# O diretório das chaves precisa existir ANTES de qualquer contêiner: se não existir, o Docker o
+# cria como root ao montar o volume e o runner não consegue gravar nele.
+mkdir -p "$RUNNER_TEMP/chaves"
+
 # --- espera o S3 descartável responder e cria o bucket
 for _ in $(seq 1 30); do
   rclone_s3 mkdir "destino:${BACKUP_S3_BUCKET}" 2>/dev/null && break
@@ -30,7 +34,6 @@ rclone_s3 lsd "destino:" | grep -q "${BACKUP_S3_BUCKET}" || falha "o S3 descart�
 gerar_chave() { no_backup age-keygen 2>/dev/null; }
 CHAVE_A=$(gerar_chave); CHAVE_B=$(gerar_chave)
 PUB_A=$(grep -o 'age1[a-z0-9]*' <<<"$CHAVE_A" | head -1)
-mkdir -p "$RUNNER_TEMP/chaves"
 grep '^AGE-SECRET-KEY' <<<"$CHAVE_A" > "$RUNNER_TEMP/chaves/a.txt"
 grep '^AGE-SECRET-KEY' <<<"$CHAVE_B" > "$RUNNER_TEMP/chaves/b.txt"
 export BACKUP_AGE_RECIPIENTS="$PUB_A"

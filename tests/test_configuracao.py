@@ -105,8 +105,7 @@ def _configuracao(env_extra=None):
         "'origens': s.CSRF_TRUSTED_ORIGINS}))"
     )
     env = {k: v for k, v in os.environ.items() if k not in VARIAVEIS_DE_PRODUCAO}
-    env["DJANGO_SECRET_KEY"] = "x"
-    env.update(env_extra or {})
+    env.update({"DJANGO_SECRET_KEY": "x", **(env_extra or {})})
     return subprocess.run(
         [sys.executable, "-c", codigo],
         cwd=RAIZ,

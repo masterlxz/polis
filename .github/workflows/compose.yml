@@ -109,6 +109,13 @@ jobs:
       COMPOSE_FILE: compose.prod.yaml
       POSTGRES_PASSWORD: descartavel
       DJANGO_SECRET_KEY: ci-chave-descartavel-com-bastante-entropia-0123456789abcdefghij
+      # Backup (ADR 0025): S3 descartável do CI (`.github/ci/compose.backup.yaml`); o teste troca
+      # o destinatário por uma chave gerada na hora.
+      BACKUP_S3_ENDPOINT: http://s3:9000
+      BACKUP_S3_BUCKET: polis-backups
+      BACKUP_S3_ACCESS_KEY: chave-ci
+      BACKUP_S3_SECRET_KEY: segredo-ci-descartavel
+      BACKUP_AGE_RECIPIENTS: age1000000000000000000000000000000000000000000000000000000000
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -128,6 +135,16 @@ jobs:
             exit 1
           fi
           grep -q "DJANGO_SECRET_KEY" erro.txt
+
+      - name: Recusa subir sem as variáveis de backup
+        run: |
+          for v in BACKUP_S3_ENDPOINT BACKUP_S3_BUCKET BACKUP_S3_ACCESS_KEY BACKUP_S3_SECRET_KEY BACKUP_AGE_RECIPIENTS; do
+            if env -u "$v" docker compose config >/dev/null 2>erro.txt; then
+              echo "::error::o Compose de produção aceitou a falta de $v"
+              exit 1
+            fi
+            grep -q "$v" erro.txt
+          done
 
       - name: Só o Caddy publica porta, e só em 127.0.0.1:8443
         run: |
@@ -193,6 +210,16 @@ jobs:
           docker compose -f compose.prod.yaml -f cabecalhos.yaml logs --no-color web | grep 'CAB .*marca=forjado-ci' | tee cab.log
           grep -q 'proto=https ' cab.log
           ! grep -q '6.6.6.6' cab.log
+
+      - name: Backup cifrado e restauração de verdade
+        env:
+          COMPOSE_FILE: compose.prod.yaml:.github/ci/compose.backup.yaml
+          POSTGRES_USER: polis
+          POSTGRES_DB: polis
+        run: |
+          docker compose build backup
+          docker compose up -d --wait s3 || { docker compose logs --no-color s3; exit 1; }
+          bash .github/scripts/teste-backup.sh || { docker compose logs --no-color --tail=40 s3 backup; exit 1; }
 
       - name: Logs em caso de falha
         if: failure()

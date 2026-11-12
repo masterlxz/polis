@@ -1,0 +1,12 @@
+# Só para o CI (job `producao`): um S3 descartável no lugar do armazenamento de objetos real.
+# `rclone serve s3` vem na própria imagem de backup (rclone 1.75.2), sem imagem de terceiros a
+# mais (o MinIO saiu do Docker Hub). As chaves de teste ficam montadas só aqui; em produção a
+# chave privada nunca está no servidor.
+services:
+  s3:
+    image: polis-backup
+    entrypoint: ["sh", "-c", "mkdir -p /tmp/dados/polis-backups && exec rclone serve s3 /tmp/dados --addr :9000 --auth-key chave-ci,segredo-ci-descartavel"]
+
+  backup:
+    volumes:
+      - ${RUNNER_TEMP:?}/chaves:/chaves:ro

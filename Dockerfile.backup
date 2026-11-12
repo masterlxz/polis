@@ -1,0 +1,20 @@
+# Imagem do BACKUP (ADR 0011, 0025). Base `postgres:18` para o `pg_dump`/`pg_restore` ter a
+# mesma versão do servidor; `age` cifra com chave pública (a privada nunca fica no servidor) e
+# `rclone` fala com qualquer armazenamento S3-compatível: o binário vem da imagem oficial
+# `rclone/rclone` com tag fixa (o do Debian é antigo, sem `serve s3`, que o CI usa como S3
+# descartável). O `age` vem do Debian da imagem base (versão do repositório). Roda sem root.
+FROM postgres:18
+
+COPY --from=rclone/rclone:1.75.2 /usr/local/bin/rclone /usr/local/bin/rclone
+
+RUN apt-get update \
+    && apt-get install --no-install-recommends -y age \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY scripts/backup.sh scripts/backup-laco.sh scripts/restaurar.sh scripts/
+
+# O entrypoint da imagem do Postgres tenta iniciar o servidor; aqui só queremos os comandos.
+ENTRYPOINT []
+USER postgres
+CMD ["bash", "scripts/backup-laco.sh"]

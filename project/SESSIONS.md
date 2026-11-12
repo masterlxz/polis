@@ -2,6 +2,14 @@
 
 Mais recente no topo.
 
+### 2026-11-12 — Sessão 63 (backup cifrado e restauração, ADR 0011 decisão 3)
+
+- **Pedido**: backup com teste de restauração (plan mode; plano aprovado). Decisões do dono: **`pg_dump` + `age` com chave pública** (descartado: restic) e **S3-compatível genérico** (descartado: SSH/rsync); depois, "pode seguir" com as suposições (retenção de 14 dias, 2 destinatários age, 03:17 UTC) e criar ADR 0025 + runbook.
+- **Feito**: `Dockerfile.backup` (base `postgres:18`, `rclone` 1.75.2 da imagem oficial, `age`), `scripts/backup.sh`, `scripts/restaurar.sh`, `scripts/backup-laco.sh`, serviço `backup` em `compose.prod.yaml` (healthcheck: sucesso nas últimas 26 h), `BACKUP_*` em `.env.example`, testes em `.github/scripts/teste-backup.sh` com S3 descartável (`.github/ci/compose.backup.yaml`), passos novos no job `producao`, ADR 0025 e seções do `runbook.md`.
+- **Provas (CI)**: vermelho (run 43321040830): o job falha no 1º passo novo (o Compose aceitou a falta de `BACKUP_S3_ENDPOINT`); como o job para ali, os demais comportamentos não foram exercitados nessa execução (prova fraca). Cinco rodadas até o verde por defeitos **meus** no teste/infra: `rclone` do Debian sem `serve s3`; MinIO retirado do Docker Hub; `mkdir /dados` sem privilégio; diretório das chaves criado como root pelo Docker; `PREFIX`/`PREFIXO`. Verde (run 43323667245): os 8 comportamentos. **3 mutações** (branches descartáveis, apagadas), cada uma pega pelo motivo certo: sem cifra (43324008905, "assinatura PGDMP"), poda fora do prefixo (43324018445, "apagou fora do prefixo polis/") e restaurar sem `--substituir` (43324028202).
+- **Não verificado**: nada rodou num servidor nem com um S3 real (o CI usa `rclone serve s3`); restauração com o tamanho real do banco (RTO de 24 h **não medido**); `age` e `rclone` com credencial só de escrita (o provedor não foi escolhido); a versão do `age` é a do Debian, sem tag fixa; o binário `rclone` copiado da imagem oficial roda na base Debian (provado no CI, mas só nesta versão); um backup falho só aparece no healthcheck (sem alerta ativo); lápides (ADR 0005) não existem para reaplicar.
+- **Fica**: provedor e armazenamento, **primeiro teste de restauração feito pelo dono**, guarda das duas chaves privadas, monitoramento, domínio e HSTS, abrir ao público (ADR próprio).
+
 ### 2026-11-12 — Sessão 62 (triagem do Dependabot e `ignore` de Python e Node)
 
 - **Pedido**: "tria os PRs do dependabot". #86 (`next` 16.4.5 → 16.4.6, patch de backport, 6/6 verdes) mesclado pelo dono. #85 (`python:3.14-slim` → `3.15-slim`) **fechado**: `uv sync --locked` falha com `No interpreter found for Python ==3.14.*`, e a versão do Python é do ADR 0006.

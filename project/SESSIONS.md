@@ -2,6 +2,12 @@
 
 Mais recente no topo.
 
+### 2026-11-12 — Sessão 62 (triagem do Dependabot e `ignore` de Python e Node)
+
+- **Pedido**: "tria os PRs do dependabot". #86 (`next` 16.4.5 → 16.4.6, patch de backport, 6/6 verdes) mesclado pelo dono. #85 (`python:3.14-slim` → `3.15-slim`) **fechado**: `uv sync --locked` falha com `No interpreter found for Python ==3.14.*`, e a versão do Python é do ADR 0006.
+- **Causa**: o `ignore` do ecossistema `docker` (Sessão 60) só barrava `semver-major`, mas 3.14 → 3.15 é "minor" para o Dependabot. Corrigido: `python` e `node` barram major e minor (só patches).
+- **Não verificado**: o efeito do `ignore` só se vê na próxima rodada do Dependabot (segunda, 2026-11-16, 06:00); o CI só valida a sintaxe do arquivo. Postgres e Caddy do `compose.prod.yaml` seguem fora do Dependabot.
+
 ### 2026-11-12 — Sessão 61 (produção: fechar as pontas soltas da Sessão 60)
 
 - **Pedido**: "vamos de 1" (teste do `X-Forwarded-*` forjado, avisos do `gunicorn`, patch do Caddy). Sem plan mode: tarefa pequena, sem decisão de produto.

@@ -66,13 +66,17 @@ updates:
       docker:
         patterns: ["*"]
     ignore:
-      # Python e Node sobem de major por decisão manual (ADR 0006).
+      # Python e Node sobem de versão por decisão manual (ADR 0006): para o Dependabot, 3.14 ->
+      # 3.15 e 24 -> 25 são "minor" e "major", e o `pyproject.toml` exige Python ==3.14.* (a 3.15
+      # quebrou o build no PR #85). Só patches automáticos.
       - dependency-name: "python"
         update-types:
           - "version-update:semver-major"
+          - "version-update:semver-minor"
       - dependency-name: "node"
         update-types:
           - "version-update:semver-major"
+          - "version-update:semver-minor"
 
   - package-ecosystem: "github-actions"
     directory: "/"

@@ -4,7 +4,8 @@ Fica fora de `Person` de propósito: a identidade de `Person` é "ciclo + SQ_CAN
 ligar um deputado a uma pessoa do TSE precisa de revisão humana (outra fatia). A chave é a
 legislatura e o id da Câmara. Dentro da legislatura, a troca de partido sobrescreve a linha
 (histórico de partido é fatia futura), e quem some da lista continua aqui: `ingestion_run` guarda
-a última execução que o viu.
+a última execução que o viu, `in_office` fica falso e `left_list_at` guarda o início da primeira
+execução sem ele (ADR 0027). Quem volta à lista volta a `in_office`.
 """
 
 from django.db import models
@@ -25,6 +26,23 @@ class Deputy(models.Model):
         on_delete=models.PROTECT,
         related_name="deputies",
         verbose_name="última execução de coleta que o viu",
+    )
+    in_office = models.BooleanField(
+        "em exercício",
+        default=True,
+        help_text=(
+            "Falso: não consta mais na lista de deputados em exercício da Câmara. A lista não "
+            "diz o motivo (licença, fim de mandato, renúncia, morte, suplente assumindo)."
+        ),
+    )
+    left_list_at = models.DateTimeField(
+        "saiu da lista em",
+        null=True,
+        blank=True,
+        help_text=(
+            "Início da primeira execução de coleta que não o trouxe: a data da COLETA, não a do "
+            "fim do mandato. Vazio enquanto está na lista."
+        ),
     )
 
     class Meta:

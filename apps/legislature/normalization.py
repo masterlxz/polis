@@ -5,8 +5,10 @@ Regras (plano da Sessão 54, espelhando `apps/elections/normalization.py`):
 - Linhas idênticas viram uma; a mesma chave (legislatura, id da Câmara) com dados diferentes para
   tudo.
 - Falha fechada: linha inválida ou conflito não gravam nada. A gravação é uma só transação.
-- Idempotente: upsert pela chave. Nunca apaga; quem some da lista fica com a execução antiga
-  (a lápide e a saída do exercício são outra fatia).
+- Idempotente: upsert pela chave. Nunca apaga; quem some da lista fica com a execução antiga e
+  sai do exercício (`in_office=False`, `left_list_at` = início desta execução, ADR 0027); quem
+  volta, volta ao exercício. Só a carga MAIS RECENTE mexe nesse estado: normalizar à mão uma
+  carga velha atualiza nome, partido e UF, mas não liga nem desliga ninguém.
 - As mensagens de erro citam só nomes de coluna e contagens, nunca valores.
 
 Atenção: duas normalizações simultâneas não são barradas (falta o agendador); o resultado seria o
@@ -30,6 +32,7 @@ BATCH_SIZE = 1000
 READ_CHUNK = 2000
 KEY = ("legislature_id", "camara_id")
 UPDATABLE = ["name", "party_acronym", "state", "ingestion_run"]
+OFFICE_STATE = ["in_office", "left_list_at"]
 
 
 class NormalizationRefused(SharedRefused):
@@ -121,6 +124,9 @@ def _collect(run):
 
 def _write(run, rows_read, deputies):
     objects = [Deputy(ingestion_run=run, **row) for row in deputies.values()]
+    latest = latest_run(run.dataset)
+    is_latest = latest is not None and latest.pk == run.pk
+    update_fields = UPDATABLE + OFFICE_STATE if is_latest else UPDATABLE
     with transaction.atomic():
         before = Deputy.objects.count()
         for start in range(0, len(objects), BATCH_SIZE):
@@ -128,8 +134,13 @@ def _write(run, rows_read, deputies):
                 objects[start : start + BATCH_SIZE],
                 update_conflicts=True,
                 unique_fields=list(KEY),
-                update_fields=UPDATABLE,
+                update_fields=update_fields,
             )
         created = Deputy.objects.count() - before
+        if is_latest:
+            # Quem estava em exercício e não veio nesta carga saiu da lista (nunca apaga).
+            Deputy.objects.filter(ingestion_run__dataset=run.dataset, in_office=True).exclude(
+                ingestion_run=run
+            ).update(in_office=False, left_list_at=run.started_at)
     unique = len(objects)
     return Result(rows_read, unique, created, unique - created)

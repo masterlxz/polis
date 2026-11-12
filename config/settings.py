@@ -102,6 +102,35 @@ USE_I18N = True
 USE_TZ = True
 
 STATIC_URL = "static/"
+# Onde o `collectstatic` junta os arquivos do admin para o proxy servir (imagem de produção).
+STATIC_ROOT = BASE_DIR / "staticfiles"
+
+# Produção atrás de um proxy com TLS (ADR 0011). Tudo por variável de ambiente e, sem variável,
+# o comportamento é o de desenvolvimento. Valor inválido recusa subir, como a SECRET_KEY vazia.
+_LIGADO = {"1", "true"}
+_HTTPS = os.environ.get("DJANGO_HTTPS", "").lower() in _LIGADO
+SESSION_COOKIE_SECURE = _HTTPS
+CSRF_COOKIE_SECURE = _HTTPS
+
+# Só com o proxy na frente: ele precisa SOBRESCREVER `X-Forwarded-Proto` e ser o único caminho
+# até o Django, senão um cliente forja o cabeçalho e finge falar HTTPS.
+SECURE_PROXY_SSL_HEADER = None
+if os.environ.get("DJANGO_BEHIND_PROXY", "").lower() in _LIGADO:
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
+# HSTS "gruda" no navegador: fica 0 (desligado) até o dono decidir.
+_HSTS = os.environ.get("DJANGO_HSTS_SECONDS", "0")
+if not _HSTS.isascii() or not _HSTS.isdigit():
+    raise ImproperlyConfigured("DJANGO_HSTS_SECONDS deve ser um inteiro não negativo.")
+SECURE_HSTS_SECONDS = int(_HSTS)
+
+CSRF_TRUSTED_ORIGINS = [
+    o.strip() for o in os.environ.get("DJANGO_CSRF_TRUSTED_ORIGINS", "").split(",") if o.strip()
+]
+if not all(o.startswith(("https://", "http://")) for o in CSRF_TRUSTED_ORIGINS):
+    raise ImproperlyConfigured(
+        "DJANGO_CSRF_TRUSTED_ORIGINS: cada origem precisa começar com https:// ou http://."
+    )
 
 MAILERS = {
     "default": {

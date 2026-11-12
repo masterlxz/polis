@@ -4,6 +4,7 @@
 !.env.example
 
 # Python
+staticfiles/
 .venv/
 __pycache__/
 *.pyc

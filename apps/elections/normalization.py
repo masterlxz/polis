@@ -6,7 +6,8 @@ Regras (ADR 0005 e ADR 0009, plano da Sessão 39):
   idênticas, medido). Cópias iguais viram uma; qualquer conflito (cópias que divergem, eleição
   descrita de dois jeitos, mesmo `SQ_CANDIDATO` com dois nomes no ciclo) para tudo.
 - Falha fechada: linha inválida ou conflito não gravam nada. A gravação é uma só transação.
-- Idempotente: upsert pela chave. Nunca apaga (a lápide da retirada pela fonte é outra fatia).
+- Idempotente: upsert pela chave. Só apaga pela retirada da fonte (ADR 0005, decisão 9;
+  `retirement.py`): candidatura ausente de uma carga íntegra vira lápide, com disjuntor.
 - As mensagens de erro citam só nomes de coluna e contagens, nunca valores.
 
 Atenção: duas normalizações simultâneas não são barradas (falta o agendador); o resultado seria
@@ -21,7 +22,9 @@ from django.db import transaction
 from apps.sources.models import Dataset, IngestionRun, RawRecord
 from apps.sources.normalization import NormalizationRefused as SharedRefused
 
+from . import retirement
 from .models import Candidacy, Election, Person
+from .retirement import RetirementsHeld  # noqa: F401  (reexportada: faz parte da interface)
 from .tse import RowError, parse_row
 
 SOURCE_SLUG = "tse"
@@ -64,6 +67,7 @@ class Result:
     unique: int
     created: int
     existing: int
+    retired: int = 0
 
 
 @dataclass(frozen=True)
@@ -89,8 +93,13 @@ def latest_run(dataset):
     )
 
 
-def normalize(run):
-    return _write(run, _collect(run))
+def normalize(run, accept_retirements=False):
+    """Normaliza `run`. Candidaturas que sumiram dela são retiradas (lápide, ADR 0005, dec. 9).
+
+    Acima do limite do disjuntor a normalização inteira é recusada, a menos que
+    `accept_retirements` (só o comando manual passa; o agendador nunca).
+    """
+    return _write(run, _collect(run), accept_retirements)
 
 
 def normalize_latest(dataset):
@@ -149,8 +158,11 @@ def _upsert(model, objects, unique_fields):
         )
 
 
-def _write(run, collected):
+def _write(run, collected, accept_retirements=False):
+    present = retirement.present_keys(collected.candidacies)
     with transaction.atomic():
+        # Antes de gravar qualquer coisa: se o disjuntor levantar, nada foi mexido.
+        missing = retirement.plan(run.dataset, present, accept_retirements)
         before = Candidacy.objects.count()
 
         _upsert(
@@ -191,6 +203,7 @@ def _write(run, collected):
             ["election", "person"],
         )
         created = Candidacy.objects.count() - before
+        retired = retirement.apply(run, missing, present)
 
     unique = len(collected.candidacies)
-    return Result(collected.rows_read, unique, created, unique - created)
+    return Result(collected.rows_read, unique, created, unique - created, retired)

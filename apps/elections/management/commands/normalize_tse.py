@@ -1,14 +1,26 @@
 from django.core.management.base import BaseCommand, CommandError
 
 from apps.elections import normalization
+from apps.sources.normalization import NormalizationRefused as SharedRefused
 
 
 class Command(BaseCommand):
     help = (
         "Normaliza o bruto do TSE (tse/consulta-cand-2026) em eleições, pessoas e candidaturas. "
         "Lê a execução mais recente que gravou linhas, sem rede. Linha inválida ou conflito "
-        "param tudo e não gravam nada; nunca apaga."
+        "param tudo e não gravam nada. Candidatura que sumiu da carga é retirada e vira lápide "
+        "(ADR 0005, decisão 9); acima do limite do disjuntor a carga é recusada."
     )
+
+    def add_arguments(self, parser):
+        parser.add_argument(
+            "--aceitar-retiradas",
+            action="store_true",
+            help=(
+                "Aceita retiradas acima do limite do disjuntor (apagamento irreversível: "
+                "confira antes que o arquivo da fonte não está incompleto)."
+            ),
+        )
 
     def handle(self, *args, **options):
         name = f"{normalization.SOURCE_SLUG}/{normalization.DATASET_SLUG}"
@@ -21,8 +33,8 @@ class Command(BaseCommand):
 
         failed = False
         try:
-            result = normalization.normalize(run)
-        except normalization.NormalizationRefused as error:
+            result = normalization.normalize(run, accept_retirements=options["aceitar_retiradas"])
+        except SharedRefused as error:
             raise CommandError(str(error)) from None
         except Exception:
             # A mensagem de um erro do banco cita valores da linha: não é repassada nem
@@ -36,5 +48,5 @@ class Command(BaseCommand):
         self.stdout.write(
             f"Execução {run.pk}: linhas lidas {result.rows_read}, "
             f"candidaturas únicas {result.unique}, criadas {result.created}, "
-            f"já existentes {result.existing}."
+            f"já existentes {result.existing}, retiradas {result.retired}."
         )

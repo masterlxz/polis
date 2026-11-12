@@ -277,6 +277,44 @@ class IngestionRun(models.Model):
         super().save(*args, **kwargs)
 
 
+class Tombstone(models.Model):
+    """Lápide da retirada pela fonte (ADR 0005, decisão 9; ADR 0026).
+
+    Guarda só o id de origem, o conjunto e as datas: NENHUM dado pessoal. Existe para não
+    reexpor o que a fonte retirou depois de um restore de backup (`apply_tombstones`). Se o
+    registro reaparece numa carga íntegra, a lápide fica "reativada" e deixa de valer.
+    """
+
+    dataset = models.ForeignKey(
+        Dataset,
+        on_delete=models.PROTECT,
+        related_name="tombstones",
+        verbose_name="conjunto de dados",
+    )
+    source_key = models.CharField("identificador na fonte", max_length=60)
+    retired_at = models.DateTimeField("retirada em", default=timezone.now)
+    retired_in_run = models.ForeignKey(
+        IngestionRun,
+        on_delete=models.PROTECT,
+        related_name="tombstones",
+        verbose_name="execução que detectou a retirada",
+    )
+    reinstated_at = models.DateTimeField("reativada em", null=True, blank=True)
+
+    class Meta:
+        verbose_name = "lápide"
+        verbose_name_plural = "lápides"
+        ordering = ["-retired_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["dataset", "source_key"], name="tombstone_unique_dataset_key"
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.dataset}: {self.source_key}"
+
+
 class RawRecord(models.Model):
     """Linha da camada bruta filtrada (ADR 0005, decisão 5): só as colunas permitidas.
 

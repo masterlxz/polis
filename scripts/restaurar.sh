@@ -42,4 +42,4 @@ criado=1
 pg_restore --no-owner --exit-on-error --dbname="$destino" "$tmp/dump"
 restaurado=1
 echo "restaurado em $destino a partir de $objeto"
-echo "lembrete: reaplicar as lápides da retirada pela fonte (ADR 0005) quando existirem"
+echo "lembrete: antes de subir o web, rode 'manage.py apply_tombstones' (lápides da retirada pela fonte, ADR 0005 e 0026)"

@@ -44,7 +44,10 @@ dc run --rm -v /caminho/privada-1.txt:/chaves/privada.txt:ro -e AGE_IDENTITY=/ch
 ```
 Confira as contagens (`dc exec db psql -U polis -d polis_teste -c '...'`) e depois apague o banco de teste. O script decifra antes de criar qualquer banco e recusa um banco que já existe.
 
-Para recuperar de um desastre **no banco em uso**: pare `web`, `agendador` e `backup` (`dc stop web agendador backup`), rode o mesmo comando com o banco `polis` e o último argumento `--substituir` (apaga o atual), e suba tudo de novo. Depois, reaplique as lápides da retirada pela fonte (ADR 0005) quando existirem.
+Para recuperar de um desastre **no banco em uso**: pare `web`, `agendador` e `backup` (`dc stop web agendador backup`), rode o mesmo comando com o banco `polis` e o último argumento `--substituir` (apaga o atual). **Antes de subir o `web`**, reaplique as lápides da retirada pela fonte (ADR 0005, 0026): `dc run --rm web python manage.py apply_tombstones` (idempotente; o backup pode trazer de volta dado que a fonte já retirou). Só então `dc up -d --wait`.
+
+## Retiradas seguradas pelo disjuntor (ADR 0026)
+Quando uma carga do TSE faz sumir mais que `max(20, 1%)` candidaturas, a normalização é recusada (`collect_due` sai com erro; o bruto fica; nada é apagado). Antes de liberar, **confira que o arquivo da fonte não está incompleto** (compare as contagens da última carga com a anterior no admin). Se a retirada é legítima: `dc run --rm web python manage.py normalize_tse --aceitar-retiradas`. **Apaga dado pessoal sem volta.**
 
 ## Não existe ainda
-Monitoramento e alerta ativo (backup falho só aparece no healthcheck), domínio com certificado público, HSTS (`DJANGO_HSTS_SECONDS`), provedor do VPS e do armazenamento, medição do tempo de restauração com o tamanho real do banco (RTO de 24 h), lápides.
+Monitoramento e alerta ativo (backup falho só aparece no healthcheck), domínio com certificado público, HSTS (`DJANGO_HSTS_SECONDS`), provedor do VPS e do armazenamento, medição do tempo de restauração com o tamanho real do banco (RTO de 24 h), lápide para o deputado da Câmara (ADR 0026).

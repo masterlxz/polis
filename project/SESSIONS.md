@@ -2,6 +2,14 @@
 
 Mais recente no topo.
 
+### 2026-11-12 — Sessão 64 (lápide da retirada pela fonte, ADR 0005 decisão 9, só TSE)
+
+- **Pedido**: "voltar ao produto" (plan mode; plano aprovado). Decisões do dono: fatia = **lápide da retirada pela fonte**; **só TSE** (deputado segue "nunca apaga", ADR 0022); **disjuntor 1% (mín. 20)**; **reaparecimento segue a fonte**. Depois: o dono pediu o teste explícito do deputado ("faz você") e confirmou o ADR 0026 + runbook.
+- **Feito**: `Tombstone` + migração `sources/0007` (só cria a tabela), `apps/elections/retirement.py`, gancho em `normalization._write` (o plano roda antes de gravar), `normalize_tse --aceitar-retiradas`, `apply_tombstones`, admin só leitura, `tests/test_retirement.py` (20 testes, incluindo o do deputado), ADR 0026, runbook e lembrete do `restaurar.sh`.
+- **Provas (CI, `workflow_dispatch`)**: vermelho (run 43327322801): 19 falhas e 772 passam. 1ª implementação (43328056525): 4 falhas, **2 minhas**: o comando só capturava a `NormalizationRefused` local e não a base compartilhada (saía "falhou de forma inesperada" no disjuntor), e o teste antigo `test_candidatura_que_sumiu_do_arquivo_continua_no_banco` fixava o comportamento antigo (reescrito de propósito para `(2, 1, 1)`: a eleição fica, some pessoa e candidatura). Verde (43328340162): **792 passam**. **5 mutações**, cada uma em branch descartável (apagadas), todas pegas pelos testes certos: `>=` no limite (43328594903, 2 falhas nos casos de borda), não apagar o bruto (43328605701), não apagar a pessoa órfã (43329670726; a 1ª tentativa, 43328615947, falhou só no lint por `Person` sem uso e **não valia**; refeita mantendo o import), `apply_tombstones` ignorando reativadas (43328625293) e "arquivo igual" contando como carga (43328635210, 5 falhas).
+- **Não verificado**: o limite de 1% é chute (só há um dia de dados do TSE); custo da varredura do bruto com retirada real (até ~126 mil linhas) não medido; nada rodou contra o banco real nem com arquivo real do TSE; duas normalizações simultâneas continuam sem trava; `apply_tombstones` só cobre o TSE; deputado fora (fatia "saída do exercício" não existe); nada disto fecha o P-16.
+- **Fica**: "saída do exercício" do deputado; avaliar o limite com dados reais depois de mais de uma carga; alerta ativo para carga recusada; abrir ao público depende de provedor, restore real, monitoramento e P-16.
+
 ### 2026-11-12 — Sessão 63 (backup cifrado e restauração, ADR 0011 decisão 3)
 
 - **Pedido**: backup com teste de restauração (plan mode; plano aprovado). Decisões do dono: **`pg_dump` + `age` com chave pública** (descartado: restic) e **S3-compatível genérico** (descartado: SSH/rsync); depois, "pode seguir" com as suposições (retenção de 14 dias, 2 destinatários age, 03:17 UTC) e criar ADR 0025 + runbook.

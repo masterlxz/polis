@@ -177,6 +177,23 @@ jobs:
       - name: O agendador está vivo (batimento)
         run: docker compose ps --format json agendador | jq -e '.Health == "healthy"'
 
+      - name: Cabeçalhos X-Forwarded-* forjados pelo cliente não chegam ao Django
+        run: |
+          # Só para este passo: o gunicorn registra os cabeçalhos que de fato recebeu.
+          cat > cabecalhos.yaml <<'EOF'
+          services:
+            web:
+              environment:
+                GUNICORN_CMD_ARGS: "--access-logfile - --access-logformat 'CAB proto=%({x-forwarded-proto}i)s xff=%({x-forwarded-for}i)s q=%(q)s'"
+          EOF
+          docker compose -f compose.prod.yaml -f cabecalhos.yaml up -d --wait web
+          curl -ksS --fail --retry 10 --retry-delay 2 --retry-all-errors -o /dev/null \
+            -H 'X-Forwarded-Proto: http' -H 'X-Forwarded-For: 6.6.6.6' \
+            'https://127.0.0.1:8443/admin/login/?marca=forjado-ci'
+          docker compose -f compose.prod.yaml -f cabecalhos.yaml logs --no-color web | grep 'CAB .*marca=forjado-ci' | tee cab.log
+          grep -q 'proto=https ' cab.log
+          ! grep -q '6.6.6.6' cab.log
+
       - name: Logs em caso de falha
         if: failure()
         run: docker compose logs --no-color --tail=100

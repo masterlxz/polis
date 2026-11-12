@@ -99,3 +99,86 @@ jobs:
           POSTGRES_PASSWORD: descartavel
           DJANGO_SECRET_KEY: descartavel
         run: docker compose down -v
+
+  # Compose de PRODUÇÃO (ADR 0011 e 0024): fechado por padrão, só o Caddy publica porta (em
+  # 127.0.0.1:8443), a API interna não passa pelo proxy e o agendador roda a cada minuto. O job
+  # `producao` não é exigido no ruleset protect-main.
+  producao:
+    runs-on: ubuntu-24.04
+    env:
+      COMPOSE_FILE: compose.prod.yaml
+      POSTGRES_PASSWORD: descartavel
+      DJANGO_SECRET_KEY: ci-chave-descartavel-com-bastante-entropia-0123456789abcdefghij
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Recusa subir sem POSTGRES_PASSWORD
+        run: |
+          if env -u POSTGRES_PASSWORD docker compose config >/dev/null 2>erro.txt; then
+            echo "::error::o Compose de produção aceitou a falta de POSTGRES_PASSWORD"
+            exit 1
+          fi
+          grep -q "POSTGRES_PASSWORD" erro.txt
+
+      - name: Recusa subir sem DJANGO_SECRET_KEY
+        run: |
+          if env -u DJANGO_SECRET_KEY docker compose config >/dev/null 2>erro.txt; then
+            echo "::error::o Compose de produção aceitou a falta de DJANGO_SECRET_KEY"
+            exit 1
+          fi
+          grep -q "DJANGO_SECRET_KEY" erro.txt
+
+      - name: Só o Caddy publica porta, e só em 127.0.0.1:8443
+        run: |
+          docker compose config --format json > config.json
+          jq -r '.services | to_entries[] | select((.value.ports // []) | length > 0) | .key' config.json | tee publicam.txt
+          test "$(cat publicam.txt)" = "caddy"
+          test "$(jq '[.services.caddy.ports[]] | length' config.json)" -eq 1
+          test "$(jq -r '.services.caddy.ports[0] | "\(.host_ip):\(.published)"' config.json)" = "127.0.0.1:8443"
+
+      - name: O agendador atende a falha do comando sem sair do laço
+        run: |
+          bash -n scripts/agendador.sh
+          AGENDADOR_COMANDO=false AGENDADOR_VOLTAS=2 AGENDADOR_ESPERA=1 \
+            AGENDADOR_BATIMENTO="$RUNNER_TEMP/batimento" scripts/agendador.sh
+          test -f "$RUNNER_TEMP/batimento"
+
+      - name: Sobe o banco e migra (passo manual do runbook)
+        run: |
+          docker compose up -d --wait db
+          docker compose run --rm web python manage.py migrate --noinput
+
+      - name: Sobe a pilha e espera tudo ficar saudável
+        run: docker compose up -d --build --wait
+
+      - name: Front responde pelo Caddy
+        run: curl -ksS --fail -o /dev/null -w '%{http_code}\n' https://127.0.0.1:8443/busca/
+
+      - name: Admin responde pelo Caddy, com os estáticos e cookie Secure
+        run: |
+          curl -ksS --fail -D cab.txt -o /dev/null https://127.0.0.1:8443/admin/login/
+          grep -i '^set-cookie: csrftoken' cab.txt | grep -qi 'secure'
+          curl -ksS --fail -o /dev/null https://127.0.0.1:8443/static/admin/css/base.css
+
+      - name: A API interna NÃO passa pelo Caddy
+        run: |
+          codigo=$(curl -ks -o /dev/null -w '%{http_code}' 'https://127.0.0.1:8443/internal/v1/busca/?q=ma')
+          echo "código: $codigo"
+          test "$codigo" = "404"
+
+      - name: Nada em 80 nem 443 do computador
+        run: |
+          ! curl -s --max-time 3 -o /dev/null http://127.0.0.1:80/
+          ! curl -ks --max-time 3 -o /dev/null https://127.0.0.1:443/
+
+      - name: O agendador está vivo (batimento)
+        run: docker compose ps --format json agendador | jq -e '.Health == "healthy"'
+
+      - name: Logs em caso de falha
+        if: failure()
+        run: docker compose logs --no-color --tail=100
+
+      - name: Derruba tudo
+        if: always()
+        run: docker compose down -v

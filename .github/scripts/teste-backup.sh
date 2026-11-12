@@ -9,6 +9,9 @@ dc() { docker compose "$@"; }
 # Roda um comando dentro da imagem de backup, ligada à rede do Compose e sem TTY.
 no_backup() { dc run --rm -T --no-deps backup "$@"; }
 rclone_s3() { no_backup rclone "$@"; }
+# restaurar <a|b> <objeto> <banco> [--substituir]: a chave privada de teste entra por arquivo
+# montado em /chaves (`docker compose run` não repassa variáveis do shell sozinho).
+restaurar() { local chave="$1"; shift; no_backup env AGE_IDENTITY="/chaves/$chave.txt" bash scripts/restaurar.sh "$@"; }
 psql_db() { dc exec -T db psql -U "$POSTGRES_USER" -d "${2:-$POSTGRES_DB}" -tAc "$1"; }
 ok() { echo "ok: $*"; }
 falha() { echo "::error::$*"; exit 1; }
@@ -48,7 +51,7 @@ head -c 22 "$RUNNER_TEMP/baixado/objeto.age" | grep -aq 'age-encryption.org' || 
 ok "objeto cifrado (sem PGDMP, sem a marca)"
 
 # --- 3. chave errada não restaura e não cria banco
-if AGE_IDENTITY=/chaves/b.txt no_backup bash scripts/restaurar.sh "$OBJETO" polis_errado; then
+if restaurar b "$OBJETO" polis_errado; then
   falha "restaurou com a chave errada"
 fi
 test "$(psql_db "SELECT count(*) FROM pg_database WHERE datname='polis_errado'")" -eq 0 \
@@ -56,7 +59,7 @@ test "$(psql_db "SELECT count(*) FROM pg_database WHERE datname='polis_errado'")
 ok "chave errada recusada"
 
 # --- 4. restaura de verdade num banco novo; origem intacta
-AGE_IDENTITY=/chaves/a.txt no_backup bash scripts/restaurar.sh "$OBJETO" polis_restaurado
+restaurar a "$OBJETO" polis_restaurado
 test "$(psql_db "SELECT valor FROM marca_ci" polis_restaurado)" = "$MARCA" || falha "marca ausente na restauração"
 test "$(psql_db "SELECT count(*) FROM django_migrations" polis_restaurado)" -eq "$ORIGEM_MIGRACOES" \
   || falha "contagem de migrações diferente na restauração"
@@ -64,10 +67,10 @@ test "$(psql_db "SELECT count(*) FROM marca_ci")" -eq 1 || falha "o banco em uso
 ok "restauração fiel; banco em uso intacto"
 
 # --- 5. não sobrescreve banco existente sem --substituir
-if AGE_IDENTITY=/chaves/a.txt no_backup bash scripts/restaurar.sh "$OBJETO" polis_restaurado; then
+if restaurar a "$OBJETO" polis_restaurado; then
   falha "restaurou sobre um banco existente sem --substituir"
 fi
-if AGE_IDENTITY=/chaves/a.txt no_backup bash scripts/restaurar.sh "$OBJETO" "$POSTGRES_DB"; then
+if restaurar a "$OBJETO" "$POSTGRES_DB"; then
   falha "restaurou sobre o banco em uso sem --substituir"
 fi
 ok "banco existente protegido sem --substituir"
@@ -82,6 +85,12 @@ grep -q "$OBJETO" <<<"$DEPOIS" || falha "a poda removeu o backup do dia"
 rclone_s3 lsf "destino:${BACKUP_S3_BUCKET}/outro/" | grep -q '^2020-01-01' || falha "a poda apagou fora do prefixo polis/"
 ok "poda respeita retenção e prefixo"
 
-# --- 7. o laço sobrevive à falha do comando e deixa batimento
-no_backup bash -c 'BACKUP_COMANDO=false BACKUP_VOLTAS=2 BACKUP_ESPERA=1 BACKUP_BATIMENTO=/tmp/b bash scripts/backup-laco.sh && test -f /tmp/b'
-ok "laço do backup sobrevive a falha"
+# --- 7. o laço sobrevive à falha do comando; só o sucesso renova o batimento (é o que faz o
+#        healthcheck acusar um backup que parou de funcionar)
+no_backup bash -c '
+  touch -d "2 days ago" /tmp/b
+  BACKUP_COMANDO=false BACKUP_VOLTAS=2 BACKUP_ESPERA=1 BACKUP_BATIMENTO=/tmp/b bash scripts/backup-laco.sh
+  test -n "$(find /tmp/b -mmin +1440)"
+  BACKUP_COMANDO=true BACKUP_VOLTAS=1 BACKUP_ESPERA=1 BACKUP_BATIMENTO=/tmp/b bash scripts/backup-laco.sh
+  test -n "$(find /tmp/b -mmin -1)"'
+ok "laço sobrevive a falha, e só o sucesso renova o batimento"

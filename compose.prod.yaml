@@ -73,6 +73,40 @@ services:
       retries: 3
       start_period: 90s
 
+  # Backup diário cifrado (ADR 0011, 0025): pg_dump -> age (só a chave PÚBLICA está aqui) -> S3.
+  # O batimento só renova após um backup bem-sucedido; o healthcheck acusa um backup parado.
+  backup:
+    build:
+      context: .
+      dockerfile: Dockerfile.backup
+    image: polis-backup
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGHOST: db
+      PGUSER: ${POSTGRES_USER:-polis}
+      PGPASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD no .env}
+      PGDATABASE: ${POSTGRES_DB:-polis}
+      BACKUP_S3_BUCKET: ${BACKUP_S3_BUCKET:?defina BACKUP_S3_BUCKET no .env}
+      BACKUP_AGE_RECIPIENTS: ${BACKUP_AGE_RECIPIENTS:?defina BACKUP_AGE_RECIPIENTS (chaves públicas age) no .env}
+      BACKUP_RETENCAO_DIAS: ${BACKUP_RETENCAO_DIAS:-14}
+      # Remoto `destino` do rclone, configurado por variável (sem arquivo de configuração).
+      RCLONE_CONFIG_DESTINO_TYPE: s3
+      RCLONE_CONFIG_DESTINO_PROVIDER: Other
+      RCLONE_CONFIG_DESTINO_FORCE_PATH_STYLE: "true"
+      RCLONE_CONFIG_DESTINO_ENDPOINT: ${BACKUP_S3_ENDPOINT:?defina BACKUP_S3_ENDPOINT no .env}
+      RCLONE_CONFIG_DESTINO_ACCESS_KEY_ID: ${BACKUP_S3_ACCESS_KEY:?defina BACKUP_S3_ACCESS_KEY no .env}
+      RCLONE_CONFIG_DESTINO_SECRET_ACCESS_KEY: ${BACKUP_S3_SECRET_KEY:?defina BACKUP_S3_SECRET_KEY no .env}
+    healthcheck:
+      # Vivo e funcionando = um backup terminou com sucesso nas últimas 26 h.
+      test: ["CMD-SHELL", "test -n \"$$(find /tmp/batimento -mmin -1560 2>/dev/null)\""]
+      interval: 5m
+      timeout: 10s
+      retries: 1
+      start_period: 1m
+
   # Front-end (ADR 0015). Fala com a API interna do Django pela rede do Compose.
   front:
     build: ./web

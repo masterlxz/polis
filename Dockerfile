@@ -1,6 +1,6 @@
 # Imagem de DESENVOLVIMENTO (ADR 0006). A imagem de produção é decisão da
 # hospedagem (P-04) e não vive aqui.
-FROM python:3.14-slim
+FROM python:3.15-slim
 
 COPY --from=ghcr.io/astral-sh/uv:0.13.6 /uv /usr/local/bin/uv
 

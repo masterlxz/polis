@@ -2,6 +2,15 @@
 
 Mais recente no topo.
 
+### 2026-11-12 — Sessão 61 (produção: fechar as pontas soltas da Sessão 60)
+
+- **Pedido**: "vamos de 1" (teste do `X-Forwarded-*` forjado, avisos do `gunicorn`, patch do Caddy). Sem plan mode: tarefa pequena, sem decisão de produto.
+- **Feito**: passo de CI novo no job `producao` (um override só do passo faz o gunicorn registrar `X-Forwarded-Proto` e `X-Forwarded-For` recebidos; o cliente manda `http` e `6.6.6.6` e o Django deve ver `https` e o IP real do cliente); `caddy:2.10-alpine` → `caddy:2.10.2-alpine`.
+- **Provas (CI)**: verde (run 43317322145): log `CAB proto=https xff=172.18.0.1`. Mutação (branch descartável, apagada): `trusted_proxies private_ranges` no `reverse_proxy` do admin, pega no passo novo (run 43317666240): o Django recebeu `proto=http xff=6.6.6.6, 172.18.0.1`. O teste **já passava antes de qualquer mudança** (comportamento padrão do Caddy); só a mutação prova que ele discrimina.
+- **`gunicorn` 26.2.0**: o "aviso de segurança" da Sessão 59 é o **conserto** da própria 26.2.0: o HTTP/2 do gunicorn aceitava cabeçalhos sem o filtro do HTTP/1 (esquema e `SCRIPT_NAME` forjáveis por cliente não confiável). Não afeta esta pilha (Caddy → gunicorn é HTTP/1.1). Fontes: notas da release 26.2.0 no GitHub e a lista de advisories do GitHub (só CVEs antigos, `< 22.0.0`). Existem 26.2.1, 26.2.2 (hardening, sem marca de segurança) e **27.0.0** (2026-11-10, major, com endurecimento do parser HTTP e mudança incompatível de `Transfer-Encoding`); não atualizei, fica para o Dependabot/decisão.
+- **Não verificado**: nada rodou num servidor; o Dependabot `docker` provavelmente não cobre `postgres` e `caddy` do `compose.prod.yaml`; a busca de advisories foi pela API do GitHub, não pelo OSV/NVD.
+- **Fica**: backup (ADR 0011), monitoramento, provedor e domínio, HSTS, abrir ao público (ADR próprio), avaliar 26.2.2 ou 27.0.0.
+
 ### 2026-11-12 — Sessão 60 (produção, PR 2 de 2: Compose, Caddy e agendador)
 
 - **Pedido**: "pr2" (plan mode; plano aprovado). Decisões do dono: `migrate` **manual** (runbook) e Caddy em `127.0.0.1:8443`; depois, criar ADR 0024 + runbook e incluir o ecossistema `docker` no Dependabot. Fechado por padrão, herdado da Sessão 59.

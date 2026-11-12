@@ -21,7 +21,15 @@ COLETADO_EM = datetime(2026, 11, 10, 15, 30, tzinfo=UTC)
 URL_ORIGEM = "https://example.org/api/v2/deputados?itens=100"
 
 CHAVES_RAIZ = {"deputado", "atribuicao"}
-CHAVES_DEPUTADO = {"legislatura", "id_camara", "nome", "partido", "uf"}
+CHAVES_DEPUTADO = {
+    "legislatura",
+    "id_camara",
+    "nome",
+    "partido",
+    "uf",
+    "em_exercicio",
+    "saiu_da_lista_em",
+}
 CHAVES_ATRIBUICAO = {"fonte", "conjunto", "coletado_em", "url_origem", "licenca"}
 CHAVES_LICENCA = {"id", "url"}
 
@@ -84,6 +92,8 @@ def test_perfil_de_deputado_existente(client, deputado):
         "nome": "Ana da Câmara",
         "partido": "XYZ",
         "uf": "SP",
+        "em_exercicio": True,
+        "saiu_da_lista_em": None,
     }
 
 

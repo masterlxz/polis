@@ -4,6 +4,9 @@
 {
 	# A API de administração do Caddy fica desligada.
 	admin off
+	# Acesso por IP não manda SNI, e dentro do Docker o endereço local é o do contêiner: sem isto
+	# nenhum certificado casa e o handshake falha.
+	default_sni localhost
 }
 
 https://127.0.0.1:8443, https://localhost:8443 {

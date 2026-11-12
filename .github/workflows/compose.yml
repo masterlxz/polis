@@ -153,7 +153,9 @@ jobs:
         run: docker compose up -d --build --wait
 
       - name: Front responde pelo Caddy
-        run: curl -ksS --fail -o /dev/null -w '%{http_code}\n' https://127.0.0.1:8443/busca/
+        run: |
+          curl -ksS --fail --retry 10 --retry-delay 2 --retry-all-errors \
+            -o /dev/null -w '%{http_code}\n' https://127.0.0.1:8443/busca/
 
       - name: Admin responde pelo Caddy, com os estáticos e cookie Secure
         run: |

@@ -1,10 +1,13 @@
 # Só para o CI (job `producao`): um S3 descartável no lugar do armazenamento de objetos real.
-# `rclone serve s3` vem na própria imagem de backup, sem imagem de terceiros a mais. Os volumes
-# das chaves de teste ficam só aqui; em produção a chave privada nunca está no servidor.
+# (O rclone do Debian é antigo demais para `rclone serve s3`, por isso o MinIO, com tag fixa.)
+# As chaves de teste ficam montadas só aqui; em produção a chave privada nunca está no servidor.
 services:
   s3:
-    image: polis-backup
-    entrypoint: ["sh", "-c", "mkdir -p /tmp/dados/polis-backups && exec rclone serve s3 /tmp/dados --addr :9000 --auth-key chave-ci,segredo-ci-descartavel"]
+    image: minio/minio:RELEASE.2025-04-22T22-12-26Z
+    command: ["server", "/data", "--address", ":9000"]
+    environment:
+      MINIO_ROOT_USER: chave-ci
+      MINIO_ROOT_PASSWORD: segredo-ci-descartavel
 
   backup:
     volumes:

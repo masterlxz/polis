@@ -19,6 +19,13 @@ falha() { echo "::error::$*"; exit 1; }
 MARCA="TOTP-CHAVE-DE-TESTE-9f3a1c7e5b2d"
 PREFIXO="${BACKUP_S3_BUCKET}/polis"
 
+# --- espera o S3 descartável responder e cria o bucket
+for _ in $(seq 1 30); do
+  rclone_s3 mkdir "destino:${BACKUP_S3_BUCKET}" 2>/dev/null && break
+  sleep 2
+done
+rclone_s3 lsd "destino:" | grep -q "${BACKUP_S3_BUCKET}" || falha "o S3 descartável não respondeu"
+
 # --- chaves age: A (certa) e B (errada), geradas dentro da imagem, sem instalar nada no runner
 gerar_chave() { no_backup age-keygen 2>/dev/null; }
 CHAVE_A=$(gerar_chave); CHAVE_B=$(gerar_chave)

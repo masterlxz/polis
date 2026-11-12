@@ -1,6 +1,7 @@
 from django.core.management.base import BaseCommand, CommandError
 
 from apps.elections import normalization
+from apps.sources.normalization import NormalizationRefused as SharedRefused
 
 
 class Command(BaseCommand):
@@ -33,7 +34,7 @@ class Command(BaseCommand):
         failed = False
         try:
             result = normalization.normalize(run, accept_retirements=options["aceitar_retiradas"])
-        except normalization.NormalizationRefused as error:
+        except SharedRefused as error:
             raise CommandError(str(error)) from None
         except Exception:
             # A mensagem de um erro do banco cita valores da linha: não é repassada nem

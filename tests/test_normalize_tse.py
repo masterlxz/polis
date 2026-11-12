@@ -2,7 +2,8 @@
 
 Dados sintéticos. Regras (plano da Sessão 39, ADR 0005 e ADR 0009): lê a execução mais recente
 que gravou linhas, sem rede; o bruto traz cada candidatura duas vezes (cópias idênticas);
-conflito entre linhas, linha inválida ou falha inesperada não gravam nada; nunca apaga.
+conflito entre linhas, linha inválida ou falha inesperada não gravam nada; só apaga pela
+retirada da fonte (lápide, `test_retirement.py`).
 """
 
 import socket
@@ -223,12 +224,14 @@ def test_carga_nova_com_campo_mudado_atualiza_sem_duplicar(dataset):
     assert candidatura.ingestion_run_id == run2.pk
 
 
-def test_candidatura_que_sumiu_do_arquivo_continua_no_banco(dataset):
+def test_candidatura_que_sumiu_de_carga_integra_e_retirada_e_a_eleicao_fica(dataset):
+    # Mudou na fatia da lápide (ADR 0005, decisão 9): antes continuava no banco. Agora some a
+    # candidatura e a pessoa (dado pessoal); a eleição fica. Detalhes em test_retirement.py.
     carga(dataset, [ana(), beto_1o_turno()])
     normalizar()
     carga(dataset, [ana()])
     normalizar()
-    assert contagens() == (2, 2, 2)
+    assert contagens() == (2, 1, 1)
 
 
 def test_volume_acima_do_tamanho_do_lote_fica_correto_e_idempotente(dataset):

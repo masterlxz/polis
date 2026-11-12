@@ -69,6 +69,23 @@ jobs:
           curl --retry 20 --retry-delay 2 --retry-all-errors \
             -fsS -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8000/admin/login/
 
+      - name: A imagem de produção constrói, sem dependências de teste, e passa no check --deploy
+        run: |
+          docker build --file Dockerfile.prod --tag polis-web-prod:ci .
+          if docker run --rm polis-web-prod:ci python -c "import pytest" 2>/dev/null; then
+            echo "::error::a imagem de produção traz o pytest"
+            exit 1
+          fi
+          docker run --rm \
+            --env DJANGO_SECRET_KEY="ci-chave-descartavel-com-bastante-entropia-0123456789abcdefghij" \
+            --env DJANGO_ALLOWED_HOSTS=polis.example.org \
+            --env DJANGO_HTTPS=1 --env DJANGO_BEHIND_PROXY=1 \
+            polis-web-prod:ci python manage.py check --deploy 2>&1 | tee deploy.txt || true
+          avisos=$(grep -o 'security\.W[0-9]*' deploy.txt | sort -u | tr '\n' ' ')
+          echo "avisos: $avisos"
+          test "$avisos" = "security.W004 security.W008 "
+          docker run --rm polis-web-prod:ci ls staticfiles/admin >/dev/null
+
       - name: Logs em caso de falha
         if: failure()
         env:

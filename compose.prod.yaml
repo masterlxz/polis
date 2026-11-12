@@ -1,0 +1,110 @@
+# Ambiente de PRODUÇÃO (ADR 0011, 0024), fechado por padrão. Uso: `docker compose -f
+# compose.prod.yaml ...` (ou COMPOSE_FILE=compose.prod.yaml). Segredos vêm do `.env` (ignorado
+# pelo git); sem POSTGRES_PASSWORD e DJANGO_SECRET_KEY o Compose recusa subir.
+# Só o `caddy` publica porta, e só no loopback: o Django só pode ser alcançado pelo proxy, que é
+# a condição para o DJANGO_BEHIND_PROXY ser seguro.
+services:
+  db:
+    image: postgres:18
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-polis}
+      POSTGRES_USER: ${POSTGRES_USER:-polis}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD no .env}
+    volumes:
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  web: &django
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+    image: polis-web-prod
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment: &django-env
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?defina DJANGO_SECRET_KEY no .env}
+      # `web` é o nome do serviço: o front chama http://web:8000 pela rede do Compose.
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,web}
+      DJANGO_HTTPS: "1"
+      DJANGO_BEHIND_PROXY: "1"
+      DJANGO_HSTS_SECONDS: ${DJANGO_HSTS_SECONDS:-0}
+      DJANGO_CSRF_TRUSTED_ORIGINS: ${DJANGO_CSRF_TRUSTED_ORIGINS:-https://localhost:8443,https://127.0.0.1:8443}
+      POSTGRES_DB: ${POSTGRES_DB:-polis}
+      POSTGRES_USER: ${POSTGRES_USER:-polis}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD no .env}
+      POSTGRES_HOST: db
+      POSTGRES_PORT: "5432"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request as u; u.urlopen('http://127.0.0.1:8000/admin/login/', timeout=4)"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+
+  # Copia os estáticos do admin da imagem para o volume que o Caddy serve. Roda e termina.
+  # Como root só para escrever no volume recém-criado (dono root); não escuta porta alguma.
+  static:
+    image: polis-web-prod
+    user: "0"
+    depends_on:
+      - web
+    restart: "no"
+    command: ["cp", "-a", "/app/staticfiles/.", "/srv/static/"]
+    volumes:
+      - static:/srv/static
+
+  # Coleta agendada (ADR 0023): `collect_due` a cada minuto, com batimento para o healthcheck.
+  agendador:
+    <<: *django
+    build: !reset null
+    command: ["bash", "scripts/agendador.sh"]
+    healthcheck:
+      # Vivo = o laço terminou uma volta nos últimos 3 minutos (não diz que a coleta deu certo).
+      test: ["CMD-SHELL", "test -n \"$$(find /tmp/batimento -mmin -3 2>/dev/null)\""]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 90s
+
+  # Front-end (ADR 0015). Fala com a API interna do Django pela rede do Compose.
+  front:
+    build: ./web
+    restart: unless-stopped
+    depends_on:
+      - web
+    environment:
+      API_URL: http://web:8000
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/saude/').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+
+  caddy:
+    image: caddy:2.10-alpine
+    restart: unless-stopped
+    depends_on:
+      front:
+        condition: service_healthy
+      web:
+        condition: service_healthy
+      static:
+        condition: service_completed_successfully
+    ports:
+      - "127.0.0.1:8443:8443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - static:/srv/static:ro
+      - caddy_data:/data
+
+volumes:
+  pgdata:
+  static:
+  caddy_data:

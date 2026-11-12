@@ -2,6 +2,14 @@
 
 Mais recente no topo.
 
+### 2026-11-12 — Sessão 60 (produção, PR 2 de 2: Compose, Caddy e agendador)
+
+- **Pedido**: "pr2" (plan mode; plano aprovado). Decisões do dono: `migrate` **manual** (runbook) e Caddy em `127.0.0.1:8443`; depois, criar ADR 0024 + runbook e incluir o ecossistema `docker` no Dependabot. Fechado por padrão, herdado da Sessão 59.
+- **Feito**: `compose.prod.yaml` (db, web, static, agendador, front, caddy; só o caddy publica porta), `Caddyfile` (`tls internal`, `default_sni localhost`, `/internal/*` → 404, `/static/*` por volume, `/admin/*` → Django, resto → front), `scripts/agendador.sh` (laço de 1 min com batimento), job `producao` em `.github/workflows/compose.yml`, `dependabot.yml` (ecossistema `docker`), ADR 0024, `runbook.md`.
+- **Provas (CI, `workflow_dispatch`)**: vermelho (run 43311962547): job `producao` falha no 1º passo, porque `compose.prod.yaml` não existia (prova fraca: não exercita os demais passos). 2ª execução (43312265107): falhou em "Front responde pelo Caddy" (TLS sem SNI por IP; corrigido com `default_sni`). Verde (43312666029): jobs `compose` e `producao`. **3 mutações**, cada uma na sua branch descartável (apagadas), todas pegas no passo certo: `/internal` repassado ao Django (43312992763, "API interna NÃO passa pelo Caddy"), `web` publicando porta (43313003829, "Só o Caddy publica porta") e `DJANGO_HTTPS` vazio (43313015878, cookie Secure).
+- **Não verificado**: nada rodou num servidor; o teste de `X-Forwarded-Proto` forjado planejado **não foi escrito** (confiei no padrão do Caddy de descartar `X-Forwarded-*` do cliente; vale um teste); o healthcheck do agendador só mede o laço, não a coleta; imagens do `compose.prod.yaml` (postgres, caddy) não entram no Dependabot `docker` (não confirmado); `caddy:2.10-alpine` é tag de minor, não fixa o patch; avisos de segurança do `gunicorn` 26.2.0 seguem sem confirmação (Sessão 59); memória e `WEB_CONCURRENCY` não medidos.
+- **Fica**: backup (ADR 0011, decisão 3), monitoramento, provedor e domínio, HSTS, teste do cabeçalho forjado, abrir ao público (ADR próprio).
+
 ### 2026-11-11 — Sessão 59 (produção, PR 1 de 2: Django pronto para rodar atrás de um proxy)
 
 - **Pedido**: "Compose de produção e disparo do agendador" (plan mode). Por ser infraestrutura e dependência nova (AGENTS §4), confirmei com o dono: **fechado por padrão** em relação ao P-16, **Caddy**, **`gunicorn` com o lock gerado dentro do contêiner de desenvolvimento** e **2 PRs** (este, o Django; o seguinte, Compose + proxy + agendador). Descartados: aberto com domínio desde já, nginx + certbot, granian/uvicorn, 1 PR só.

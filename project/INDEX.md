@@ -13,6 +13,7 @@ Leia o arquivo relevante para o que você precisa:
 | Decisões em aberto | `PENDING.md` |
 | Decisões tomadas e seus motivos | `adr/` |
 | LGPD e LAI (pesquisa de apoio ao P-16, sem parecer) | `lgpd-lai.md` |
+| Subir, migrar e atualizar a produção (fechada por padrão) | `runbook.md` |
 | Log de sessões de trabalho (mais recente no topo) | `SESSIONS.md` |
 
 **Ao começar uma sessão:** use `/projeto polis` na raiz do workspace.

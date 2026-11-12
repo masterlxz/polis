@@ -1,0 +1,36 @@
+# Proxy de PRODUÇÃO (ADR 0011, 0024). Fechado por padrão: o Compose só publica 127.0.0.1:8443
+# (acesso por túnel SSH) e o certificado é de uma CA interna do Caddy. Para abrir ao público,
+# troque os endereços pelo domínio e publique 80 e 443 (ADR próprio, com HSTS e backup antes).
+{
+	# A API de administração do Caddy fica desligada.
+	admin off
+	# Acesso por IP não manda SNI, e dentro do Docker o endereço local é o do contêiner: sem isto
+	# nenhum certificado casa e o handshake falha.
+	default_sni localhost
+}
+
+https://127.0.0.1:8443, https://localhost:8443 {
+	tls internal
+
+	# A API interna (ADR 0013) não tem autenticação e é isolada só pela rede do Compose: o proxy
+	# nunca a repassa.
+	handle /internal/* {
+		respond 404
+	}
+
+	# Estáticos do admin, copiados da imagem do Django para o volume `static` (serviço `static`).
+	handle /static/* {
+		root * /srv
+		file_server
+	}
+
+	handle /admin/* {
+		reverse_proxy web:8000
+	}
+
+	# O resto é o front (Next.js). O Caddy descarta X-Forwarded-* vindos do cliente e põe os seus,
+	# então o Django só confia no `X-Forwarded-Proto` que o proxy escreveu.
+	handle {
+		reverse_proxy front:3000
+	}
+}

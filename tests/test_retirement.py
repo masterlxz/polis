@@ -391,6 +391,49 @@ def test_pessoa_retirada_some_do_perfil_e_da_busca(dataset, client):
     assert "Ana da Urna" not in client.get("/internal/v1/busca/?q=Ana").content.decode()
 
 
+# --- Deputado da Câmara não é tocado (ADR 0022: sumir da lista de exercício não é retirada) ---
+
+
+def deputado(id, nome):
+    return {
+        "id": id,
+        "uri": f"https://dadosabertos.camara.leg.br/api/v2/deputados/{id}",
+        "nome": nome,
+        "siglaPartido": "XYZ",
+        "siglaUf": "SP",
+        "idLegislatura": 57,
+    }
+
+
+def test_deputado_que_some_da_lista_de_exercicio_continua_e_nao_gera_lapide():
+    from apps.legislature.models import Deputy
+
+    fonte = Source.objects.create(
+        slug="camara",
+        name="Câmara",
+        institution="Câmara dos Deputados",
+        official_url="https://example.org",
+        access_type=Source.AccessType.API,
+    )
+    camara = Dataset.objects.create(
+        source=fonte,
+        slug="deputados",
+        name="Deputados em exercício",
+        url="https://example.org/deputados",
+        format=Dataset.Format.JSON,
+        allowed_columns=DATASETS[-1]["allowed_columns"],
+    )
+    carga(camara, [deputado(1, "Ana da Câmara"), deputado(2, "Beto da Câmara")])
+    call_command("normalize_camara", stdout=StringIO())
+    assert Deputy.objects.count() == 2  # controle
+
+    carga(camara, [deputado(2, "Beto da Câmara")])
+    call_command("normalize_camara", stdout=StringIO())
+
+    assert Deputy.objects.count() == 2
+    assert lapidas().count() == 0
+
+
 # --- A lápide não guarda dado pessoal ---
 
 

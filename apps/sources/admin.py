@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Dataset, IngestionRun, Source
+from .models import Dataset, IngestionRun, Source, Tombstone
 
 
 @admin.register(Source)
@@ -23,6 +23,23 @@ class IngestionRunAdmin(admin.ModelAdmin):
 
     list_display = ["dataset", "state", "started_at", "finished_at", "rows_loaded", "error_code"]
     list_filter = ["state", "error_code", "dataset__source"]
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(Tombstone)
+class TombstoneAdmin(admin.ModelAdmin):
+    """Só leitura: a lápide é escrita pela normalização (ADR 0005, decisão 9) e só tem ids."""
+
+    list_display = ["dataset", "source_key", "retired_at", "reinstated_at"]
+    list_filter = ["dataset"]
 
     def has_add_permission(self, request):
         return False

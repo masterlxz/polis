@@ -21,7 +21,6 @@ import pytest
 from apps.sources.http_client import BlockedError, DownloadError, DownloadResult
 from apps.sources.ingestion import ingest
 from apps.sources.json_list import DuplicateItemError, InvalidJsonError
-from apps.sources.json_senado_votacoes import fetch_senate_votings
 from apps.sources.models import Dataset, IngestionRun, RawRecord, Source
 
 pytestmark = pytest.mark.django_db
@@ -142,6 +141,13 @@ def make_dataset(status=Source.Status.INTEGRATING, **kwargs):
         format=Dataset.Format.JSON_SENADO_VOTACOES,
         **kwargs,
     )
+
+
+def fetch_senate_votings(*args, **kwargs):
+    """O leitor, importado só ao usar: cada teste falha por si, não a coleta."""
+    from apps.sources.json_senado_votacoes import fetch_senate_votings as leitor
+
+    return leitor(*args, **kwargs)
 
 
 def buscar(tmp_path, dados):

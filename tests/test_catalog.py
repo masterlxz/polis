@@ -6,6 +6,7 @@ A lista de 50 colunas é o esquema medido de `consulta_cand_2026` (project/fonte
 from io import StringIO
 
 import pytest
+from django.conf import settings
 from django.core.management import call_command
 
 from apps.sources import catalog
@@ -110,17 +111,60 @@ def test_seed_cria_as_tres_fontes_e_os_conjuntos_do_tse_da_camara_e_do_senado():
         "tse/consulta-cand-2026",
         "camara/deputados",
         "senado/senadores",
+        "senado/votacoes",
     }
     assert str(dataset_tse()) == "tse/consulta-cand-2026"
 
 
 def test_os_conjuntos_sem_licenca_declarada_nascem_desabilitados_e_sem_justificativa():
     seed()
-    for fonte in ("camara", "senado"):
-        conjunto = Dataset.objects.get(source__slug=fonte)
+    conjuntos = Dataset.objects.filter(source__slug__in=("camara", "senado"))
+    assert conjuntos.count() == 3
+    for conjunto in conjuntos:
         assert conjunto.enabled is False
         assert conjunto.license_basis == Dataset.LicenseBasis.OWNER_DECISION
         assert conjunto.license_justification == "", "a justificativa é do dono, no admin"
+
+
+def test_votacoes_do_senado_so_leem_a_allowlist_combinada_e_coletam_uma_vez_por_dia():
+    seed()
+    votacoes = Dataset.objects.get(source__slug="senado", slug="votacoes")
+    assert votacoes.format == Dataset.Format.JSON_SENADO_VOTACOES
+    assert votacoes.url == "https://legis.senado.leg.br/dadosabertos/votacao"
+    assert votacoes.allowed_columns == [
+        "codigoSessaoVotacao",
+        "dataSessao",
+        "sigla",
+        "numero",
+        "ano",
+        "identificacao",
+        "ementa",
+        "resultadoVotacao",
+        "votacaoSecreta",
+        "totalVotosSim",
+        "totalVotosNao",
+        "totalVotosAbstencao",
+        "idProcesso",
+        "codigoMateria",
+        "codigoParlamentar",
+        "nomeParlamentar",
+        "siglaPartidoParlamentar",
+        "siglaUFParlamentar",
+        "siglaVotoParlamentar",
+    ]
+    # Minimização (ADR 0005): sexo, texto livre do voto e o informe legislativo ficam de fora.
+    for fora in ("sexoParlamentar", "descricaoVotoParlamentar", "informeLegislativo"):
+        assert fora not in votacoes.allowed_columns
+    assert votacoes.internal_columns == []
+    assert votacoes.schedule_interval_hours == 24
+    assert votacoes.earliest_hour_utc == 8
+
+
+def test_o_agendador_normaliza_as_votacoes_do_senado_depois_da_coleta():
+    assert (
+        settings.NORMALIZERS["senado/votacoes"]
+        == "apps.legislature.senate_voting_normalization.normalize_latest"
+    )
 
 
 def test_fontes_nascem_medidas_e_sem_integracao():
@@ -176,7 +220,7 @@ def test_segunda_execucao_nao_duplica_nem_cria():
     seed()
     texto = seed()
     assert Source.objects.count() == 3
-    assert Dataset.objects.count() == 3
+    assert Dataset.objects.count() == 4
     assert "0 criad" in texto
 
 

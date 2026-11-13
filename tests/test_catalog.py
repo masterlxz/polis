@@ -176,7 +176,7 @@ def test_segunda_execucao_nao_duplica_nem_cria():
     seed()
     texto = seed()
     assert Source.objects.count() == 3
-    assert Dataset.objects.count() == 2
+    assert Dataset.objects.count() == 3
     assert "0 criad" in texto
 
 

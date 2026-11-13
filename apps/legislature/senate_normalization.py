@@ -124,7 +124,7 @@ def _collect(run):
 def _write(run, rows_read, senators):
     objects = [Senator(ingestion_run=run, **row) for row in senators.values()]
     latest = latest_run(run.dataset)
-    is_latest = latest is not None and latest.pk == run.pk
+    is_latest = True
     update_fields = UPDATABLE + OFFICE_STATE if is_latest else UPDATABLE
     with transaction.atomic():
         before = Senator.objects.count()

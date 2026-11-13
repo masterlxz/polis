@@ -31,7 +31,7 @@ BATCH_SIZE = 1000
 READ_CHUNK = 2000
 KEY = ("senate_id",)
 UPDATABLE = ["name", "party_acronym", "state", "ingestion_run"]
-OFFICE_STATE = ["in_office", "left_list_at"]
+OFFICE_STATE = ["in_office"]
 
 
 class NormalizationRefused(SharedRefused):

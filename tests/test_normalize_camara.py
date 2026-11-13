@@ -197,9 +197,9 @@ def test_sem_carga_com_linhas_o_comando_manda_rodar_a_coleta(dataset):
         ({k: v for k, v in ANA.items() if k != "id"}, "id"),
         ({**ANA, "siglaUf": "sp"}, "siglaUf"),
         ({**ANA, "nome": "   "}, "nome"),
-        ({**ANA, "idLegislatura": "57"}, "idLegislatura"),
+        ({**ANA, "idLegislatura": "5x"}, "idLegislatura"),
     ],
-    ids=["id_booleano", "id_zero", "id_ausente", "uf_minuscula", "nome_vazio", "legislatura_texto"],
+    ids=["id_booleano", "id_zero", "id_ausente", "uf_minuscula", "nome_vazio", "legislatura_letra"],
 )
 def test_linha_invalida_entre_validas_recusa_tudo_e_cita_so_a_coluna(dataset, ruim, coluna):
     carga(dataset, [BETO, ruim, CAIO])

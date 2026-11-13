@@ -157,7 +157,7 @@ curl -sS "$B/api-docs" | python3 -c 'import json,sys;print(len(json.load(sys.std
 O `itens=101` (504) não é para repetir sem necessidade.
 
 ## Estado da integração
-Nenhuma. Histórico de sincronizações: não se aplica ainda.
+Lista de deputados em exercício (`camara/deputados`, ADR 0021, 0022 e 0027): coletada de verdade em banco de **desenvolvimento** (execuções 5 a 7: a 5 falhou em `download`, a 6 gravou 513 linhas, a 7 deu "arquivo igual", 0 linhas) e normalizada em 2026-11-13 (Sessão 67): 513 deputados, todos em exercício, legislatura 57, partido vazio em 0; segunda normalização sem criar nada; chaves do bruto exatamente as 6 da allowlist; API interna com 200 e as chaves esperadas, e 404 para código inexistente. Nada em produção. Votações, proposições e detalhe do deputado: nada integrado.
 
 ## Ainda não medido nesta rodada
 Taxa máxima aceita sem bloqueio; comportamento de `429` ou bloqueio por IP; XML e ODS; despesas, discursos e votos por deputado (volumes e custo); consistência entre a API e os arquivos para o mesmo registro; estabilidade dos ids ao longo do tempo; completude histórica.

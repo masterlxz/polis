@@ -7,6 +7,11 @@ resposta leva a atribuição da fonte (ADR 0008, decisão 3).
 
 A Câmara não declara licença (ADR 0021): `licenca` sai com `id` e `url` nulos, sem inventar uma.
 `coletado_em` é o início da última execução que viu o deputado.
+
+`em_exercicio: false` significa só "não consta mais na lista de deputados em exercício da Câmara":
+a lista não diz o motivo (licença, fim de mandato, renúncia, morte, suplente assumindo).
+`saiu_da_lista_em` é o início da primeira coleta que não o trouxe (ADR 0027): a data da COLETA,
+não a do fim do mandato.
 """
 
 from django.http import JsonResponse
@@ -47,6 +52,10 @@ def deputy_profile(request, legislature, camara_id):
                 "nome": deputy.name,
                 "partido": _or_none(deputy.party_acronym),
                 "uf": deputy.state,
+                "em_exercicio": deputy.in_office,
+                "saiu_da_lista_em": deputy.left_list_at.isoformat()
+                if deputy.left_list_at
+                else None,
             },
             "atribuicao": _attribution(deputy.ingestion_run),
         },

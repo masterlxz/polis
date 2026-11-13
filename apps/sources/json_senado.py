@@ -35,7 +35,7 @@ def _senators(path):
     node = body
     for key in ("ListaParlamentarEmExercicio", "Parlamentares", "Parlamentar"):
         node = node.get(key) if isinstance(node, dict) else None
-    if not isinstance(node, list) or not node:
+    if not isinstance(node, list):
         raise InvalidJsonError("esperava a lista de parlamentares no envelope")
     if len(node) > MAX_ITEMS:
         raise InvalidJsonError("itens demais")

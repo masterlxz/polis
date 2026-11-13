@@ -134,4 +134,31 @@ DATASETS = [
         "schedule_interval_hours": 24,
         "earliest_hour_utc": 8,
     },
+    {
+        # Lista dos senadores em exercício: uma resposta só, aninhada (ADR 0028). Sem licença
+        # declarada: a base é a decisão do dono, feita no admin com o texto do ADR. Da
+        # `IdentificacaoParlamentar` só 4 campos; ficam de fora e são descartados na leitura o nome
+        # completo (civil), e-mail, telefones, foto, suplentes e mandato (ADR 0005). O sufixo
+        # `.json` escolhe o formato (o cliente não envia `Accept`).
+        "source": "senado",
+        "slug": "senadores",
+        "name": "Senadores em exercício",
+        "url": "https://legis.senado.leg.br/dadosabertos/senador/lista/atual.json",
+        "format": "json_senado",
+        "allowed_columns": [
+            "CodigoParlamentar",
+            "NomeParlamentar",
+            "SiglaPartidoParlamentar",
+            "UfParlamentar",
+        ],
+        "internal_columns": [],
+        "license_basis": "owner_decision",
+        "license_id": "",
+        "license_url": "",
+        "license_check_url": "",
+        # Uma vez por dia, depois das 08:00 GMT; a política do Senado pede fugir de horários
+        # redondos de pico (a coleta é 1 requisição por dia).
+        "schedule_interval_hours": 24,
+        "earliest_hour_utc": 8,
+    },
 ]

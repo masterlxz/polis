@@ -155,7 +155,9 @@ curl -sS -H 'Accept: application/json' "$B/senador/99999999" -w '\n%{http_code}\
 Os números de senadores e de itens de processo e votação mudam com o tempo.
 
 ## Estado da integração
-Desde a Sessão 66 (2026-11-13, ADR 0028): coleta e normalização da **lista de senadores em exercício** (`senado/senadores`, `GET /senador/lista/atual.json`, allowlist de 4 campos), conjunto cadastrado e **desabilitado** até o dono habilitar no admin. Medido de novo em 2026-11-12: 200, JSON, 129.557 bytes, 81 senadores, código do parlamentar como texto. Votações, proposições e o detalhe do senador: nada integrado. Histórico de sincronizações: nenhuma coleta real ainda.
+Desde a Sessão 66 (2026-11-13, ADR 0028): coleta e normalização da **lista de senadores em exercício** (`senado/senadores`, `GET /senador/lista/atual.json`, allowlist de 4 campos), conjunto cadastrado e habilitado pelo dono em 2026-11-13 (Sessão 68). Medido de novo em 2026-11-12: 200, JSON, 129.557 bytes, 81 senadores, código do parlamentar como texto. Votações, proposições e o detalhe do senador: nada integrado.
+
+**Primeira coleta real (2026-11-13, Sessão 68, banco de desenvolvimento):** 81 lidas e 81 gravadas; normalização 81 criadas e, na segunda execução, 0 criadas e 81 existentes. 27 UFs, nome mais longo com 25 caracteres, 81 em exercício. **O partido nunca vem vazio, mas a fonte usa o texto `S/Partido` para quem não tem partido** (1 valor, 1 coleta). Para coletar, a fonte precisa estar "Em integração" ou "Ativa" além do conjunto habilitado. Uma coleta só: a saída da lista (`saiu_da_lista_em`) ainda não foi vista com dado real.
 
 ## Ainda não medido nesta rodada
 O comportamento real do 429 (não testei o limite); volume e custo de `/processo` sem filtro de ano e de `/votacao` num ano inteiro; discursos, taquigrafia, orçamento e votações de comissão; conteúdo dos endpoints `/senador/{codigo}/...` e seus dados pessoais; XML e NDJSON; consistência entre os endpoints legados e novos para o mesmo registro; estabilidade dos ids; o Plano de Dados Abertos 2026/2028; leitura jurídica da política de uso para a API.

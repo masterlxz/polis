@@ -130,7 +130,8 @@ def test_votacoes_do_senado_so_leem_a_allowlist_combinada_e_coletam_uma_vez_por_
     seed()
     votacoes = Dataset.objects.get(source__slug="senado", slug="votacoes")
     assert votacoes.format == Dataset.Format.JSON_SENADO_VOTACOES
-    assert votacoes.url == "https://legis.senado.leg.br/dadosabertos/votacao"
+    # O cliente não envia `Accept`: o sufixo `.json` escolhe o formato (medido em 2026-11-13).
+    assert votacoes.url == "https://legis.senado.leg.br/dadosabertos/votacao.json"
     assert votacoes.allowed_columns == [
         "codigoSessaoVotacao",
         "dataSessao",

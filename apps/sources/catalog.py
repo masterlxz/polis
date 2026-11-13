@@ -161,4 +161,46 @@ DATASETS = [
         "schedule_interval_hours": 24,
         "earliest_hour_utc": 8,
     },
+    {
+        # Votações do Senado com o voto de cada senador embutido (ADR 0029). Sem licença
+        # declarada: a base é a decisão do dono, no admin. O leitor pede os últimos 360 dias (a
+        # API aceita até 1 ano) e achata a resposta: uma linha por voto. Ficam de fora e são
+        # descartados na leitura o sexo, o texto livre do voto, a descrição da votação e o informe
+        # legislativo (ADR 0005). O sufixo `.json` escolhe o formato (o cliente não envia
+        # `Accept`).
+        "source": "senado",
+        "slug": "votacoes",
+        "name": "Votações do Senado",
+        "url": "https://legis.senado.leg.br/dadosabertos/votacao.json",
+        "format": "json_senado_votacoes",
+        "allowed_columns": [
+            "codigoSessaoVotacao",
+            "dataSessao",
+            "sigla",
+            "numero",
+            "ano",
+            "identificacao",
+            "ementa",
+            "resultadoVotacao",
+            "votacaoSecreta",
+            "totalVotosSim",
+            "totalVotosNao",
+            "totalVotosAbstencao",
+            "idProcesso",
+            "codigoMateria",
+            "codigoParlamentar",
+            "nomeParlamentar",
+            "siglaPartidoParlamentar",
+            "siglaUFParlamentar",
+            "siglaVotoParlamentar",
+        ],
+        "internal_columns": [],
+        "license_basis": "owner_decision",
+        "license_id": "",
+        "license_url": "",
+        "license_check_url": "",
+        # Uma requisição por dia, depois das 08:00 GMT (mesma política do conjunto dos senadores).
+        "schedule_interval_hours": 24,
+        "earliest_hour_utc": 8,
+    },
 ]

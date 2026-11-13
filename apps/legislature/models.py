@@ -105,3 +105,85 @@ class Senator(models.Model):
 
     def __str__(self):
         return self.name
+
+
+class SenateVoting(models.Model):
+    """Votação do Senado, com a marca de votação secreta (ADR 0029).
+
+    A chave é o código da votação no Senado (`codigoSessaoVotacao`, único em 87 de 87 medidas). A
+    tabela só acumula: votação que sai da janela de coleta continua aqui. Os totais vêm da fonte,
+    nulos nas votações abertas (calculam-se dos votos); nas secretas são o único resultado.
+    """
+
+    session_voting_code = models.PositiveIntegerField("código da votação no Senado")
+    voted_on = models.DateField("data da sessão")
+    type_acronym = models.CharField("sigla do tipo", max_length=20)
+    number = models.CharField("número", max_length=20)
+    year = models.PositiveSmallIntegerField("ano")
+    identification = models.CharField("identificação", max_length=60)
+    summary = models.TextField("ementa", blank=True)
+    result = models.CharField("resultado", max_length=10)
+    secret = models.BooleanField(
+        "votação secreta",
+        help_text="Verdadeiro: o conteúdo do voto não é divulgado; 'Votou' só diz que votou.",
+    )
+    total_yes = models.PositiveIntegerField("total de votos sim", null=True, blank=True)
+    total_no = models.PositiveIntegerField("total de votos não", null=True, blank=True)
+    total_abstention = models.PositiveIntegerField("total de abstenções", null=True, blank=True)
+    process_id = models.PositiveIntegerField("código do processo")
+    matter_id = models.PositiveIntegerField("código da matéria")
+    ingestion_run = models.ForeignKey(
+        IngestionRun,
+        on_delete=models.PROTECT,
+        related_name="senate_votings",
+        verbose_name="última execução de coleta que a viu",
+    )
+
+    class Meta:
+        verbose_name = "votação do Senado"
+        verbose_name_plural = "votações do Senado"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["session_voting_code"], name="senate_voting_unique_code"
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.identification} ({self.voted_on})"
+
+
+class SenateVote(models.Model):
+    """Voto de um parlamentar numa votação do Senado (ADR 0029).
+
+    Sem chave para `Senator`: quem votou e saiu da lista de exercício não está lá, e uma chave
+    recusaria a carga. Guarda o nome, o partido e a UF do momento do voto (o partido da data, não o
+    de hoje); a junção com `Senator` é por código, na leitura. A sigla do voto vem da fonte, sem
+    mapeamento (o significado de AP, LS, P-NRV e outras não foi verificado).
+    """
+
+    voting = models.ForeignKey(
+        SenateVoting, on_delete=models.PROTECT, related_name="votes", verbose_name="votação"
+    )
+    senate_id = models.PositiveIntegerField("código do parlamentar no Senado")
+    name = models.CharField("nome parlamentar", max_length=100)
+    party_acronym = models.CharField("sigla do partido", max_length=20, blank=True)
+    state = models.CharField("UF", max_length=2)
+    vote_code = models.CharField("sigla do voto", max_length=40)
+    ingestion_run = models.ForeignKey(
+        IngestionRun,
+        on_delete=models.PROTECT,
+        related_name="senate_votes",
+        verbose_name="última execução de coleta que o viu",
+    )
+
+    class Meta:
+        verbose_name = "voto no Senado"
+        verbose_name_plural = "votos no Senado"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["voting", "senate_id"], name="senate_vote_unique_per_voting"
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.name}: {self.vote_code}"

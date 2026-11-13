@@ -59,6 +59,7 @@ class Dataset(models.Model):
         ZIP_CSV = "zip_csv", "ZIP com CSV"
         JSON = "json", "JSON"
         JSON_SENADO = "json_senado", "JSON do Senado"
+        JSON_SENADO_VOTACOES = "json_senado_votacoes", "JSON das votações do Senado"
         XML = "xml", "XML"
         OTHER = "other", "Outro"
 

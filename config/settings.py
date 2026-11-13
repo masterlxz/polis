@@ -95,6 +95,7 @@ NORMALIZERS = {
     "tse/consulta-cand-2026": "apps.elections.normalization.normalize_latest",
     "camara/deputados": "apps.legislature.normalization.normalize_latest",
     "senado/senadores": "apps.legislature.senate_normalization.normalize_latest",
+    "senado/votacoes": "apps.legislature.senate_voting_normalization.normalize_latest",
 }
 
 LANGUAGE_CODE = "pt-br"

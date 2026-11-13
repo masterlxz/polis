@@ -2,6 +2,14 @@
 
 Mais recente no topo.
 
+### 2026-11-12 — Sessão 65 (saída do exercício do deputado, ADR 0022 "fatia própria")
+
+- **Pedido**: "segue no saída do exercício do deputado" (plan mode; plano aprovado). Decisão do dono: nomes da API **`em_exercicio` + `saiu_da_lista_em`** (descartado: `na_lista_de_exercicio` + `visto_por_ultimo_em`). Depois: "pode seguir" com as suposições (estado gravado, sem disjuntor, volta limpa o instante) e confirmou o ADR 0027.
+- **Feito**: `Deputy.in_office` e `left_list_at` + migração `legislature/0002` (só adiciona colunas); `normalization._write` marca quem não veio na carga mais recente e religa quem volta; só a carga mais recente mexe no estado; API do perfil com as 2 chaves novas; admin com colunas e filtro; `tests/test_deputy_exit.py` (14 testes) e 2 ajustes em `test_deputy_profile_api.py`; ADR 0027 e nota no 0022.
+- **Provas (CI, `workflow_dispatch`)**: vermelho (run 43332179776): 6 falhas e 9 erros nos testes novos/ajustados, 790 antigos passam. Verde (43333104666): **805 passam**, na primeira tentativa. **4 mutações** (branches descartáveis, apagadas), cada uma pega pelos testes certos: não limpar `left_list_at` na volta (43333321895), sem a guarda da carga mais recente (43333331035), marcar quem está na carga (43333342553, 3 falhas) e `now()` no lugar do início da execução (43333353141, 3 falhas).
+- **Não verificado**: nada rodou contra o banco real nem com a lista real da Câmara; efeito da troca de legislatura (58, 2027) só testado com dados sintéticos; `em_exercicio: false` pode ser licença (a lista não diz o motivo); duas normalizações simultâneas continuam sem trava; nada isto fecha o P-16.
+- **Fica**: histórico de mandatos e de partido; ligar deputado a pessoa do TSE (fatia 4, com revisão humana); Senado; votações da Câmara; abrir ao público depende de provedor, restore real, monitoramento e P-16.
+
 ### 2026-11-12 — Sessão 64 (lápide da retirada pela fonte, ADR 0005 decisão 9, só TSE)
 
 - **Pedido**: "voltar ao produto" (plan mode; plano aprovado). Decisões do dono: fatia = **lápide da retirada pela fonte**; **só TSE** (deputado segue "nunca apaga", ADR 0022); **disjuntor 1% (mín. 20)**; **reaparecimento segue a fonte**. Depois: o dono pediu o teste explícito do deputado ("faz você") e confirmou o ADR 0026 + runbook.

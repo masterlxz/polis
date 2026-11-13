@@ -22,3 +22,6 @@ O ADR 0009 previa um modelo unificado "generalizado quando Câmara e Senado entr
 - O ADR 0009 ("modelo unificado generalizado") fica adiado, não descartado: reavaliar depois da fatia 4, quando houver dado real sobre quando dois registros são a mesma pessoa.
 - `siglaPartido` vazia é aceita (suposição, não medida); `siglaUf` e `nome` são obrigatórios. Se a Câmara devolver outra coisa, a normalização recusa e cita a coluna.
 - `latest_run` e a base da normalização foram copiados do app de eleições para não acoplar os apps; a duplicação é candidata a refatoração depois.
+
+## Atualização (2026-11-12, Sessão 65): saída do exercício
+A decisão 3 segue (nunca apaga). A "saída do exercício" que ficou como fatia futura existe agora: `in_office` e `left_list_at` em `Deputy`, expostos na API interna como `em_exercicio` e `saiu_da_lista_em` (ADR 0027). A lápide do ADR 0026 continua só para o TSE.

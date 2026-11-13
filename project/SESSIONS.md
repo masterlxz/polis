@@ -2,6 +2,16 @@
 
 Mais recente no topo.
 
+### 2026-11-13 — Sessão 69 (votações do Senado com voto por senador, ADR 0029)
+
+- **Pedido**: "vamos começar" nas votações (plan mode; plano aprovado). Decisões do dono: **Senado primeiro**, fatia **votação + voto por senador**, depois da medição **janela fixa de 360 dias**, **votações secretas gravadas com a marca**, **votação sem votos recusa a carga inteira**; e criar o ADR 0029.
+- **Medido antes de escrever teste** (Rodada 3 em `fontes/senado.md`, 3 requisições reais): 365 dias = 87 votações, 7.047 votos, 1,65 MB, 0,68 s. **Corrigiu duas premissas do plano**: as 40 votações secretas (de 87) trazem os 81 itens (`Votou` = votou, sem o conteúdo) e têm totais preenchidos; e há 93 códigos de parlamentar no ano contra 81 em exercício. O sufixo `.json` sem `Accept` dá o mesmo conteúdo (o cliente não envia `Accept`).
+- **Feito**: formato `json_senado_votacoes` (leitor achatado, `sources/0009`), conjunto `senado/votacoes` no catálogo (**desabilitado**) e em `NORMALIZERS`, `SenateVoting` e `SenateVote` (`legislature/0004`, voto sem chave para `Senator`), `senate_voting_parsing`, `senate_voting_normalization`, comando `normalize_senado_votacoes`, admin só leitura, ADR 0029. 3 arquivos de teste (82 testes novos) e ajustes no catálogo.
+- **Provas (CI, `workflow_dispatch`)**: vermelho (run 43442417861): 6 falhas e 76 erros, 918 antigos passam (o 1º vermelho, 43442272030, foi fraco: um `ModuleNotFoundError` parou a coleta; corrigido importando o leitor só ao usar). Verde (43444331933): **1000 passam**; a 1ª tentativa (43444070910) teve 1 falha, **erro do meu teste** (a ementa só numa das linhas da mesma votação, que a normalização recusa por conflito). **5 mutações** em branches descartáveis (apagadas), cada uma pega pelos testes certos: janela de 366 dias (43444665841, 2 falhas), aceitar votação sem votos (43444680297), ignorar conflito de voto (43444693294), apagar o voto que saiu da carga (43444704068, 2 falhas), `votacaoSecreta` sem guarda (43444716440, 2 falhas).
+- **Deslize meu**: gravei um trecho de `models.py` por heredoc no Bash (o `CLAUDE.md` proíbe); desfiz com `git checkout` e refiz com `Edit` antes de qualquer commit.
+- **Não verificado**: nada rodou contra o banco real nem com a API real pelo pipeline (a coleta real é sessão própria, com o dono habilitando o conjunto); a ementa com quebra de linha pararia a coleta do dia (não há caso nos 87 medidos, sem teste); o significado das siglas de voto e de `A`/`R`; a estabilidade de `codigoSessaoVotacao` no tempo; o teto de 50.000 votos nunca foi atingido; nada disto fecha o P-16.
+- **Fica**: o dono habilita `senado/votacoes` (justificativa dele) e roda `ingest_dataset` e `normalize_senado_votacoes`; API e página de votações (fatia seguinte); Câmara; histórico de mandato e partido; decidir o `S/Partido` na interface; ligar parlamentar a pessoa do TSE (fatia 4); ideia anotada: propostas de plebiscito.
+
 ### 2026-11-13 — Sessão 68 (primeira coleta real do Senado, banco de desenvolvimento)
 
 - **Pedido**: "sim" ao fechar o Senado real, pendente da Sessão 67. Eu guiei, o dono rodou cada comando e tomou as decisões. Banco: o mesmo `polis_pgdata` de desenvolvimento; nenhuma migração pendente (`migrate --plan` vazio).

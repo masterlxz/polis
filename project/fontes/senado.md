@@ -173,5 +173,7 @@ Desde a Sessão 66 (2026-11-13, ADR 0028): coleta e normalização da **lista de
 
 **Primeira coleta real (2026-11-13, Sessão 68, banco de desenvolvimento):** 81 lidas e 81 gravadas; normalização 81 criadas e, na segunda execução, 0 criadas e 81 existentes. 27 UFs, nome mais longo com 25 caracteres, 81 em exercício. **O partido nunca vem vazio, mas a fonte usa o texto `S/Partido` para quem não tem partido** (1 valor, 1 coleta). Para coletar, a fonte precisa estar "Em integração" ou "Ativa" além do conjunto habilitado. Uma coleta só: a saída da lista (`saiu_da_lista_em`) ainda não foi vista com dado real.
 
+**Votações (Sessão 69, ADR 0029):** conjunto `senado/votacoes` (formato `json_senado_votacoes`, `GET /votacao.json` com janela de 360 dias, uma linha por voto), cadastrado **desabilitado**; `SenateVoting` e `SenateVote` e o comando `normalize_senado_votacoes`. Medido em 2026-11-13 (Rodada 3), mas **nenhuma coleta real pelo pipeline ainda**. O sufixo `.json` sem `Accept` devolveu o mesmo conteúdo que o `Accept: application/json` (11 votações em 30 dias, 208.811 bytes).
+
 ## Ainda não medido nesta rodada
 O comportamento real do 429 (não testei o limite); volume e custo de `/processo` sem filtro de ano e de `/votacao` num ano inteiro; discursos, taquigrafia, orçamento e votações de comissão; conteúdo dos endpoints `/senador/{codigo}/...` e seus dados pessoais; XML e NDJSON; consistência entre os endpoints legados e novos para o mesmo registro; estabilidade dos ids; o Plano de Dados Abertos 2026/2028; leitura jurídica da política de uso para a API.

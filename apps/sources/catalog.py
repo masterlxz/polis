@@ -150,6 +150,7 @@ DATASETS = [
             "NomeParlamentar",
             "SiglaPartidoParlamentar",
             "UfParlamentar",
+            "NomeCompletoParlamentar",
         ],
         "internal_columns": [],
         "license_basis": "owner_decision",

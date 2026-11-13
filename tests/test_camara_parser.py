@@ -41,6 +41,12 @@ def test_linha_valida_vira_os_campos_do_modelo(parsing):
     }
 
 
+def test_o_bruto_real_guarda_numero_como_texto_e_o_parser_converte(parsing):
+    """O leitor JSON grava `id` e `idLegislatura` como texto; é essa a forma que chega aqui."""
+    row = parsing.parse_row(linha(id="204554", idLegislatura="57"))
+    assert (row["camara_id"], row["legislature_id"]) == (204554, 57)
+
+
 def test_nome_e_sigla_perdem_espacos_nas_pontas(parsing):
     row = parsing.parse_row(linha(nome="  Ana da Câmara ", siglaPartido=" XYZ "))
     assert (row["name"], row["party_acronym"]) == ("Ana da Câmara", "XYZ")
@@ -56,14 +62,39 @@ def test_partido_vazio_ou_nulo_e_aceito_como_vazio(parsing):
     [
         sem("id"),
         linha(id=None),
-        linha(id="204554"),
+        linha(id=""),
+        linha(id=" "),
+        linha(id="20a4"),
+        linha(id="2045.5"),
+        linha(id="-7"),
+        linha(id="0"),
+        linha(id="0x1F"),
+        linha(id="٥٨٩٥"),
+        linha(id="9" * 20),
         linha(id=2045.5),
         linha(id=True),
         linha(id=0),
         linha(id=-7),
         linha(id=2**63),
     ],
-    ids=["ausente", "nulo", "texto", "decimal", "booleano", "zero", "negativo", "enorme"],
+    ids=[
+        "ausente",
+        "nulo",
+        "vazio",
+        "espaco",
+        "letra",
+        "texto_decimal",
+        "texto_negativo",
+        "texto_zero",
+        "hexadecimal",
+        "digitos_nao_ascii",
+        "texto_enorme",
+        "decimal",
+        "booleano",
+        "zero",
+        "negativo",
+        "enorme",
+    ],
 )
 def test_id_invalido_recusa_citando_so_a_coluna_id(parsing, valores):
     with pytest.raises(parsing.RowError) as erro:
@@ -76,12 +107,13 @@ def test_id_invalido_recusa_citando_so_a_coluna_id(parsing, valores):
     [
         sem("idLegislatura"),
         linha(idLegislatura=None),
-        linha(idLegislatura="57"),
+        linha(idLegislatura="5x"),
+        linha(idLegislatura="-1"),
         linha(idLegislatura=True),
         linha(idLegislatura=0),
         linha(idLegislatura=-1),
     ],
-    ids=["ausente", "nulo", "texto", "booleano", "zero", "negativo"],
+    ids=["ausente", "nulo", "letra", "texto_negativo", "booleano", "zero", "negativo"],
 )
 def test_legislatura_invalida_recusa_citando_idlegislatura(parsing, valores):
     with pytest.raises(parsing.RowError) as erro:

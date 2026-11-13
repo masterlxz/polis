@@ -2,6 +2,16 @@
 
 Mais recente no topo.
 
+### 2026-11-13 — Sessão 67 (primeira coleta real: Câmara e Senado, banco de desenvolvimento)
+
+- **Pedido**: "sim, prepara o plano da coleta real" (plan mode; plano aprovado). Eu guiei, o dono rodou cada comando. Banco: o `polis_pgdata` de desenvolvimento, que estava parado e **8 migrações atrás**.
+- **Feito**: `pg_dump` antes (92,7 MB, fora do repositório); `migrate --plan` (todas aditivas: `sources` 0005 a 0008 e `legislature` 0001 a 0003) e `migrate` sem erro, a primeira vez dessas migrações num Postgres real; `seed_sources` criou só `senado/senadores` (o `camara/deputados` já existia, habilitado e em integração desde uma sessão anterior, com a justificativa do ADR 0021).
+- **Câmara, provada com dado real**: o bruto já tinha 513 linhas (execução 6, texto como o leitor grava). `normalize_camara`: **513 lidas, 513 únicas, 513 criadas**; segunda execução: 0 criadas, 513 existentes. 513 em exercício, só a legislatura 57, **partido vazio em 0**; chaves do bruto exatamente `id, idLegislatura, nome, siglaPartido, siglaUf, uri`. API interna: 200 com as chaves esperadas e atribuição, 404 para código inexistente. Foi a primeira vez que a correção do texto contra inteiro (PR #98) enfrentou dado real.
+- **Senado: pendente.** O conjunto está `desabilitado` e a fonte em `measured`; habilitar é decisão do dono (ADR 0008) e ele deixou para depois. Falta `ingest_dataset senado/senadores` (1 requisição real), `normalize_senado`, as conferências e a API.
+- **Surpresa pequena**: o plano dizia que o `seed_sources` criaria 2 conjuntos; criou 1, porque o da Câmara já existia.
+- **Não verificado**: Senado real pelo pipeline; a causa da falha `download` da execução 5 (não consultei o `error_detail`); saída do exercício com dado real (precisa de uma lista que mude); nada disto é produção nem fecha o P-16.
+- **Fica**: o dono habilita o Senado e roda a coleta; depois atualizar este registro e `fontes/senado.md`; `docker compose down` (sem `-v`) quando terminar; o backup `~/backup-polis-dev-2026-11-13.sql` fica até o dono decidir apagar.
+
 ### 2026-11-13 — Sessão 66 (Senado: lista de senadores em exercício, ADR 0028)
 
 - **Pedido**: "sim" ao Senado (plan mode; plano aprovado). Decisões do dono: habilitar por decisão do dono e **allowlist de 4 campos** (descartado: 4 + mandato). Depois confirmou os testes e o ADR 0028.

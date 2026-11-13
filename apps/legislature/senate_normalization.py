@@ -17,6 +17,7 @@ from collections import Counter
 from dataclasses import dataclass
 
 from django.db import transaction
+from django.utils import timezone
 
 from apps.sources.models import Dataset, IngestionRun, RawRecord
 from apps.sources.normalization import NormalizationRefused as SharedRefused
@@ -140,6 +141,6 @@ def _write(run, rows_read, senators):
             # Quem estava em exercício e não veio nesta carga saiu da lista (nunca apaga).
             Senator.objects.filter(ingestion_run__dataset=run.dataset, in_office=True).exclude(
                 ingestion_run=run
-            ).update(in_office=False, left_list_at=__import__("django.utils.timezone").utils.timezone.now())
+            ).update(in_office=False, left_list_at=timezone.now())
     unique = len(objects)
     return Result(rows_read, unique, created, unique - created)

@@ -370,7 +370,7 @@ def test_normalize_latest_sem_carga_com_linhas_devolve_none(dataset):
 
 
 def test_comando_normaliza_e_resume_so_com_contagens(dataset):
-    carga(dataset, [linha(1, 10, ementa=SEGREDO), linha(1, 20)])
+    carga(dataset, [linha(1, 10, ementa=SEGREDO), linha(1, 20, ementa=SEGREDO)])
     saida = normalizar()
     assert "linhas lidas 2" in saida
     assert "criadas 2" in saida

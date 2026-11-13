@@ -2,6 +2,16 @@
 
 Mais recente no topo.
 
+### 2026-11-13 — Sessão 66 (Senado: lista de senadores em exercício, ADR 0028)
+
+- **Pedido**: "sim" ao Senado (plan mode; plano aprovado). Decisões do dono: habilitar por decisão do dono e **allowlist de 4 campos** (descartado: 4 + mandato). Depois confirmou os testes e o ADR 0028.
+- **Feito**: formato `json_senado` (`apps/sources/json_senado.py`, migração `sources/0008`), conjunto `senado/senadores` no catálogo (desabilitado), `Senator` + migração `legislature/0003`, `senate_parsing`, `senate_normalization`, comando `normalize_senado`, registro em `NORMALIZERS`, API `GET /internal/v1/senadores/<codigo>/`, admin só leitura, ADR 0028. 4 arquivos de teste novos e 1 ajuste no catálogo.
+- **Provas (CI)**: vermelho: coleta interrompida por `ModuleNotFoundError` (um arquivo de teste não importava). Verde no PR #92: 6 de 6 jobs na segunda tentativa (a primeira teve 908 passando e 1 falha, o contador de conjuntos do teste do catálogo). **5 mutações** (PRs descartáveis, fechados e apagados), cada uma pega pelos testes certos: aceitar lista vazia, não limpar `left_list_at` na volta, sem a guarda da carga mais recente, nome completo na allowlist, `now()` no lugar do início da execução. As mutações 3 e 5 falharam primeiro no lint e foram refeitas.
+- **Achado**: o `parse_row` da Câmara exige `id` inteiro, mas o `JsonListReader` grava tudo como texto; os testes da Câmara só usam inteiros no bruto e não há teste ponta a ponta. Pela leitura, a normalização da Câmara recusaria toda linha numa coleta real. **Não confirmado por CI.** Vai num PR próprio.
+- **Medido**: `GET /senador/lista/atual.json` em 2026-11-12: 200, JSON, 129.557 bytes, 81 senadores, 81 códigos únicos, 4 campos sempre texto, nome até 25 caracteres, UF sempre de 2 letras, sem redirecionamento.
+- **Não verificado**: nada rodou contra o banco real nem com o Senado real pelo pipeline completo; campo de partido vazio ou nulo é suposição; o limite do Senado (10 req/s) não foi exercitado; nada isto fecha o P-16. Dono ainda precisa habilitar `senado/senadores` no admin com a justificativa do ADR 0028.
+- **Fica**: corrigir a Câmara (texto contra inteiro); votações (Câmara e Senado); histórico de mandato e partido; ligar parlamentar a pessoa do TSE (fatia 4); abrir ao público depende de provedor, restore real, monitoramento e P-16.
+
 ### 2026-11-12 — Sessão 65 (saída do exercício do deputado, ADR 0022 "fatia própria")
 
 - **Pedido**: "segue no saída do exercício do deputado" (plan mode; plano aprovado). Decisão do dono: nomes da API **`em_exercicio` + `saiu_da_lista_em`** (descartado: `na_lista_de_exercicio` + `visto_por_ultimo_em`). Depois: "pode seguir" com as suposições (estado gravado, sem disjuntor, volta limpa o instante) e confirmou o ADR 0027.

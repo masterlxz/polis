@@ -103,23 +103,24 @@ def test_o_leitor_aceita_a_allowlist_do_catalogo():
 # --- O que o seed cria ---
 
 
-def test_seed_cria_as_tres_fontes_e_os_conjuntos_do_tse_e_da_camara():
+def test_seed_cria_as_tres_fontes_e_os_conjuntos_do_tse_da_camara_e_do_senado():
     seed()
     assert set(Source.objects.values_list("slug", flat=True)) == {"camara", "senado", "tse"}
     assert {str(d) for d in Dataset.objects.all()} == {
         "tse/consulta-cand-2026",
         "camara/deputados",
+        "senado/senadores",
     }
     assert str(dataset_tse()) == "tse/consulta-cand-2026"
 
 
-def test_so_o_senado_fica_sem_conjunto_e_o_da_camara_nasce_desabilitado():
+def test_os_conjuntos_sem_licenca_declarada_nascem_desabilitados_e_sem_justificativa():
     seed()
-    assert not Dataset.objects.filter(source__slug="senado").exists()
-    deputados = Dataset.objects.get(source__slug="camara")
-    assert deputados.enabled is False
-    assert deputados.license_basis == Dataset.LicenseBasis.OWNER_DECISION
-    assert deputados.license_justification == "", "a justificativa é do dono, no admin"
+    for fonte in ("camara", "senado"):
+        conjunto = Dataset.objects.get(source__slug=fonte)
+        assert conjunto.enabled is False
+        assert conjunto.license_basis == Dataset.LicenseBasis.OWNER_DECISION
+        assert conjunto.license_justification == "", "a justificativa é do dono, no admin"
 
 
 def test_fontes_nascem_medidas_e_sem_integracao():
@@ -165,7 +166,6 @@ def test_toda_fonte_tem_termos_em_https_e_nota_de_licenca():
 def test_seed_resume_so_com_contagens():
     texto = seed()
     assert "3" in texto
-    assert "2" in texto
     assert "NR_CPF" not in texto
 
 
@@ -176,7 +176,7 @@ def test_segunda_execucao_nao_duplica_nem_cria():
     seed()
     texto = seed()
     assert Source.objects.count() == 3
-    assert Dataset.objects.count() == 2
+    assert Dataset.objects.count() == 3
     assert "0 criad" in texto
 
 

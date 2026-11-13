@@ -155,7 +155,7 @@ curl -sS -H 'Accept: application/json' "$B/senador/99999999" -w '\n%{http_code}\
 Os números de senadores e de itens de processo e votação mudam com o tempo.
 
 ## Estado da integração
-Nenhuma. Histórico de sincronizações: não se aplica ainda.
+Desde a Sessão 66 (2026-11-13, ADR 0028): coleta e normalização da **lista de senadores em exercício** (`senado/senadores`, `GET /senador/lista/atual.json`, allowlist de 4 campos), conjunto cadastrado e **desabilitado** até o dono habilitar no admin. Medido de novo em 2026-11-12: 200, JSON, 129.557 bytes, 81 senadores, código do parlamentar como texto. Votações, proposições e o detalhe do senador: nada integrado. Histórico de sincronizações: nenhuma coleta real ainda.
 
 ## Ainda não medido nesta rodada
 O comportamento real do 429 (não testei o limite); volume e custo de `/processo` sem filtro de ano e de `/votacao` num ano inteiro; discursos, taquigrafia, orçamento e votações de comissão; conteúdo dos endpoints `/senador/{codigo}/...` e seus dados pessoais; XML e NDJSON; consistência entre os endpoints legados e novos para o mesmo registro; estabilidade dos ids; o Plano de Dados Abertos 2026/2028; leitura jurídica da política de uso para a API.

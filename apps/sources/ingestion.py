@@ -39,6 +39,7 @@ from django.utils import timezone
 from .ckan import CkanError, read_license_id
 from .http_client import BlockedError, DownloadError
 from .json_list import JsonListError, JsonListReader, fetch_pages
+from .json_senado import fetch_senate_list
 from .models import IngestionRun, RawRecord, Source
 from .zip_csv import DuplicateColumnError, InvalidFormatError, MissingColumnError, ZipCsvReader
 
@@ -105,6 +106,8 @@ def _execute(dataset, client, run, destination, batch_size, keep_loads):
                 return {}, IngestionRun.ErrorCode.LICENSE
         if dataset.format == dataset.Format.JSON:
             result = fetch_pages(client, dataset.url, destination)
+        elif dataset.format == dataset.Format.JSON_SENADO:
+            result = fetch_senate_list(client, dataset.url, destination)
         else:
             result = client.download(dataset.url, destination)
     except BlockedError as error:
@@ -148,7 +151,7 @@ def _same_as_last_load(dataset, sha256):
 
 
 def _load(dataset, run, path, fields, batch_size, keep_loads):
-    if dataset.format == dataset.Format.JSON:
+    if dataset.format in (dataset.Format.JSON, dataset.Format.JSON_SENADO):
         reader = JsonListReader(path, dataset.allowed_columns)
     else:
         reader = ZipCsvReader(path, dataset.allowed_columns)

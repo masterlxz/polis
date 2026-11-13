@@ -57,3 +57,51 @@ class Deputy(models.Model):
 
     def __str__(self):
         return self.name
+
+
+class Senator(models.Model):
+    """Senador da lista em exercício do Senado (nome parlamentar, não o civil; ADR 0028).
+
+    Fora de `Person` e de `Deputy`, pelo mesmo motivo do ADR 0022. A chave é só o código do
+    parlamentar: o mandato de senador atravessa duas legislaturas. As regras de `in_office` e
+    `left_list_at` são as do `Deputy` (ADR 0027): a data é a da COLETA, não a do fim do mandato.
+    """
+
+    senate_id = models.PositiveIntegerField("código no Senado")
+    name = models.CharField("nome parlamentar", max_length=100)
+    party_acronym = models.CharField("sigla do partido", max_length=20, blank=True)
+    state = models.CharField("UF", max_length=2)
+    ingestion_run = models.ForeignKey(
+        IngestionRun,
+        on_delete=models.PROTECT,
+        related_name="senators",
+        verbose_name="última execução de coleta que o viu",
+    )
+    in_office = models.BooleanField(
+        "em exercício",
+        default=True,
+        help_text=(
+            "Falso: não consta mais na lista de senadores em exercício do Senado. A lista não "
+            "diz o motivo (licença, fim de mandato, renúncia, morte, titular de volta)."
+        ),
+    )
+    left_list_at = models.DateTimeField(
+        "saiu da lista em",
+        null=True,
+        blank=True,
+        help_text=(
+            "Início da primeira execução de coleta que não o trouxe: a data da COLETA, não a do "
+            "fim do mandato. Vazio enquanto está na lista."
+        ),
+    )
+
+    class Meta:
+        verbose_name = "senador"
+        verbose_name_plural = "senadores"
+        constraints = [
+            models.UniqueConstraint(fields=["senate_id"], name="senator_unique_senate_id"),
+            models.CheckConstraint(condition=~models.Q(name=""), name="senator_name"),
+        ]
+
+    def __str__(self):
+        return self.name

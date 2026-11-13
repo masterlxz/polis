@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Deputy
+from .models import Deputy, Senator
 
 
 @admin.register(Deputy)
@@ -28,3 +28,11 @@ class DeputyAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+
+@admin.register(Senator)
+class SenatorAdmin(DeputyAdmin):
+    """Idem: só leitura (ADR 0028)."""
+
+    list_display = ["name", "party_acronym", "state", "senate_id", "in_office", "left_list_at"]
+    list_filter = ["in_office", "state", "party_acronym"]

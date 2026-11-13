@@ -7,7 +7,7 @@ só o NOME da coluna do bruto, nunca o valor, e é levantado fora de qualquer `e
 encadear a exceção original.
 
 Suposição, não medida: `siglaPartido` pode vir vazia ou nula (vira ""); id, legislatura, nome e
-UF são obrigatórios.
+UF são obrigatórios. `id` e `idLegislatura` chegam como texto do leitor JSON (Sessão 66).
 """
 
 import re
@@ -17,6 +17,7 @@ from .models import Deputy
 
 INT32 = 2**31 - 1
 _UF = re.compile(r"[A-Z]{2}")
+_DIGITS = re.compile(r"[0-9]{1,10}")
 
 
 class RowError(Exception):
@@ -28,7 +29,13 @@ class RowError(Exception):
 
 
 def _int(values, column):
+    """Inteiro positivo que cabe no int32. O bruto real guarda número como TEXTO (o leitor JSON
+    converte); inteiro puro também é aceito. Texto só com dígitos ASCII: sem sinal, espaço, ponto,
+    hexadecimal nem dígito de outro alfabeto.
+    """
     value = values.get(column)
+    if type(value) is str and _DIGITS.fullmatch(value):
+        value = int(value)
     if type(value) is not int or not 0 < value <= INT32:
         raise RowError(column)
     return value

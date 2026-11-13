@@ -2,6 +2,16 @@
 
 Mais recente no topo.
 
+### 2026-11-13 — Sessão 68 (primeira coleta real do Senado, banco de desenvolvimento)
+
+- **Pedido**: "sim" ao fechar o Senado real, pendente da Sessão 67. Eu guiei, o dono rodou cada comando e tomou as decisões. Banco: o mesmo `polis_pgdata` de desenvolvimento; nenhuma migração pendente (`migrate --plan` vazio).
+- **Feito**: o dono refez o segundo fator do `masterlxz` (`reset_totp`; o usuário existia com 0 dispositivos TOTP, então nunca tinha sido inscrito), entrou no admin, **habilitou `senado/senadores`** com a justificativa dele (`owner_decision`, ADR 0028 decisão 1) e passou a fonte `senado` de "Medida, sem integração" para **"Em integração"**.
+- **Senado, provado com dado real**: `ingest_dataset senado/senadores`: succeeded, 81 lidas, 81 gravadas. `normalize_senado`: **81 lidas, 81 únicas, 81 criadas**; segunda execução (a mesma execução 8): 0 criadas, 81 existentes. 81 em exercício, 0 fora, UF sempre com 2 letras (27 UFs, DF incluído), nome mais longo 25, chaves do bruto exatamente a allowlist (`CodigoParlamentar`, `NomeParlamentar`, `SiglaPartidoParlamentar`, `UfParlamentar`). API interna: `GET /internal/v1/senadores/22/` 200 com as chaves esperadas e a atribuição; código 999999: 404.
+- **Achado**: o partido nunca vem vazio (0), mas 1 valor é o texto literal **`S/Partido`**: a fonte escreve "sem partido" como string, não como campo vazio. A suposição "partido vazio ou nulo" da Sessão 66 estava errada. A API devolve `S/Partido` como se fosse sigla; tratar isso na interface é decisão de produto, ainda aberta.
+- **Surpresas pequenas**: a coleta exige duas chaves, o conjunto habilitado **e** a fonte em integração ou ativa (`ingestion.py`); o erro `A fonte não está em integração nem ativa.` saiu antes de qualquer requisição. Eu não tinha avisado da segunda chave. A saída do `reset_totp` (URL do TOTP e códigos de recuperação) passou pelo chat por causa do `!`; é banco de desenvolvimento, e o dono refez o segredo depois.
+- **Não verificado**: saída do exercício com dado real (precisa de uma lista que mude: só houve uma carga); limite do Senado (10 req/s) não exercitado (foi 1 requisição); `S/Partido` só visto em 1 coleta; nada disto é produção nem fecha o P-16.
+- **Fica**: decidir o tratamento de `S/Partido` na interface; `docker compose down` (sem `-v`); o backup `~/backup-polis-dev-2026-11-13.sql` fica até o dono decidir apagar; votações (Câmara e Senado); histórico de mandato e partido; ligar parlamentar a pessoa do TSE (fatia 4); abrir ao público depende de provedor, restore real, monitoramento e P-16. Ideia anotada pelo dono: propostas de plebiscito (memória do workspace, sem escopo).
+
 ### 2026-11-13 — Sessão 67 (primeira coleta real: Câmara e Senado, banco de desenvolvimento)
 
 - **Pedido**: "sim, prepara o plano da coleta real" (plan mode; plano aprovado). Eu guiei, o dono rodou cada comando. Banco: o `polis_pgdata` de desenvolvimento, que estava parado e **8 migrações atrás**.

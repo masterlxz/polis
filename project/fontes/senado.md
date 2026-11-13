@@ -143,6 +143,20 @@ curl -sS -H 'Accept: application/json' "https://legis.senado.leg.br/dadosabertos
 
 **Não verificado nesta rodada:** os campos de senadores além do n=1; discursos e apartes com filtro de data; votações secretas; o significado das siglas de voto; `profissao` e `historicoAcademico` para outros senadores.
 
+## Rodada 3: votações em janela de 30 dias e de 1 ano (medido, 2026-11-13)
+Duas requisições `GET /votacao?dataInicio&dataFim` (200, `application/json`, `cache-control: max-age=600`), uma pausa de 8 s entre elas, da mesma máquina. Só estrutura e contagens; nenhum voto individual foi impresso ou commitado.
+
+| Janela | Votações | Votos | Tamanho | Tempo |
+|---|---|---|---|---|
+| 2026-10-14 a 2026-11-13 (30 dias) | 11 | 891 | 208.811 B | 0,31 s |
+| 2025-11-14 a 2026-11-13 (365 dias) | 87 | 7.047 | 1.652.031 B | 0,68 s |
+
+- **Votação (25 chaves, todas presentes nas 87):** `codigoSessaoVotacao` (inteiro, **87 de 87 distintos**, sem nulo), `idProcesso`, `codigoMateria`, `codigoSessao`, `codigoSessaoLegislativa`, `numeroSessao`, `sequencialSessao`, `sequencialVotacao` (nulo em 2 votações abertas), `identificacao`, `sigla`, `numero`, `ano`, `casaSessao`, `siglaTipoSessao`, `dataSessao` e `dataApresentacao` (`aaaa-mm-dd`), `descricaoVotacao`, `ementa`, `resultadoVotacao` (`A` em 82, `R` em 5), `votacaoSecreta` (`N` 47, `S` 40), `informeLegislativo` (objeto em 83, nulo em 4), `totalVotosSim`, `totalVotosNao`, `totalVotosAbstencao`, `votos`. Tamanhos máximos vistos: `ementa` 606, `descricaoVotacao` 164, `identificacao` 30, `nomeParlamentar` 25.
+- **Cada votação traz exatamente 81 votos**, sem voto repetido por (votação, parlamentar). `codigoParlamentar` é inteiro; **93 códigos distintos no ano** (os 81 de hoje mais suplentes que votaram e saíram); 23 desses códigos não votaram em todas. Partido nunca vazio e UF sempre com 2 letras. Voto: 7 chaves (`codigoParlamentar`, `nomeParlamentar`, `sexoParlamentar`, `siglaPartidoParlamentar`, `siglaUFParlamentar`, `siglaVotoParlamentar`, `descricaoVotoParlamentar`, esta preenchida em 1.788 de 7.047).
+- **`siglaVotoParlamentar` tem 13 valores no ano:** `Sim` 2.718, `Votou` 2.043, `P-NRV` 988, `AP` 536, `Não` 437, `LS` 124, `MIS` 74, `Presidente (art. 51 RISF)` 48, `NCom` 50, `Abstenção` 13, `LP` 8, `NA` 7, `LAP` 1. **O significado de `AP`, `LS`, `P-NRV`, `MIS`, `NCom`, `LP`, `NA` e `LAP` continua sem verificação.**
+- **Votação secreta (40 de 87) NÃO vem sem votos:** traz os mesmos 81 itens, mas o conteúdo do voto não aparece. `Votou` (2.043 itens) só diz que o senador votou, não como; as outras siglas são ausência ou impedimento. Nas secretas os **totais vêm preenchidos** (40 de 40: por exemplo 43, 2 e 1); nas abertas **vêm nulos** (47 de 47). Isso corrige a medição de 2026-11-05 ("votações secretas só trazem totais"), que se baseava na especificação e não em dado.
+- **Ainda não medido:** o que acontece com janela maior que 1 ano (a documentação diz que o intervalo é de até 1 ano); o comportamento com `dataFim` no futuro; o significado das siglas; se votações antigas mudam depois de publicadas.
+
 ## Reproduzir as medições
 Use um `User-Agent` genérico e espere alguns segundos entre as requisições.
 ```bash
@@ -158,6 +172,8 @@ Os números de senadores e de itens de processo e votação mudam com o tempo.
 Desde a Sessão 66 (2026-11-13, ADR 0028): coleta e normalização da **lista de senadores em exercício** (`senado/senadores`, `GET /senador/lista/atual.json`, allowlist de 4 campos), conjunto cadastrado e habilitado pelo dono em 2026-11-13 (Sessão 68). Medido de novo em 2026-11-12: 200, JSON, 129.557 bytes, 81 senadores, código do parlamentar como texto. Votações, proposições e o detalhe do senador: nada integrado.
 
 **Primeira coleta real (2026-11-13, Sessão 68, banco de desenvolvimento):** 81 lidas e 81 gravadas; normalização 81 criadas e, na segunda execução, 0 criadas e 81 existentes. 27 UFs, nome mais longo com 25 caracteres, 81 em exercício. **O partido nunca vem vazio, mas a fonte usa o texto `S/Partido` para quem não tem partido** (1 valor, 1 coleta). Para coletar, a fonte precisa estar "Em integração" ou "Ativa" além do conjunto habilitado. Uma coleta só: a saída da lista (`saiu_da_lista_em`) ainda não foi vista com dado real.
+
+**Votações (Sessão 69, ADR 0029):** conjunto `senado/votacoes` (formato `json_senado_votacoes`, `GET /votacao.json` com janela de 360 dias, uma linha por voto), cadastrado **desabilitado**; `SenateVoting` e `SenateVote` e o comando `normalize_senado_votacoes`. Medido em 2026-11-13 (Rodada 3), mas **nenhuma coleta real pelo pipeline ainda**. O sufixo `.json` sem `Accept` devolveu o mesmo conteúdo que o `Accept: application/json` (11 votações em 30 dias, 208.811 bytes).
 
 ## Ainda não medido nesta rodada
 O comportamento real do 429 (não testei o limite); volume e custo de `/processo` sem filtro de ano e de `/votacao` num ano inteiro; discursos, taquigrafia, orçamento e votações de comissão; conteúdo dos endpoints `/senador/{codigo}/...` e seus dados pessoais; XML e NDJSON; consistência entre os endpoints legados e novos para o mesmo registro; estabilidade dos ids; o Plano de Dados Abertos 2026/2028; leitura jurídica da política de uso para a API.

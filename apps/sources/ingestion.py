@@ -40,6 +40,7 @@ from .ckan import CkanError, read_license_id
 from .http_client import BlockedError, DownloadError
 from .json_list import JsonListError, JsonListReader, fetch_pages
 from .json_senado import fetch_senate_list
+from .json_senado_votacoes import MAX_VOTES, fetch_senate_votings
 from .models import IngestionRun, RawRecord, Source
 from .zip_csv import DuplicateColumnError, InvalidFormatError, MissingColumnError, ZipCsvReader
 
@@ -108,6 +109,8 @@ def _execute(dataset, client, run, destination, batch_size, keep_loads):
             result = fetch_pages(client, dataset.url, destination)
         elif dataset.format == dataset.Format.JSON_SENADO:
             result = fetch_senate_list(client, dataset.url, destination)
+        elif dataset.format == dataset.Format.JSON_SENADO_VOTACOES:
+            result = fetch_senate_votings(client, dataset.url, destination)
         else:
             result = client.download(dataset.url, destination)
     except BlockedError as error:
@@ -151,7 +154,10 @@ def _same_as_last_load(dataset, sha256):
 
 
 def _load(dataset, run, path, fields, batch_size, keep_loads):
-    if dataset.format in (dataset.Format.JSON, dataset.Format.JSON_SENADO):
+    if dataset.format == dataset.Format.JSON_SENADO_VOTACOES:
+        # Um ano são ~7 mil linhas (uma por voto): o teto padrão de 10 mil é apertado.
+        reader = JsonListReader(path, dataset.allowed_columns, max_items=MAX_VOTES)
+    elif dataset.format in (dataset.Format.JSON, dataset.Format.JSON_SENADO):
         reader = JsonListReader(path, dataset.allowed_columns)
     else:
         reader = ZipCsvReader(path, dataset.allowed_columns)

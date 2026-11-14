@@ -251,7 +251,9 @@ def test_partido_vazio_sai_null_e_s_partido_sai_como_vem(client, run):
 
 def test_nada_de_id_interno_nem_execucao_no_detalhe(client, aberta):
     corpo = _detalhe(client, ABERTA)
-    chaves = set(_todas_as_chaves(corpo))
+    # `atribuicao.licenca.id` é o id da licença (contrato de todas as APIs, fixado em outro teste),
+    # não id interno; por isso a busca é fora da atribuição.
+    chaves = set(_todas_as_chaves({k: v for k, v in corpo.items() if k != "atribuicao"}))
     texto = client.get(f"{LISTA}{ABERTA}/").content.decode()
 
     assert not chaves & {"id", "pk", "voting", "voting_id", "ingestion_run"}

@@ -565,6 +565,150 @@ def test_o_comando_termina_com_erro_quando_a_normalizacao_recusa(
         rodar_comando()
 
 
+# --- Resultado da normalização gravado no conjunto (painel das fontes) ---
+
+
+def _recusa(mensagem="Normalização recusada: linhas inválidas: 2; colunas: id (2). Nada gravado."):
+    from apps.sources.normalization import NormalizationRefused
+
+    return NormalizationRefused(mensagem)
+
+
+def test_conjunto_novo_nao_tem_resultado_de_normalizacao():
+    dataset = make_dataset()
+
+    assert dataset.last_normalization_at is None
+    assert dataset.last_normalization_error == ""
+
+
+def test_recusa_grava_a_mensagem_e_a_hora_no_conjunto(agendador, ingest, registrar_normalizador):
+    mensagem = "Normalização recusada: linhas inválidas: 2; colunas: id (2). Nada gravado."
+    registrar_normalizador("camara/deputados", FakeNormalizador(erro=_recusa(mensagem)))
+    dataset = make_dataset()
+
+    coletar(agendador)
+
+    dataset.refresh_from_db()
+    assert dataset.last_normalization_error == mensagem
+    assert dataset.last_normalization_at == NOW
+
+
+def test_erro_inesperado_grava_texto_fixo_e_nunca_a_mensagem_da_excecao(
+    agendador, ingest, registrar_normalizador
+):
+    segredo = "SEGREDO-DE-TESTE-NAO-PODE-APARECER"
+    erro = RuntimeError(f"DETAIL: Failing row contains ({segredo})")
+    registrar_normalizador("camara/deputados", FakeNormalizador(erro=erro))
+    dataset = make_dataset()
+
+    coletar(agendador)
+
+    dataset.refresh_from_db()
+    assert dataset.last_normalization_error != ""
+    assert "inesperad" in dataset.last_normalization_error
+    assert segredo not in dataset.last_normalization_error
+
+
+def test_mensagem_de_recusa_muito_longa_e_truncada_em_300_caracteres(
+    agendador, ingest, registrar_normalizador
+):
+    registrar_normalizador("camara/deputados", FakeNormalizador(erro=_recusa("x" * 1000)))
+    dataset = make_dataset()
+
+    coletar(agendador)
+
+    dataset.refresh_from_db()
+    assert len(dataset.last_normalization_error) == 300
+    assert dataset.last_normalization_error == "x" * 300
+
+
+def test_normalizacao_bem_sucedida_limpa_o_erro_anterior_e_grava_a_hora(
+    agendador, ingest, registrar_normalizador
+):
+    registrar_normalizador("camara/deputados", FakeNormalizador())
+    dataset = make_dataset()
+    Dataset.objects.filter(pk=dataset.pk).update(
+        last_normalization_error="Normalização recusada antes.",
+        last_normalization_at=NOW - timedelta(days=1),
+    )
+
+    coletar(agendador)
+
+    dataset.refresh_from_db()
+    assert dataset.last_normalization_error == ""
+    assert dataset.last_normalization_at == NOW
+
+
+def test_nada_a_normalizar_tambem_limpa_o_erro_anterior(agendador, ingest, registrar_normalizador):
+    registrar_normalizador("camara/deputados", FakeNormalizador(resultado=None))
+    dataset = make_dataset()
+    Dataset.objects.filter(pk=dataset.pk).update(last_normalization_error="Recusada antes.")
+
+    coletar(agendador)
+
+    dataset.refresh_from_db()
+    assert dataset.last_normalization_error == ""
+    assert dataset.last_normalization_at == NOW
+
+
+def test_coleta_que_falhou_nao_mexe_no_resultado_da_normalizacao(
+    agendador, ingest, registrar_normalizador
+):
+    registrar_normalizador("camara/deputados", FakeNormalizador())
+    ingest.modos["deputados"] = "failed"
+    dataset = make_dataset()
+    Dataset.objects.filter(pk=dataset.pk).update(last_normalization_error="Recusada antes.")
+
+    coletar(agendador)
+
+    dataset.refresh_from_db()
+    assert dataset.last_normalization_error == "Recusada antes."
+    assert dataset.last_normalization_at is None
+
+
+def test_conjunto_sem_normalizador_nao_mexe_no_resultado_da_normalizacao(agendador, ingest):
+    dataset = make_dataset()
+
+    coletar(agendador)
+
+    dataset.refresh_from_db()
+    assert dataset.last_normalization_error == ""
+    assert dataset.last_normalization_at is None
+
+
+def test_so_o_conjunto_que_recusou_fica_marcado(agendador, ingest, registrar_normalizador):
+    fonte = make_source()
+    ruim = make_dataset(fonte=fonte, slug="a-ruim")
+    bom = make_dataset(fonte=fonte, slug="b-bom")
+    registrar_normalizador("camara/a-ruim", FakeNormalizador(erro=_recusa("recusada")))
+    registrar_normalizador("camara/b-bom", FakeNormalizador())
+
+    coletar(agendador)
+
+    ruim.refresh_from_db()
+    bom.refresh_from_db()
+    assert ruim.last_normalization_error == "recusada"
+    assert bom.last_normalization_error == ""
+    assert bom.last_normalization_at == NOW
+
+
+def test_gravar_o_resultado_nao_desfaz_uma_edicao_feita_no_admin_durante_a_coleta(
+    agendador, ingest, registrar_normalizador
+):
+    def editar_durante_a_normalizacao(dataset):
+        Dataset.objects.filter(pk=dataset.pk).update(name="Nome editado no admin")
+        raise _recusa("recusada")
+
+    registrar_normalizador("camara/deputados", editar_durante_a_normalizacao)
+    dataset = make_dataset()
+
+    coletar(agendador)
+
+    dataset.refresh_from_db()
+    assert dataset.name == "Nome editado no admin"
+    assert dataset.last_normalization_error == "recusada"
+
+
 def test_ponta_a_ponta_da_camara_o_bruto_coletado_vira_deputados(agendador, ingest):
     from apps.legislature.models import Deputy
 

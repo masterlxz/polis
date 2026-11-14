@@ -24,6 +24,7 @@ def _situacao(**extra):
         "next_collection_at": NOW + timedelta(hours=1),
         "last_success_at": NOW - timedelta(hours=1),
         "last_finished_state": "succeeded",
+        "normalization_failed": False,
         "now": NOW,
         **extra,
     }
@@ -60,6 +61,37 @@ def test_sem_intervalo_e_sem_agenda_mesmo_com_coleta_velha_ou_falha():
 
 def test_ultima_coleta_que_falhou_aparece_mesmo_com_sucesso_recente():
     assert _situacao(last_finished_state="failed") is Situation.FAILED
+
+
+def test_normalizacao_que_falhou_aparece_mesmo_com_a_coleta_em_dia():
+    assert _situacao(normalization_failed=True) is Situation.NORMALIZATION_FAILED
+
+
+def test_normalizacao_que_falhou_vence_o_atraso():
+    velha = NOW - timedelta(days=10)
+
+    resultado = _situacao(normalization_failed=True, last_success_at=velha)
+
+    assert resultado is Situation.NORMALIZATION_FAILED
+
+
+def test_coleta_que_falhou_vence_a_normalizacao_que_falhou():
+    resultado = _situacao(normalization_failed=True, last_finished_state="failed")
+
+    assert resultado is Situation.FAILED
+
+
+def test_desabilitado_e_sem_agenda_vencem_a_normalizacao_que_falhou():
+    assert _situacao(normalization_failed=True, enabled=False) is Situation.DISABLED
+    assert _situacao(normalization_failed=True, interval_hours=None) is Situation.NO_SCHEDULE
+
+
+def test_normalizacao_que_falhou_vale_tambem_para_quem_nunca_teve_sucesso():
+    nunca_coletou = {"last_success_at": None, "last_finished_state": None}
+
+    resultado = _situacao(normalization_failed=True, **nunca_coletou)
+
+    assert resultado is Situation.NORMALIZATION_FAILED
 
 
 def test_falha_antes_de_um_sucesso_nao_conta():
@@ -136,14 +168,15 @@ def test_so_falhas_sem_nenhum_sucesso_aparece_como_falha():
 
 
 @pytest.mark.parametrize(
-    ("situacao", "rotulo"),
+    ("valor", "rotulo"),
     [
-        (Situation.ON_TIME, "Em dia"),
-        (Situation.LATE, "Atrasado"),
-        (Situation.FAILED, "Última coleta falhou"),
-        (Situation.NO_SCHEDULE, "Sem agenda"),
-        (Situation.DISABLED, "Desabilitado"),
+        ("on_time", "Em dia"),
+        ("late", "Atrasado"),
+        ("failed", "Última coleta falhou"),
+        ("normalization_failed", "Normalização falhou"),
+        ("no_schedule", "Sem agenda"),
+        ("disabled", "Desabilitado"),
     ],
 )
-def test_cada_situacao_tem_o_rotulo_em_portugues(situacao, rotulo):
-    assert situacao.label == rotulo
+def test_cada_situacao_tem_o_rotulo_em_portugues(valor, rotulo):
+    assert Situation(valor).label == rotulo

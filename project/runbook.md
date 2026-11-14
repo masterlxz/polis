@@ -1,6 +1,6 @@
 # Runbook de produção (ADR 0011, 0024, 0025)
 
-Estado: **a topologia e o ciclo backup → restauração só foram exercidos no CI**, nunca num servidor real nem com o tamanho real do banco. O monitoramento é só um painel: a lista de "Conjuntos de dados" do admin mostra a situação de cada fonte (em dia, atrasado, última coleta falhou, sem agenda, desabilitado; atrasado = mais de 2 intervalos sem coleta com sucesso). **Não há alerta ativo**: alguém precisa abrir o admin. Não abra ao público antes de um alerta ativo e antes de **você mesmo restaurar um backup** (seção abaixo).
+Estado: **a topologia e o ciclo backup → restauração só foram exercidos no CI**, nunca num servidor real nem com o tamanho real do banco. O monitoramento é só um painel: a lista de "Conjuntos de dados" do admin mostra a situação de cada fonte (em dia, atrasado, última coleta falhou, normalização falhou, sem agenda, desabilitado; atrasado = mais de 2 intervalos sem coleta com sucesso; "normalização falhou" = o bruto está fresco mas a normalização foi recusada ou falhou, e a mensagem aparece na coluna "última normalização"). **Não há alerta ativo**: alguém precisa abrir o admin. Não abra ao público antes de um alerta ativo e antes de **você mesmo restaurar um backup** (seção abaixo).
 
 Todos os comandos usam `docker compose -f compose.prod.yaml` (abaixo, `dc`). Atalho: `export COMPOSE_FILE=compose.prod.yaml`.
 
@@ -50,4 +50,4 @@ Para recuperar de um desastre **no banco em uso**: pare `web`, `agendador` e `ba
 Quando uma carga do TSE faz sumir mais que `max(20, 1%)` candidaturas, a normalização é recusada (`collect_due` sai com erro; o bruto fica; nada é apagado). Antes de liberar, **confira que o arquivo da fonte não está incompleto** (compare as contagens da última carga com a anterior no admin). Se a retirada é legítima: `dc run --rm web python manage.py normalize_tse --aceitar-retiradas`. **Apaga dado pessoal sem volta.**
 
 ## Não existe ainda
-Alerta ativo (o painel de fontes só mostra a coleta; backup falho só aparece no healthcheck; erro de normalização não aparece em lugar nenhum), domínio com certificado público, HSTS (`DJANGO_HSTS_SECONDS`), provedor do VPS e do armazenamento, medição do tempo de restauração com o tamanho real do banco (RTO de 24 h), lápide para o deputado da Câmara (ADR 0026).
+Alerta ativo (o painel de fontes não avisa, só mostra; backup falho só aparece no healthcheck; o erro de normalização só é visto do agendador, não da normalização manual `normalize_*`), domínio com certificado público, HSTS (`DJANGO_HSTS_SECONDS`), provedor do VPS e do armazenamento, medição do tempo de restauração com o tamanho real do banco (RTO de 24 h), lápide para o deputado da Câmara (ADR 0026).

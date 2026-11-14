@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { buscarVotacaoDoSenado } from "../../../../lib/api.js";
@@ -83,7 +84,13 @@ function Votantes({ itens, rotuloDaColuna, titulo }) {
       <tbody>
         {itens.map((item) => (
           <tr key={item.id_senado}>
-            <td>{item.nome}</td>
+            <td>
+              {item.tem_perfil ? (
+                <Link href={`/senado/senadores/${item.id_senado}/`}>{item.nome}</Link>
+              ) : (
+                item.nome
+              )}
+            </td>
             <td>{partidoParaExibir(item.partido)}</td>
             <td>{item.uf}</td>
             <td>{descreverSigla(item.sigla)}</td>

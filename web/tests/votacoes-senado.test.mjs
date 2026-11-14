@@ -397,6 +397,10 @@ test("código válido: a API recebe exatamente GET /internal/v1/senado/votacoes/
 });
 
 test("API responde 404: página 404 em português", async () => {
+  const controle = await detalhe();
+  assert.equal(controle.status, 200, "controle: sem a rota, o 404 viria do Next e não da API");
+  api.chamadas.length = 0;
+
   const { status, html } = await abrir("/senado/votacoes/7001/", {
     status: 404,
     corpo: { erro: "não encontrado" },
@@ -404,6 +408,7 @@ test("API responde 404: página 404 em português", async () => {
 
   assert.equal(status, 404);
   assert.match(html, /não encontrad/i);
+  assert.deepEqual(api.chamadas, [`GET ${CAMINHO_DA_LISTA}7001/`], "a API não foi chamada");
 });
 
 test("API responde 500: erro genérico, sem o endereço da API", async () => {
@@ -414,7 +419,8 @@ test("API responde 500: erro genérico, sem o endereço da API", async () => {
 });
 
 test("estrutura: um h1, título com o descritor e noindex", async () => {
-  for (const { html } of [await listaOk(), await detalhe()]) {
+  for (const { status, html } of [await listaOk(), await detalhe()]) {
+    assert.equal(status, 200, "controle: a 404 do Next também tem h1, título e noindex");
     assert.equal((html.match(/<h1[ >]/g) ?? []).length, 1);
     assert.match(html, /<title>[^<]*transparência e inteligência cívica[^<]*<\/title>/);
     assert.match(html, /<meta name="robots" content="noindex/);

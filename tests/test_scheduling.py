@@ -666,7 +666,10 @@ def test_coleta_que_falhou_nao_mexe_no_resultado_da_normalizacao(
     assert dataset.last_normalization_at is None
 
 
-def test_conjunto_sem_normalizador_nao_mexe_no_resultado_da_normalizacao(agendador, ingest):
+def test_conjunto_sem_normalizador_nao_mexe_no_resultado_da_normalizacao(
+    agendador, ingest, registrar_normalizador
+):
+    # A fixture esvazia `settings.NORMALIZERS`: `camara/deputados` tem normalizador de verdade.
     dataset = make_dataset()
 
     coletar(agendador)

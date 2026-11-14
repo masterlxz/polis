@@ -2,6 +2,16 @@
 
 Mais recente no topo.
 
+### 2026-11-14 — Sessão 73 (página do senador e link do nome na votação)
+
+- **Pedido**: abrir o projeto, conferir o #106 e o OVERVIEW, e seguir para a página do senador (plan mode; plano aprovado). Decisões do dono: **só o perfil** (histórico de votos fica para depois) e **link só quando há perfil** (`tem_perfil` na API). Rótulos "Em exercício" e "Fora da lista de exercício" e a nota no ADR 0030 seguiram a minha recomendação (o dono disse "segue" sem responder).
+- **Antes**: #106 e #107 já estavam mesclados. OVERVIEW defasado (Etapa 1 "não iniciada", votações "sem API nem página"): corrigido no #108, que **depende de merge** e não está neste PR para não conflitar.
+- **Feito**: `tem_perfil` em cada item do detalhe da votação (`apps/legislature/views.py`, junção por código numa consulta só); `buscarSenador` e `perfilDeSenadorValido` em `web/lib/api.js`; página `web/app/senado/senadores/[codigo]/page.js` (situação, ressalva de que a data é a da coleta e a fonte não diz o motivo); link do nome em `web/app/senado/votacoes/[codigo]/page.js`; emenda (decisão 6) no ADR 0030.
+- **Provas (CI, `workflow_dispatch`)**: vermelho: backend **6 falham, 1040 passam** (43599077635), web **24 falham, 138 passam** (43599079856). Verde: backend **1046 passam** (43599528096), web verde (43599391710). A 1ª tentativa de verde (43599389369) teve 1 falha, **teste antigo que comparava o item inteiro** sem o campo novo. **5 mutações** (branches apagadas): link sempre (43599678588, 4 falhas), `tem_perfil` invertido (43599685794, 5), situação sempre "em exercício" (43599699203, 1), sem validar o campo (43599705469, 2), consulta extra por voto (43600191439, 1: esperava 3 consultas, fez 43). **Deslize meu:** a 1ª mutação do N+1 (43599692384) caiu no *lint* (variável sem uso), não num teste, então não provava nada; refeita.
+- **Deslize de processo**: tentei criar um arquivo por heredoc no Bash, contra o `CLAUDE.md`; o hook barrou e refiz com `Write`/`Edit`.
+- **Não verificado**: conferência real no Compose (página de um senador real, de um fora da lista, link na votação 7115); teclado, zoom e leitor de tela; o `ruff` local não está instalado (o lint rodou só no CI); nada é público (P-16).
+- **Fica**: votos por senador (endpoint novo); Câmara; mesclar o #108 e depois atualizar a linha da Etapa 1 do OVERVIEW com esta página; linha da Etapa 0 do OVERVIEW, defasada.
+
 ### 2026-11-13 — Sessão 72 (página das votações do Senado no front)
 
 - **Pedido**: "seguimos" (plan mode; plano aprovado). Decisões do dono: **medir a legenda das siglas antes** (não inventar significado); `S/Partido` como **"Sem partido"**; depois da medição, `A`/`R` como **"Aprovada"/"Rejeitada" com nota** de que é leitura do placar.

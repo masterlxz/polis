@@ -11,6 +11,7 @@ As votações do Senado (ADR 0029) estão no banco com dado real (Sessão 70: 87
 3. **`contagem_por_sigla` é calculada pelo polis** a partir dos itens, separada de `totais_da_fonte` (como vieram; nulos nas abertas). Nada é gravado: o ADR 0029, decisão 6, continua valendo.
 4. **Lista com 50 por página**, da mais recente para a mais antiga (data, depois código). `?pagina=` de 1 a 4 dígitos ASCII; malformada ou 0 dá 400; além da última dá 200 com a lista vazia (decisão do dono). A atribuição da lista é a da coleta mais recente entre as votações da página (nula se a página vier vazia).
 5. Siglas de voto, `resultado` (`A`/`R`) e `S/Partido` saem como vêm; partido vazio sai nulo. O significado das siglas segue sem verificação; tratar na página.
+6. **Emenda (Sessão 73): `tem_perfil` em cada item de `votos`/`participacao`.** Booleano: o código do parlamentar existe em `Senator` (junção por código na leitura, ADR 0029, decisão 5). Existir não quer dizer estar em exercício: quem saiu da lista tem perfil com `em_exercicio` falso. O front liga o nome ao perfil só quando é verdadeiro (12 de 93 códigos do ano não estão em `Senator`). Custo: o detalhe passa a 3 consultas (uma a mais, para os códigos com perfil, sem N+1), fixadas por teste. Campo acrescentado, nenhum removido.
 
 ## Alternativas
 - **Secreta só com os totais, sem lista:** descartada pelo dono; perde a presença, que a fonte publica.
@@ -20,7 +21,7 @@ As votações do Senado (ADR 0029) estão no banco com dado real (Sessão 70: 87
 
 ## Consequências
 - O cliente trata duas formas no detalhe (`votos` ou `participacao`). É o custo de a forma errada não existir.
-- Detalhe em 2 consultas (votação com execução, conjunto e fonte num JOIN; os votos), lista em 2 (contagem e página), fixadas por teste.
+- Detalhe em 3 consultas desde a emenda da decisão 6 (votação com execução, conjunto e fonte num JOIN; os votos; os códigos com perfil), lista em 2 (contagem e página), fixadas por teste.
 - Se `contagem_por_sigla` e `totais_da_fonte` divergirem numa secreta, a divergência aparece; não é escondida.
 - Reversível: só leitura, sem migração. Mudar o formato depois custa a API e a página.
 - **Não validado por mim:** o significado das siglas; o uso real pela página (fatia seguinte); nada vai a público antes do P-16.

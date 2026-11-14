@@ -50,6 +50,11 @@ def _conjunto(fonte, slug, **extra):
 
 
 def _execucao(conjunto, estado, ha_horas, **extra):
+    # O banco exige hash na execução concluída com sucesso e código de erro na que falhou.
+    if estado == IngestionRun.State.SUCCEEDED:
+        extra.setdefault("sha256_original", "a" * 64)
+    if estado == IngestionRun.State.FAILED:
+        extra.setdefault("error_code", IngestionRun.ErrorCode.DOWNLOAD)
     fim = timezone.now() - timedelta(hours=ha_horas)
     return IngestionRun.objects.create(
         dataset=conjunto,

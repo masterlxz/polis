@@ -140,7 +140,8 @@ test("lista: votação secreta vem marcada, a aberta não", async () => {
     lista({ votacoes: [item(), item({ codigo: 7002, identificacao: "MSF 9/2026", secreta: true })] }),
   );
 
-  assert.equal((html.match(/Votação secreta/g) ?? []).length, 1);
+  // Conta só na marcação: o payload do React (`self.__next_f`) repete o texto no mesmo HTML.
+  assert.equal((html.match(/<span class="detalhe">Votação secreta<\/span>/g) ?? []).length, 1);
 });
 
 test("lista: primeira de duas páginas tem 'Próxima' e não tem 'Anterior'", async () => {

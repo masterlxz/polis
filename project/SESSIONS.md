@@ -2,6 +2,16 @@
 
 Mais recente no topo.
 
+### 2026-11-14 — Sessão 74 (Etapa 0: situação das fontes no admin)
+
+- **Pedido**: "vamos continuar na etapa 0" (plan mode; plano aprovado). Das 9 entradas do PRD §15 restavam o **monitoramento** e a restauração real de backup. Decisões do dono: começar pelo monitoramento, com **painel de fontes no admin** (sem alerta ativo). A regra de "atrasado" (2 intervalos, "nunca coletou" só atrasa se a próxima venceu há mais de 2 intervalos) é minha, **a confirmar**.
+- **Feito**: `apps/sources/freshness.py` (função pura `situation`, `Situation`, `LATE_FACTOR = 2`); `DatasetAdmin` com as colunas situação, última coleta com sucesso e resultado da última execução concluída, filtro `?situacao=` e `list_select_related`; `runbook.md` e OVERVIEW.
+- **Provas (CI, `workflow_dispatch`)**: o 1º vermelho (43605292207) foi barrado pela **formatação** do `ruff` antes dos testes; o 2º (43605366787) foi só `ModuleNotFoundError` e interrompe a rodada, então não provava o admin. Com só o `freshness.py` (43605628066): **6 falham** no admin (rótulo ausente, filtro recusado, consultas 19 contra 9). Verde (43605808594 e 43607606514): **1074 passam**. **5 mutações** (branches apagadas): limite `>=` (43605974469, 1 falha), ignora falha (43605980508, 4), sem `select_related` (43606000258, 1), desabilitado como "em dia" (43605993270, 2), execução em andamento como concluída (43607604118, 1).
+- **Achado**: o `DatasetAdmin` já tinha um N+1 (o `__str__` lê `source` por linha); o teste de consultas o pegou e `list_select_related` o corrigiu.
+- **Deslizes meus**: (1) formatação do `ruff` quebrou o CI porque não há `ruff` local; (2) meu helper de teste violava as constraints do banco (`succeeded` exige hash, `failed` exige `error_code`); (3) **a 1ª mutação da execução em andamento passou sem falha** (43605986567): meu teste não a distinguia; reforcei com "em andamento depois de uma falha" e refiz.
+- **Não verificado**: a lista no navegador com o banco de desenvolvimento (rótulos, largura, ordem das colunas); o fator 2 contra o comportamento real das fontes; o filtro calcula em Python sobre todos os conjuntos (ok para dezenas, não para milhares); nada é público (P-16).
+- **Fica**: alerta ativo; erro de normalização não é gravado em lugar nenhum (o painel não o vê); restaurar um backup real; decidir se o design system entra na Etapa 0.
+
 ### 2026-11-14 — Sessão 73 (página do senador e link do nome na votação)
 
 - **Pedido**: abrir o projeto, conferir o #106 e o OVERVIEW, e seguir para a página do senador (plan mode; plano aprovado). Decisões do dono: **só o perfil** (histórico de votos fica para depois) e **link só quando há perfil** (`tem_perfil` na API). Rótulos "Em exercício" e "Fora da lista de exercício" e a nota no ADR 0030 seguiram a minha recomendação (o dono disse "segue" sem responder).

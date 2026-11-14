@@ -140,6 +140,18 @@ def test_execucao_em_andamento_nao_conta_como_sucesso_nem_como_falha(admin_clien
     assert _conjuntos_na_lista(admin_client, situacao="on_time") == {"fonte/rodando"}
 
 
+def test_execucao_em_andamento_depois_de_uma_falha_nao_apaga_a_falha(admin_client, fonte):
+    conjunto = _conjunto(fonte, "retentando")
+    _execucao(conjunto, IngestionRun.State.SUCCEEDED, ha_horas=30)
+    _execucao(conjunto, IngestionRun.State.FAILED, ha_horas=2)
+    IngestionRun.objects.create(
+        dataset=conjunto, source_url=conjunto.url, state=IngestionRun.State.RUNNING
+    )
+
+    assert _conjuntos_na_lista(admin_client, situacao="failed") == {"fonte/retentando"}
+    assert "Em andamento" not in _html(admin_client)
+
+
 def test_o_numero_de_consultas_nao_cresce_com_o_numero_de_conjuntos(admin_client, fonte):
     for numero in range(2):
         conjunto = _conjunto(fonte, f"a{numero}")

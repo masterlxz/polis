@@ -12,4 +12,11 @@ urlpatterns = [
     ),
     # Código do Senado de 1 a 9 dígitos (cabe no int32 do parser); o resto é 404 sem banco.
     re_path(r"^senadores/(?P<senate_id>\d{1,9})/$", views.senator_profile, name="senator-profile"),
+    re_path(r"^senado/votacoes/$", views.senate_voting_list, name="senate-voting-list"),
+    # Código da votação de 1 a 9 dígitos, como o do senador; o resto é 404 sem banco.
+    re_path(
+        r"^senado/votacoes/(?P<code>\d{1,9})/$",
+        views.senate_voting_detail,
+        name="senate-voting-detail",
+    ),
 ]

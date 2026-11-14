@@ -2,6 +2,15 @@
 
 Mais recente no topo.
 
+### 2026-11-13 — Sessão 71 (API interna das votações do Senado, ADR 0030)
+
+- **Pedido**: "vamos seguir" (plan mode; plano aprovado). Decisões do dono: **só a API** (página na fatia seguinte), **secreta com a lista como `participacao`** (nunca `votos`), **contagem por sigla calculada e rotulada**, separada dos totais da fonte; depois, **página além da última dá 200 vazio**. ADR 0030.
+- **Feito**: `senate_voting_list` e `senate_voting_detail` em `apps/legislature/views.py`, rotas `senado/votacoes/` e `senado/votacoes/<codigo>/`, `tests/test_senate_voting_api.py` (42 testes), ADR 0030. Antes, PR só de docs (#104) corrigindo um registro meu da Sessão 70 ("totais batem" nas abertas era vazio: os totais da fonte são nulos nas 47).
+- **Provas (CI, `workflow_dispatch`)**: vermelho (43539989235): **42 falham, 1000 passam**, todas pelo 404 do pedido de controle (rota inexistente). Verde (43541180939): **1042 passam**; a 1ª tentativa (43540996432) teve 1 falha, **erro do meu teste** (tomou `atribuicao.licenca.id` por id interno). **5 mutações** em branches descartáveis (apagadas), todas pegas: secreta como `votos` (43541354016, 3 falhas), lista da mais antiga para a mais nova (43541369374, 2), detalhe sem `select_related` (43541382724, 1, a de consultas), página deslocada (43541398077, 5), contagem só com Sim/Não/Abstenção (43541416830, 2).
+- **Conferência real (Compose deste PC, só leitura)**: lista com 50 + 37 = 87, da mais recente (2026-11-12) para a mais antiga; aberta 7115 com `votos` (81) e totais da fonte nulos; secreta 7104 com `participacao` (81), totais da fonte 63/4/0 e **`Votou` 67 = 63 + 4 + 0** (primeira prova com dado real de que totais e participação batem numa secreta); 404 para código inexistente e malformado, 400 para `?pagina=0`. **POST real dá 403** (CSRF do Django, antes da view), não 405 como no cliente de teste; recusa do mesmo jeito, igual às outras APIs.
+- **Não verificado**: o significado das siglas e de `A`/`R`; o uso real pela página; se totais e participação batem em todas as 40 secretas (vi uma); nada disto é público nem fecha o P-16.
+- **Fica**: página de votações no front (próximo plano), com o tratamento das siglas e do `S/Partido`; página do senador; votos por senador; o que já estava aberto na Sessão 70.
+
 ### 2026-11-13 — Sessão 70 (primeira coleta real das votações do Senado, banco de desenvolvimento)
 
 - **Pedido**: "vamos na coleta real" das votações (pendente da Sessão 69). Eu guiei, o dono rodou cada comando e tomou as decisões. Banco: o `polis_pgdata` de desenvolvimento **de outro PC** (hostname `archlinux`), não o das Sessões 67 a 69.

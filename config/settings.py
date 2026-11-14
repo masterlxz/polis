@@ -7,6 +7,7 @@ a menos que `DJANGO_DEBUG` seja definido explicitamente.
 
 import os
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from django.core.exceptions import ImproperlyConfigured
 
@@ -133,6 +134,16 @@ if not all(o.startswith(("https://", "http://")) for o in CSRF_TRUSTED_ORIGINS):
     raise ImproperlyConfigured(
         "DJANGO_CSRF_TRUSTED_ORIGINS: cada origem precisa começar com https:// ou http://."
     )
+
+# Webhook do alerta ativo (Sessão 76). Vazio = alerta desligado. A URL costuma carregar o segredo
+# (token, tópico), então a mensagem de erro não a mostra.
+ALERT_WEBHOOK_URL = os.environ.get("ALERT_WEBHOOK_URL", "").strip()
+if ALERT_WEBHOOK_URL:
+    _alert_url = urlsplit(ALERT_WEBHOOK_URL)
+    if _alert_url.scheme != "https" or not _alert_url.hostname:
+        raise ImproperlyConfigured(
+            "ALERT_WEBHOOK_URL: precisa ser uma URL https com host (o valor não é mostrado)."
+        )
 
 MAILERS = {
     "default": {

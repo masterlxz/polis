@@ -565,6 +565,125 @@ def test_o_comando_termina_com_erro_quando_a_normalizacao_recusa(
         rodar_comando()
 
 
+# --- Alerta ativo ligado ao comando (Sessão 76) ---
+
+URL_DO_ALERTA = "https://alerta.example.org/segredo-do-topico"
+
+
+@pytest.fixture
+def alerta(settings, monkeypatch):
+    """Liga o alerta e troca o envio real por um espião; devolve os textos enviados."""
+    from apps.sources import webhook
+
+    settings.ALERT_WEBHOOK_URL = URL_DO_ALERTA
+    enviados = []
+
+    def falso(url, texto, **kwargs):
+        enviados.append((url, texto))
+
+    monkeypatch.setattr(webhook, "post_text", falso)
+    return enviados
+
+
+def _conjunto_atrasado_para_o_alerta():
+    dataset = make_dataset(next_at=NOW + timedelta(days=30))
+    IngestionRun.objects.create(
+        dataset=dataset,
+        source_url=dataset.url,
+        state=IngestionRun.State.SUCCEEDED,
+        sha256_original="a" * 64,
+        started_at=NOW - timedelta(days=10, minutes=1),
+        finished_at=NOW - timedelta(days=10),
+    )
+    return dataset
+
+
+def test_comando_sem_url_de_alerta_nao_envia_nada(comando, ingest, settings, monkeypatch):
+    from apps.sources import alerts
+
+    settings.ALERT_WEBHOOK_URL = ""
+    chamadas = []
+    monkeypatch.setattr(alerts, "send_pending", lambda *args, **kwargs: chamadas.append(args))
+    make_dataset()
+
+    rodar_comando()
+
+    assert chamadas == []
+
+
+def test_comando_com_url_de_alerta_avisa_o_conjunto_atrasado(comando, ingest, alerta):
+    _conjunto_atrasado_para_o_alerta()
+
+    rodar_comando()
+
+    assert len(alerta) == 1
+    url, texto = alerta[0]
+    assert url == URL_DO_ALERTA
+    assert "camara/deputados" in texto
+    assert "Atrasado" in texto
+
+
+def test_a_saida_do_comando_nunca_mostra_a_url_do_alerta(comando, ingest, alerta):
+    _conjunto_atrasado_para_o_alerta()
+
+    saida = rodar_comando()
+
+    assert "segredo-do-topico" not in saida
+    assert "alerta.example.org" not in saida
+
+
+def test_alerta_sai_mesmo_quando_a_normalizacao_recusa_e_o_comando_termina_com_erro(
+    comando, ingest, alerta, registrar_normalizador
+):
+    registrar_normalizador("camara/deputados", FakeNormalizador(erro=_recusa("recusada")))
+    make_dataset()
+
+    with pytest.raises(CommandError, match="normaliza"):
+        rodar_comando()
+
+    assert len(alerta) == 1
+    assert "Normalização falhou" in alerta[0][1]
+
+
+def test_falha_no_envio_do_alerta_nao_derruba_a_coleta_nem_vaza_a_excecao(
+    comando, ingest, settings, monkeypatch
+):
+    from apps.sources import webhook
+
+    settings.ALERT_WEBHOOK_URL = URL_DO_ALERTA
+
+    def quebra(url, texto, **kwargs):
+        raise RuntimeError(f"explodiu com {url}")
+
+    monkeypatch.setattr(webhook, "post_text", quebra)
+    _conjunto_atrasado_para_o_alerta()
+
+    saida = rodar_comando()  # não levanta
+
+    assert "segredo-do-topico" not in saida
+    assert "explodiu" not in saida
+    assert "alerta" in saida.lower()
+
+
+def test_erro_inesperado_dentro_do_alerta_tambem_nao_derruba_o_comando(
+    comando, ingest, settings, monkeypatch
+):
+    from apps.sources import alerts
+
+    settings.ALERT_WEBHOOK_URL = URL_DO_ALERTA
+
+    def quebra(*args, **kwargs):
+        raise RuntimeError("SEGREDO-DE-TESTE-NAO-PODE-APARECER")
+
+    monkeypatch.setattr(alerts, "send_pending", quebra)
+    make_dataset()
+
+    saida = rodar_comando()  # não levanta
+
+    assert "SEGREDO-DE-TESTE" not in saida
+    assert "alerta" in saida.lower()
+
+
 # --- Resultado da normalização gravado no conjunto (painel das fontes) ---
 
 

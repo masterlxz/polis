@@ -2,6 +2,15 @@
 
 Mais recente no topo.
 
+### 2026-11-14 — Sessão 76 (Etapa 0: alerta ativo das fontes por webhook)
+
+- **Pedido**: "alerta ativo" (plan mode; plano aprovado, com a migração e a variável de ambiente de produção). Decisões do dono: canal **webhook genérico**, escopo **só as fontes** (sem backup) e **avisar ao mudar com lembrete diário**. Regra minha, **a confirmar**: ruim = atrasado, coleta falhou ou normalização falhou; lembrete após 24 h; recuperação avisa.
+- **Feito**: `apps/sources/monitoring.py` (leitura da situação, usada pelo admin e pelo alerta); `alerts.py` (`decide` pura e `send_pending`, uma mensagem por volta, estado gravado só depois de o envio dar certo); `webhook.py` (POST de texto puro, só https, sem seguir redirecionamento, erros sem a URL); `Dataset.last_alert_situation` e `last_alert_at` (migração `0011`, aditiva, escrita à mão); `ALERT_WEBHOOK_URL` validada nas settings (recusa subir se não for https, sem citar o valor); `collect_due` avisa depois de coletar, sem nunca derrubar a coleta nem mostrar a URL; `compose.prod.yaml` (só o `agendador`), `.env.example`, `runbook.md`, OVERVIEW.
+- **Provas (CI, `workflow_dispatch`)**: vermelho (43614900495): **56 falham e 3 erram**, por módulo e variável inexistentes (nada importa módulo novo no topo do teste, para não interromper a coleta). Verde (43615207480): **1144 passam**; `compose` e `producao` também verdes (43615210064). **6 mutações** (branches apagadas, todas pegas no passo "Testes"): lembrete cedo (43615457314, 2 falhas), lembrete nunca (43615464603, 4), grava o estado com envio falho (43615472064, 1), host no erro (43615479287, 1), segue redirecionamento (43615486873, 1), uma mensagem por conjunto (43615494433, 2).
+- **Não verificado**: um aviso de verdade chegando num webhook real (ntfy ou outro); o `compose.prod.yaml` com a variável preenchida; a migração `0011` num Postgres real; o procedimento de teste do runbook; o formato de mensagem em celular; nada é público (P-16).
+- **Não cobre**: backup que falhou, servidor ou agendador parados (precisa de um serviço externo de batimento), Slack, Discord e Telegram (pedem JSON), e-mail.
+- **Fica**: escolher o serviço do webhook e a conferência real; alerta do backup; batimento externo; restaurar um backup real; design system; confirmar o fator 2 do "atrasado" (Sessão 74) antes de ligar o alerta, porque agora ele acorda você.
+
 ### 2026-11-14 — Sessão 75 (Etapa 0: erro de normalização visível no painel)
 
 - **Pedido**: "erro de normalização" (plan mode; plano aprovado, com a migração). Antes disto, uma normalização recusada ou falha só virava uma linha na saída do `collect_due` (log do agendador): nada no banco, e o painel da Sessão 74 mostrava "Em dia". Decisões do dono: **2 campos no `Dataset`, sem histórico** (contra um modelo `NormalizationRun`) e **situação nova** no painel.

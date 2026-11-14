@@ -14,10 +14,17 @@ a lista não diz o motivo (licença, fim de mandato, renúncia, morte, suplente 
 não a do fim do mandato.
 """
 
+import re
+from collections import Counter
+
 from django.http import JsonResponse
 from django.views.decorators.http import require_safe
 
-from .models import Deputy, Senator
+from .models import Deputy, SenateVoting, Senator
+
+VOTINGS_PER_PAGE = 50
+# Só dígitos ASCII, de 1 a 4: `\d` aceitaria dígitos de outras escritas.
+_PAGE_PATTERN = re.compile(r"[0-9]{1,4}")
 
 
 def _or_none(value):
@@ -86,6 +93,104 @@ def senator_profile(request, senate_id):
                 else None,
             },
             "atribuicao": _attribution(senator.ingestion_run),
+        },
+        json_dumps_params={"ensure_ascii": False},
+    )
+
+
+def _votings_with_attribution():
+    return SenateVoting.objects.select_related("ingestion_run__dataset__source")
+
+
+@require_safe
+def senate_voting_list(request):
+    """Votações do Senado, mais recente primeiro, 50 por página (ADR 0030).
+
+    Página além da última devolve a lista vazia (200), não 404: quem percorre as páginas num laço
+    para ao ver a lista vazia. A atribuição é a da coleta mais recente entre as votações da página.
+    """
+    page_text = request.GET.get("pagina", "1")
+    if not _PAGE_PATTERN.fullmatch(page_text) or int(page_text) == 0:
+        return JsonResponse(
+            {"erro": "página inválida"}, status=400, json_dumps_params={"ensure_ascii": False}
+        )
+    page = int(page_text)
+
+    total = SenateVoting.objects.count()
+    start = (page - 1) * VOTINGS_PER_PAGE
+    votings = list(
+        _votings_with_attribution().order_by("-voted_on", "-session_voting_code")[
+            start : start + VOTINGS_PER_PAGE
+        ]
+    )
+    newest_run = max((v.ingestion_run for v in votings), key=lambda r: r.started_at, default=None)
+    return JsonResponse(
+        {
+            "votacoes": [
+                {
+                    "codigo": v.session_voting_code,
+                    "data": v.voted_on.isoformat(),
+                    "identificacao": v.identification,
+                    "ementa": v.summary,
+                    "resultado": v.result,
+                    "secreta": v.secret,
+                }
+                for v in votings
+            ],
+            "pagina": page,
+            "total_paginas": (total + VOTINGS_PER_PAGE - 1) // VOTINGS_PER_PAGE,
+            "atribuicao": _attribution(newest_run) if newest_run else None,
+        },
+        json_dumps_params={"ensure_ascii": False},
+    )
+
+
+@require_safe
+def senate_voting_detail(request, code):
+    """Uma votação do Senado com os votos (ADR 0029 e 0030).
+
+    Na votação secreta a lista sai como `participacao`, nunca como `votos`: a sigla `Votou` diz que
+    o senador votou, não como (ADR 0029, decisão 6). `contagem_por_sigla` é calculada pelo polis a
+    partir dos itens; `totais_da_fonte` são os do Senado, como vieram (nulos nas abertas).
+    """
+    voting = _votings_with_attribution().filter(session_voting_code=code).first()
+    if voting is None:
+        return JsonResponse({"erro": "não encontrado"}, status=404)
+
+    votes = list(voting.votes.order_by("name", "senate_id"))
+    list_key = "participacao" if voting.secret else "votos"
+    return JsonResponse(
+        {
+            "votacao": {
+                "codigo": voting.session_voting_code,
+                "data": voting.voted_on.isoformat(),
+                "sigla": voting.type_acronym,
+                "numero": voting.number,
+                "ano": voting.year,
+                "identificacao": voting.identification,
+                "ementa": voting.summary,
+                "resultado": voting.result,
+                "secreta": voting.secret,
+                "id_processo": voting.process_id,
+                "codigo_materia": voting.matter_id,
+                "totais_da_fonte": {
+                    "sim": voting.total_yes,
+                    "nao": voting.total_no,
+                    "abstencao": voting.total_abstention,
+                },
+            },
+            "contagem_por_sigla": dict(Counter(v.vote_code for v in votes).most_common()),
+            list_key: [
+                {
+                    "id_senado": v.senate_id,
+                    "nome": v.name,
+                    "partido": _or_none(v.party_acronym),
+                    "uf": v.state,
+                    "sigla": v.vote_code,
+                }
+                for v in votes
+            ],
+            "atribuicao": _attribution(voting.ingestion_run),
         },
         json_dumps_params={"ensure_ascii": False},
     )

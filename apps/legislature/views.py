@@ -158,6 +158,13 @@ def senate_voting_detail(request, code):
         return JsonResponse({"erro": "não encontrado"}, status=404)
 
     votes = list(voting.votes.order_by("name", "senate_id"))
+    # Junção por código na leitura (ADR 0029, decisão 5): quem votou e saiu da lista de exercício
+    # pode não estar em `Senator`, e o link para o perfil só existe para quem está.
+    with_profile = set(
+        Senator.objects.filter(senate_id__in={v.senate_id for v in votes}).values_list(
+            "senate_id", flat=True
+        )
+    )
     list_key = "participacao" if voting.secret else "votos"
     return JsonResponse(
         {
@@ -187,6 +194,7 @@ def senate_voting_detail(request, code):
                     "partido": _or_none(v.party_acronym),
                     "uf": v.state,
                     "sigla": v.vote_code,
+                    "tem_perfil": v.senate_id in with_profile,
                 }
                 for v in votes
             ],

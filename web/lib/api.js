@@ -230,7 +230,8 @@ function votanteValido(item) {
     typeof item.nome === "string" &&
     textoOuNulo(item.partido) &&
     typeof item.uf === "string" &&
-    typeof item.sigla === "string"
+    typeof item.sigla === "string" &&
+    typeof item.tem_perfil === "boolean"
   );
 }
 
@@ -279,6 +280,35 @@ export const buscarVotacaoDoSenado = cache(async (codigo) => {
   if (corpo === null) return null;
   if (!detalheDeVotacaoValido(corpo)) {
     throw new ErroDaApi("a API devolveu uma votação fora do formato esperado");
+  }
+  return corpo;
+});
+
+// Código do senador no Senado, de 1 a 9 dígitos: o mesmo formato da rota do Django.
+export function codigoDeSenadorValido(codigo) {
+  return PADRAO_DO_CODIGO_DA_VOTACAO.test(codigo);
+}
+
+function perfilDeSenadorValido(corpo) {
+  const senador = corpo?.senador;
+  return (
+    Number.isInteger(senador?.id_senado) &&
+    typeof senador.nome === "string" &&
+    textoOuNulo(senador.partido) &&
+    typeof senador.uf === "string" &&
+    typeof senador.em_exercicio === "boolean" &&
+    textoOuNulo(senador.saiu_da_lista_em) &&
+    atribuicaoValida(corpo.atribuicao)
+  );
+}
+
+// Mesmo desenho de `buscarVotacaoDoSenado`: uma chamada por requisição, nunca em cache de dado.
+export const buscarSenador = cache(async (codigo) => {
+  if (!codigoDeSenadorValido(codigo)) return null;
+  const corpo = await lerDaApi(`/internal/v1/senadores/${codigo}/`);
+  if (corpo === null) return null;
+  if (!perfilDeSenadorValido(corpo)) {
+    throw new ErroDaApi("a API devolveu um senador fora do formato esperado");
   }
   return corpo;
 });

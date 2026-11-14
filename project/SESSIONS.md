@@ -2,6 +2,16 @@
 
 Mais recente no topo.
 
+### 2026-11-13 — Sessão 72 (página das votações do Senado no front)
+
+- **Pedido**: "seguimos" (plan mode; plano aprovado). Decisões do dono: **medir a legenda das siglas antes** (não inventar significado); `S/Partido` como **"Sem partido"**; depois da medição, `A`/`R` como **"Aprovada"/"Rejeitada" com nota** de que é leitura do placar.
+- **Medição (PR #106, Rodada 4 em `fontes/senado.md`)**: 1 requisição a `/votacao.json` (365 dias) e o `api-docs`. A documentação não traz legenda; **o próprio dado traz**: cada sigla especial tem sempre a mesma `descricaoVotoParlamentar` (AP, LAP, LP, LS, MIS, NA, NCom, P-NRV, nos 1.788 votos com descrição). `A`/`R` sem descrição: `A` coincide com mais Sim que Não em 82 de 82 e `R` com Sim ≤ Não em 5 de 5 (inferência). Nada gravado; o campo segue descartado (ADR 0029).
+- **Feito (front)**: `web/lib/siglas.js` (legenda com a citação, `S/Partido`, resultado), `buscarVotacoesDoSenado` e `buscarVotacaoDoSenado` em `web/lib/api.js` (recusam a resposta que mistura `votos` e `participacao`), páginas `web/app/senado/votacoes/page.js` e `[codigo]/page.js`, link no menu, CSS de tabela. `web/tests/votacoes-senado.test.mjs` (42 testes).
+- **Provas (CI, `web.yml` por `workflow_dispatch`)**: 1º vermelho (43543409399) **fraco**: 40 falhas, porque 2 testes passaram sem a rota (o 404 e a estrutura casavam com a 404 do Next); pus o pedido de controle de 200 nos dois. Vermelho (43543497744): **42 falham, 96 passam**. Verde (43543974545): **138 passam**; a tentativa anterior (43543869890) teve 1 falha, **erro do meu teste**: o HTML do Next repete o texto no payload do React (`self.__next_f`), e a contagem de "Votação secreta" deu 2. **5 mutações** (branches apagadas), cada uma pega pelo teste certo: coluna "Voto" na secreta (43544095433), front aceitando as duas chaves (43544110290), `S/Partido` cru (43544124978), toda sigla como conhecida (43544140007), detalhe sem a origem (43544157208). Também reforcei, antes de implementar, o teste "além da última" (o link do menu já tinha o mesmo `href`).
+- **Conferência real (Compose deste PC)**: `docker compose build front` e `up -d front`; `curl` só leitura: as 4 páginas 200 e `abc` 404; a secreta 7104 com aviso, "Participação", "Situação", "Votou (voto secreto)" e total 63/4/0, **sem coluna "Voto"**; a aberta 7115 com "Aprovada (A)", nota e siglas por extenso (MIS, NCom). No navegador, o dono: "tudo certo, mt legal" (sem detalhar teclado, zoom e leitor de tela).
+- **Não verificado**: teclado, zoom de 200% e leitor de tela; a estabilidade da legenda no tempo; `NA` ("Dispositivo não citado") numa votação nominal; o art. 51 do RISF; nada é público (P-16).
+- **Fica**: página do senador (e o link do nome na votação); votos por senador; Câmara; mesclar o #106 (Rodada 4), que este PR cita.
+
 ### 2026-11-13 — Sessão 71 (API interna das votações do Senado, ADR 0030)
 
 - **Pedido**: "vamos seguir" (plan mode; plano aprovado). Decisões do dono: **só a API** (página na fatia seguinte), **secreta com a lista como `participacao`** (nunca `votos`), **contagem por sigla calculada e rotulada**, separada dos totais da fonte; depois, **página além da última dá 200 vazio**. ADR 0030.

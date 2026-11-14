@@ -179,5 +179,7 @@ Desde a Sessão 66 (2026-11-13, ADR 0028): coleta e normalização da **lista de
 
 **API interna das votações (Sessão 71, ADR 0030):** `GET /internal/v1/senado/votacoes/` (50 por página) e `/<codigo>/` (secreta com `participacao`, aberta com `votos`, contagem por sigla calculada e totais da fonte à parte). Numa secreta real (7104) os totais da fonte, 63/4/0, somam exatamente os 67 `Votou`; não conferido nas outras 39.
 
+**Página das votações (Sessão 72):** `/senado/votacoes/` e `/senado/votacoes/<codigo>/` no front. As siglas ganham significado pela legenda da Rodada 4 (`web/lib/siglas.js`); `A`/`R` aparecem como "Aprovada"/"Rejeitada" com a nota de que são lidos pelo placar; `S/Partido` vira "Sem partido".
+
 ## Ainda não medido nesta rodada
 O comportamento real do 429 (não testei o limite); volume e custo de `/processo` sem filtro de ano e de `/votacao` num ano inteiro; discursos, taquigrafia, orçamento e votações de comissão; conteúdo dos endpoints `/senador/{codigo}/...` e seus dados pessoais; XML e NDJSON; consistência entre os endpoints legados e novos para o mesmo registro; estabilidade dos ids; o Plano de Dados Abertos 2026/2028; leitura jurídica da política de uso para a API.

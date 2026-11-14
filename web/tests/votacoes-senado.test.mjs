@@ -56,7 +56,7 @@ function lista({ votacoes = [item()], pagina = 1, total_paginas = 1, atribuicao 
 }
 
 function votante(id, nome, sigla, extra = {}) {
-  return { id_senado: id, nome, partido: "XYZ", uf: "SP", sigla, ...extra };
+  return { id_senado: id, nome, partido: "XYZ", uf: "SP", sigla, tem_perfil: false, ...extra };
 }
 
 function votacao(extra = {}) {
@@ -427,4 +427,61 @@ test("estrutura: um h1, título com o descritor e noindex", async () => {
     assert.match(html, /<title>[^<]*transparência e inteligência cívica[^<]*<\/title>/);
     assert.match(html, /<meta name="robots" content="noindex/);
   }
+});
+
+// --- Link para o perfil do senador (`tem_perfil`) ------------------------------------------------
+
+test("nome vira link para o senador só quando a API diz que há perfil", async () => {
+  const { status, html } = await detalhe(
+    aberta({
+      votos: [
+        votante(1, "Ana", "Sim", { tem_perfil: true }),
+        votante(2, "Bruno", "Sim", { tem_perfil: false }),
+      ],
+    }),
+  );
+
+  assert.equal(status, 200);
+  assert.ok(html.includes('href="/senado/senadores/1/"'));
+  assert.ok(!html.includes('href="/senado/senadores/2/"'));
+  assert.ok(html.includes("Bruno"), "controle: o nome sem perfil continua na tabela");
+});
+
+test("votação secreta também liga o nome ao perfil, sem mostrar coluna Voto", async () => {
+  const { status, html } = await detalhe(
+    secreta({
+      participacao: [
+        votante(1, "Ana", "Votou", { tem_perfil: true }),
+        votante(2, "Bruno", "Votou"),
+      ],
+    }),
+  );
+
+  assert.equal(status, 200, "controle: a página precisa existir");
+  assert.ok(html.includes('href="/senado/senadores/1/"'));
+  assert.ok(!html.includes('href="/senado/senadores/2/"'));
+  assert.ok(!html.includes(">Voto<"));
+});
+
+test("resposta sem `tem_perfil` num item é recusada inteira", async () => {
+  const controle = await detalhe();
+  assert.equal(controle.status, 200, "controle: com o campo a página existe");
+
+  const sem = votante(1, "Ana", "Sim");
+  delete sem.tem_perfil;
+  const { status, html } = await detalhe(aberta({ votos: [sem] }));
+
+  assert.equal(status, 500);
+  assert.ok(!html.includes("Ana"));
+});
+
+test("`tem_perfil` que não é booleano é recusado (string não vira link)", async () => {
+  const controle = await detalhe();
+  assert.equal(controle.status, 200, "controle: com booleano a página existe");
+
+  const { status } = await detalhe(
+    aberta({ votos: [votante(1, "Ana", "Sim", { tem_perfil: "false" })] }),
+  );
+
+  assert.equal(status, 500);
 });

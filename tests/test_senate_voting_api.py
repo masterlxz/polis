@@ -41,7 +41,7 @@ CHAVES_VOTACAO = {
     "totais_da_fonte",
 }
 CHAVES_TOTAIS = {"sim", "nao", "abstencao"}
-CHAVES_VOTO = {"id_senado", "nome", "partido", "uf", "sigla"}
+CHAVES_VOTO = {"id_senado", "nome", "partido", "uf", "sigla", "tem_perfil"}
 CHAVES_ATRIBUICAO = {"fonte", "conjunto", "coletado_em", "url_origem", "licenca"}
 
 
@@ -139,6 +139,20 @@ def secreta(run):
     _voto(votacao, 3, "Carla", "Votou")
     _voto(votacao, 4, "Davi", "AP")
     return votacao
+
+
+def _senador(run, senate_id, **extra):
+    from apps.legislature.models import Senator
+
+    campos = {
+        "senate_id": senate_id,
+        "name": f"Senador {senate_id}",
+        "party_acronym": "XYZ",
+        "state": "SP",
+        "ingestion_run": run,
+        **extra,
+    }
+    return Senator.objects.create(**campos)
 
 
 def _ok(client, url):
@@ -291,16 +305,60 @@ def test_codigo_malformado_da_404_sem_consultar_o_banco(
     assert resposta.status_code == 404
 
 
-def test_o_detalhe_custa_duas_consultas_mesmo_com_muitos_votos(
+def test_o_detalhe_custa_tres_consultas_mesmo_com_muitos_votos(
     client, run, django_assert_num_queries
 ):
     votacao = _votacao(run, ABERTA)
     for codigo in range(1, 82):
         _voto(votacao, codigo, f"Parlamentar {codigo:02d}", "Sim")
+        if codigo % 2:
+            _senador(run, codigo)
     _detalhe(client, ABERTA)  # controle (e aquece o que o Django guarda em cache)
 
-    with django_assert_num_queries(2):
+    # votação com a atribuição, votos, e os códigos que têm perfil (uma consulta só, sem N+1)
+    with django_assert_num_queries(3):
         client.get(f"{LISTA}{ABERTA}/")
+
+
+# --- Link para o perfil do senador (`tem_perfil`) ------------------------------------------------
+
+
+def _tem_perfil_por_codigo(corpo):
+    lista = corpo["participacao"] if "participacao" in corpo else corpo["votos"]
+    return {item["id_senado"]: item["tem_perfil"] for item in lista}
+
+
+def test_tem_perfil_so_para_quem_esta_em_senator(client, run, aberta):
+    _senador(run, 1)
+    _senador(run, 3)
+
+    assert _tem_perfil_por_codigo(_detalhe(client, ABERTA)) == {
+        1: True,
+        2: False,
+        3: True,
+        4: False,
+    }
+
+
+def test_tem_perfil_tambem_na_votacao_secreta(client, run, secreta):
+    _senador(run, 2)
+
+    assert _tem_perfil_por_codigo(_detalhe(client, SECRETA)) == {
+        1: False,
+        2: True,
+        3: False,
+        4: False,
+    }
+
+
+def test_senador_fora_da_lista_de_exercicio_ainda_tem_perfil(client, run, aberta):
+    _senador(run, 1, in_office=False, left_list_at=COLETADO_EM)
+
+    assert _tem_perfil_por_codigo(_detalhe(client, ABERTA))[1] is True
+
+
+def test_sem_nenhum_senator_ninguem_tem_perfil(client, aberta):
+    assert not any(_tem_perfil_por_codigo(_detalhe(client, ABERTA)).values())
 
 
 # --- Lista ---------------------------------------------------------------------------------------

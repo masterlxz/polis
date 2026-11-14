@@ -155,7 +155,28 @@ Duas requisições `GET /votacao?dataInicio&dataFim` (200, `application/json`, `
 - **Cada votação traz exatamente 81 votos**, sem voto repetido por (votação, parlamentar). `codigoParlamentar` é inteiro; **93 códigos distintos no ano** (os 81 de hoje mais suplentes que votaram e saíram); 23 desses códigos não votaram em todas. Partido nunca vazio e UF sempre com 2 letras. Voto: 7 chaves (`codigoParlamentar`, `nomeParlamentar`, `sexoParlamentar`, `siglaPartidoParlamentar`, `siglaUFParlamentar`, `siglaVotoParlamentar`, `descricaoVotoParlamentar`, esta preenchida em 1.788 de 7.047).
 - **`siglaVotoParlamentar` tem 13 valores no ano:** `Sim` 2.718, `Votou` 2.043, `P-NRV` 988, `AP` 536, `Não` 437, `LS` 124, `MIS` 74, `Presidente (art. 51 RISF)` 48, `NCom` 50, `Abstenção` 13, `LP` 8, `NA` 7, `LAP` 1. **O significado de `AP`, `LS`, `P-NRV`, `MIS`, `NCom`, `LP`, `NA` e `LAP` continua sem verificação.**
 - **Votação secreta (40 de 87) NÃO vem sem votos:** traz os mesmos 81 itens, mas o conteúdo do voto não aparece. `Votou` (2.043 itens) só diz que o senador votou, não como; as outras siglas são ausência ou impedimento. Nas secretas os **totais vêm preenchidos** (40 de 40: por exemplo 43, 2 e 1); nas abertas **vêm nulos** (47 de 47). Isso corrige a medição de 2026-11-05 ("votações secretas só trazem totais"), que se baseava na especificação e não em dado.
-- **Ainda não medido:** o que acontece com janela maior que 1 ano (a documentação diz que o intervalo é de até 1 ano); o comportamento com `dataFim` no futuro; o significado das siglas. Votações antigas **mudam** depois de publicadas: ver "Estado da integração" (Sessão 70).
+- **Ainda não medido:** o que acontece com janela maior que 1 ano (a documentação diz que o intervalo é de até 1 ano); o comportamento com `dataFim` no futuro; o significado das siglas (medido na Rodada 4). Votações antigas **mudam** depois de publicadas: ver "Estado da integração" (Sessão 70).
+
+## Rodada 4: legenda das siglas de voto e do resultado (medido, 2026-11-13)
+Uma requisição `GET /votacao.json?dataInicio=2025-11-14&dataFim=2026-11-13` (200, 1.652.138 B, 0,62 s) e a leitura de `GET /v3/api-docs`. Só pares (sigla, descrição) e contagens; nenhum nome foi impresso ou commitado.
+
+- **A documentação não traz legenda:** `siglaVotoParlamentar` é "Sigla do voto do parlamentar" (exemplo `Sim`), `descricaoVotoParlamentar` é "Descrição do voto do parlamentar" e `resultadoVotacao` é "Resultado da votação" (exemplo `A`).
+- **A legenda vem no próprio dado:** cada sigla especial tem **sempre a mesma** `descricaoVotoParlamentar` (1 para 1, nos 1.788 votos com descrição):
+
+| Sigla | `descricaoVotoParlamentar` (texto da fonte) | Votos |
+|---|---|---|
+| `AP` | Atividade parlamentar | 536 |
+| `LAP` | Licença paternidade ou ao adotante | 1 |
+| `LP` | Licença Particular | 8 |
+| `LS` | Licença saúde | 124 |
+| `MIS` | Missão da Casa no País/exterior | 75 |
+| `NA` | Dispositivo não citado | 7 |
+| `NCom` | Não Compareceu | 44 |
+| `P-NRV` | Presente – Não registrou voto | 993 |
+
+- **Sem descrição (nulo):** `Sim` 2.718, `Votou` 2.043, `Não` 437, `Presidente (art. 51 RISF)` 48, `Abstenção` 13. O texto da sigla já é a descrição; `Presidente (art. 51 RISF)` não foi conferido no Regimento Interno.
+- **`A`/`R` não têm descrição.** Inferência, não declaração da fonte: `A` coincide com mais `Sim` que `Não` em **82 de 82** votações (43 abertas, pela contagem dos votos; 39 secretas, pelos totais) e `R` com `Sim` ≤ `Não` em **5 de 5**. O `informeLegislativo` não decide (7 votações `A` citam "aprovad" e "rejeitad").
+- **Não verificado:** se a legenda é estável no tempo (uma medição); o significado de `NA` ("Dispositivo não citado") numa votação nominal; o art. 51 do RISF.
 
 ## Reproduzir as medições
 Use um `User-Agent` genérico e espere alguns segundos entre as requisições.

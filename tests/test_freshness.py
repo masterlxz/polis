@@ -68,9 +68,7 @@ def test_falha_antes_de_um_sucesso_nao_conta():
 
 
 def test_falha_com_sucesso_velho_continua_sendo_falha_nao_atraso():
-    resultado = _situacao(
-        last_finished_state="failed", last_success_at=NOW - timedelta(days=10)
-    )
+    resultado = _situacao(last_finished_state="failed", last_success_at=NOW - timedelta(days=10))
 
     assert resultado is Situation.FAILED
 

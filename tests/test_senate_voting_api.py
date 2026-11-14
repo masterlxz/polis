@@ -239,7 +239,14 @@ def test_votos_saem_ordenados_por_nome(client, aberta):
     votos = _detalhe(client, ABERTA)["votos"]
 
     assert [v["nome"] for v in votos] == ["Ana", "Bruno", "Carla", "Davi"]
-    assert votos[0] == {"id_senado": 1, "nome": "Ana", "partido": "XYZ", "uf": "SP", "sigla": "Sim"}
+    assert votos[0] == {
+        "id_senado": 1,
+        "nome": "Ana",
+        "partido": "XYZ",
+        "uf": "SP",
+        "sigla": "Sim",
+        "tem_perfil": False,
+    }
 
 
 def test_participacao_na_secreta_traz_a_sigla_da_fonte(client, secreta):

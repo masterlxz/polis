@@ -154,6 +154,135 @@ function perfilDeDeputadoValido(perfil) {
   );
 }
 
+// Código da votação do Senado, de 1 a 9 dígitos: o mesmo formato da rota do Django.
+const PADRAO_DO_CODIGO_DA_VOTACAO = /^\d{1,9}$/;
+// Página da lista: de 1 a 4 dígitos ASCII, como a API aceita (ADR 0030).
+const PADRAO_DA_PAGINA = /^[0-9]{1,4}$/;
+
+export function codigoDeVotacaoValido(codigo) {
+  return PADRAO_DO_CODIGO_DA_VOTACAO.test(codigo);
+}
+
+// A página que vai à API: a que o usuário pediu, se válida; qualquer outra coisa vira a 1.
+export function prepararPagina(valor) {
+  const texto = primeiroTexto(valor);
+  return PADRAO_DA_PAGINA.test(texto) && Number(texto) > 0 ? Number(texto) : 1;
+}
+
+// GET na API interna: `null` no 404; qualquer outra falha vira `ErroDaApi` sem o endereço.
+async function lerDaApi(caminho) {
+  let resposta;
+  try {
+    resposta = await fetch(`${process.env.API_URL}${caminho}`, {
+      cache: "no-store",
+      headers: { accept: "application/json" },
+      signal: AbortSignal.timeout(tempoLimiteMs()),
+    });
+  } catch {
+    throw new ErroDaApi("falha ao falar com a API");
+  }
+  if (resposta.status === 404) return null;
+  if (!resposta.ok) throw new ErroDaApi(`a API respondeu ${resposta.status}`);
+  try {
+    return await resposta.json();
+  } catch {
+    throw new ErroDaApi("a API devolveu algo que não é JSON");
+  }
+}
+
+function atribuicaoValida(atribuicao) {
+  return typeof atribuicao?.fonte === "string" && typeof atribuicao.conjunto === "string";
+}
+
+function itemDaListaValido(item) {
+  return (
+    Number.isInteger(item?.codigo) &&
+    typeof item.data === "string" &&
+    typeof item.identificacao === "string" &&
+    typeof item.ementa === "string" &&
+    typeof item.resultado === "string" &&
+    typeof item.secreta === "boolean"
+  );
+}
+
+function listaDeVotacoesValida(corpo) {
+  return (
+    Array.isArray(corpo?.votacoes) &&
+    corpo.votacoes.every(itemDaListaValido) &&
+    Number.isInteger(corpo.pagina) &&
+    Number.isInteger(corpo.total_paginas) &&
+    (corpo.atribuicao === null || atribuicaoValida(corpo.atribuicao))
+  );
+}
+
+// A lista nunca é 404 na API; se vier, é erro.
+export async function buscarVotacoesDoSenado(pagina) {
+  const corpo = await lerDaApi(`/internal/v1/senado/votacoes/?pagina=${pagina}`);
+  if (!listaDeVotacoesValida(corpo)) {
+    throw new ErroDaApi("a API devolveu uma lista de votações fora do formato esperado");
+  }
+  return corpo;
+}
+
+function votanteValido(item) {
+  return (
+    Number.isInteger(item?.id_senado) &&
+    typeof item.nome === "string" &&
+    textoOuNulo(item.partido) &&
+    typeof item.uf === "string" &&
+    typeof item.sigla === "string"
+  );
+}
+
+function contagemValida(contagem) {
+  return (
+    contagem !== null &&
+    typeof contagem === "object" &&
+    !Array.isArray(contagem) &&
+    Object.values(contagem).every(Number.isInteger)
+  );
+}
+
+function inteiroOuNulo(valor) {
+  return valor === null || Number.isInteger(valor);
+}
+
+// A secreta só pode vir com `participacao` e a aberta só com `votos` (ADR 0030, decisão 2). O que
+// misturar as formas é recusado inteiro: a página prefere quebrar a mostrar "Votou" como voto.
+function detalheDeVotacaoValido(corpo) {
+  const votacao = corpo?.votacao;
+  if (typeof votacao?.secreta !== "boolean") return false;
+  const chaveCerta = votacao.secreta ? "participacao" : "votos";
+  const chaveErrada = votacao.secreta ? "votos" : "participacao";
+  const totais = votacao.totais_da_fonte;
+  return (
+    Number.isInteger(votacao.codigo) &&
+    typeof votacao.data === "string" &&
+    typeof votacao.identificacao === "string" &&
+    typeof votacao.ementa === "string" &&
+    typeof votacao.resultado === "string" &&
+    inteiroOuNulo(totais?.sim) &&
+    inteiroOuNulo(totais.nao) &&
+    inteiroOuNulo(totais.abstencao) &&
+    !Object.hasOwn(corpo, chaveErrada) &&
+    Array.isArray(corpo[chaveCerta]) &&
+    corpo[chaveCerta].every(votanteValido) &&
+    contagemValida(corpo.contagem_por_sigla) &&
+    atribuicaoValida(corpo.atribuicao)
+  );
+}
+
+// Mesmo desenho de `buscarPerfil`: uma chamada por requisição, nunca em cache de dado.
+export const buscarVotacaoDoSenado = cache(async (codigo) => {
+  if (!codigoDeVotacaoValido(codigo)) return null;
+  const corpo = await lerDaApi(`/internal/v1/senado/votacoes/${codigo}/`);
+  if (corpo === null) return null;
+  if (!detalheDeVotacaoValido(corpo)) {
+    throw new ErroDaApi("a API devolveu uma votação fora do formato esperado");
+  }
+  return corpo;
+});
+
 // Mesmo desenho de `buscarPerfil`: uma chamada por requisição, nunca em cache de dado.
 export const buscarDeputado = cache(async (id) => {
   if (!idDeDeputadoValido(id)) return null;

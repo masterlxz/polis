@@ -192,7 +192,8 @@ test("lista: além da última, aviso e link para a primeira", async () => {
 
   assert.equal(status, 200);
   assert.ok(html.includes("Nenhuma votação nesta página"));
-  assert.ok(html.includes('href="/senado/votacoes/"'));
+  // O menu também aponta para /senado/votacoes/: o teste exige o link com o texto da página.
+  assert.match(html, /<a href="\/senado\/votacoes\/">Voltar para a primeira página<\/a>/);
 });
 
 test("lista: sem nenhuma votação coletada, aviso e nada de atribuição", async () => {

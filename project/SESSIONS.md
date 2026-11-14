@@ -2,6 +2,14 @@
 
 Mais recente no topo.
 
+### 2026-11-14 — Sessão 75 (Etapa 0: erro de normalização visível no painel)
+
+- **Pedido**: "erro de normalização" (plan mode; plano aprovado, com a migração). Antes disto, uma normalização recusada ou falha só virava uma linha na saída do `collect_due` (log do agendador): nada no banco, e o painel da Sessão 74 mostrava "Em dia". Decisões do dono: **2 campos no `Dataset`, sem histórico** (contra um modelo `NormalizationRun`) e **situação nova** no painel.
+- **Feito**: `Dataset.last_normalization_at` e `last_normalization_error` (migração `0010`, aditiva, escrita à mão); `scheduling._normalize` grava com `update()` (não desfaz edição concorrente do admin): recusa grava a mensagem (segura por contrato, truncada a 300), falha inesperada grava **texto fixo** (nunca a mensagem da exceção), sucesso ou "nada a fazer" limpa o erro; `Situation.NORMALIZATION_FAILED` entre "última coleta falhou" e "atrasado"; coluna "última normalização" no admin e os dois campos só leitura; `runbook.md` e OVERVIEW.
+- **Provas (CI, `workflow_dispatch`)**: vermelho (43609325136): **32 falham e 6 erram**, por campo, parâmetro ou rótulo inexistente (o `parametrize` com `Situation.NORMALIZATION_FAILED` foi trocado por texto antes, para não interromper a coleta). Verde (43609705230): **1093 passam**, inclusive o `makemigrations --check` contra a migração escrita à mão. A 1ª tentativa de verde (43609542615) teve 1 falha, **erro do meu teste**: `camara/deputados` tem normalizador real em `settings.NORMALIZERS` e o teste não esvaziou o registro. **5 mutações** (branches apagadas): recusa não grava (43609890123, 4 falhas), grava a mensagem da exceção (43609897529, 1), sucesso não limpa (43609904077, 3), ordem trocada com "última coleta falhou" (43609910928, 1), `save()` em vez de `update()` (43609917093, 3).
+- **Não verificado**: a migração num Postgres real (só o CI a aplicou); o painel no navegador com uma recusa de verdade; a mensagem truncada em 300 caracteres no admin; a normalização manual (`normalize_*`) continua sem gravar nada, de propósito; nada é público (P-16).
+- **Fica**: alerta ativo; restaurar um backup real; decidir o design system na Etapa 0; histórico de recusas se uma repetida precisar de linha do tempo.
+
 ### 2026-11-14 — Sessão 74 (Etapa 0: situação das fontes no admin)
 
 - **Pedido**: "vamos continuar na etapa 0" (plan mode; plano aprovado). Das 9 entradas do PRD §15 restavam o **monitoramento** e a restauração real de backup. Decisões do dono: começar pelo monitoramento, com **painel de fontes no admin** (sem alerta ativo). A regra de "atrasado" (2 intervalos, "nunca coletou" só atrasa se a próxima venceu há mais de 2 intervalos) é minha, **a confirmar**.

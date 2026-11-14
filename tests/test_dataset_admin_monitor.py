@@ -19,6 +19,7 @@ from apps.sources.models import Dataset, IngestionRun, Source
 pytestmark = pytest.mark.django_db
 
 LISTA = "admin:sources_dataset_changelist"
+MENSAGEM_DA_RECUSA = "Normalização recusada: linhas inválidas: 2; colunas: id (2). Nada gravado."
 
 
 @pytest.fixture
@@ -92,13 +93,29 @@ def varios(fonte):
 
     _conjunto(fonte, "sem-agenda", schedule_interval_hours=None)
     _conjunto(fonte, "desabilitado", enabled=False)
+
+    normalizacao = _conjunto(
+        fonte,
+        "normalizacao-ruim",
+        last_normalization_at=timezone.now() - timedelta(hours=1),
+        last_normalization_error=MENSAGEM_DA_RECUSA,
+    )
+    _execucao(normalizacao, IngestionRun.State.SUCCEEDED, ha_horas=1)
     return fonte
 
 
 def test_a_lista_mostra_a_situacao_de_cada_conjunto(admin_client, varios):
     html = _html(admin_client)
 
-    for rotulo in ("Em dia", "Atrasado", "Última coleta falhou", "Sem agenda", "Desabilitado"):
+    rotulos = (
+        "Em dia",
+        "Atrasado",
+        "Última coleta falhou",
+        "Normalização falhou",
+        "Sem agenda",
+        "Desabilitado",
+    )
+    for rotulo in rotulos:
         assert rotulo in html, f"faltou a situação {rotulo!r} na lista"
 
 
@@ -107,6 +124,7 @@ def test_cada_situacao_cai_no_conjunto_certo_pelo_filtro(admin_client, varios):
         "on_time": {"fonte/em-dia"},
         "late": {"fonte/atrasado"},
         "failed": {"fonte/falhou"},
+        "normalization_failed": {"fonte/normalizacao-ruim"},
         "no_schedule": {"fonte/sem-agenda"},
         "disabled": {"fonte/desabilitado"},
     }
@@ -116,7 +134,26 @@ def test_cada_situacao_cai_no_conjunto_certo_pelo_filtro(admin_client, varios):
 
 
 def test_sem_filtro_aparecem_todos(admin_client, varios):
-    assert len(_conjuntos_na_lista(admin_client)) == 5
+    assert len(_conjuntos_na_lista(admin_client)) == 6
+
+
+def test_a_mensagem_da_recusa_aparece_na_coluna_de_normalizacao(admin_client, varios):
+    assert MENSAGEM_DA_RECUSA in _html(admin_client)
+
+
+def test_normalizacao_concluida_aparece_como_concluida(admin_client, fonte):
+    _conjunto(fonte, "ok", last_normalization_at=timezone.now(), last_normalization_error="")
+
+    assert "Concluída" in _html(admin_client)
+
+
+def test_os_campos_da_normalizacao_sao_so_leitura_no_admin():
+    from django.contrib import admin
+
+    somente_leitura = admin.site._registry[Dataset].readonly_fields
+
+    assert "last_normalization_at" in somente_leitura
+    assert "last_normalization_error" in somente_leitura
 
 
 def test_filtro_desconhecido_nao_quebra_a_lista(admin_client, varios):

@@ -6,6 +6,8 @@ a um alerta depois. Ordem das regras:
 
 1. Desabilitado vence tudo; depois, sem intervalo de coleta ("sem agenda").
 2. A última execução concluída ter falhado aparece antes do atraso: é o motivo mais útil.
+   Em seguida, a normalização ter falhado: o bruto está fresco, mas as tabelas derivadas estão
+   velhas (a coleta foi boa e a normalização, não).
 3. Atrasado é passar de `LATE_FACTOR` intervalos sem coleta bem-sucedida. Dois intervalos cobrem
    uma tentativa perdida e o retentar do agendador (`RETRY_HOURS`, em `scheduling.py`).
 4. Conjunto que nunca coletou só é atrasado se a próxima coleta venceu há mais de `LATE_FACTOR`
@@ -23,6 +25,7 @@ class Situation(models.TextChoices):
     ON_TIME = "on_time", "Em dia"
     LATE = "late", "Atrasado"
     FAILED = "failed", "Última coleta falhou"
+    NORMALIZATION_FAILED = "normalization_failed", "Normalização falhou"
     NO_SCHEDULE = "no_schedule", "Sem agenda"
     DISABLED = "disabled", "Desabilitado"
 
@@ -34,15 +37,21 @@ def situation(
     next_collection_at,
     last_success_at,
     last_finished_state,
+    normalization_failed,
     now,
 ):
-    """`last_finished_state`: estado da última execução concluída (`succeeded` ou `failed`)."""
+    """`last_finished_state`: estado da última execução concluída (`succeeded` ou `failed`).
+
+    `normalization_failed`: a última normalização tentada foi recusada ou falhou.
+    """
     if not enabled:
         return Situation.DISABLED
     if interval_hours is None:
         return Situation.NO_SCHEDULE
     if last_finished_state == "failed":
         return Situation.FAILED
+    if normalization_failed:
+        return Situation.NORMALIZATION_FAILED
 
     tolerance = timedelta(hours=LATE_FACTOR * interval_hours)
     if last_success_at is None:

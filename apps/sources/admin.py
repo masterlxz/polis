@@ -20,6 +20,7 @@ def _situation_of(dataset, now):
         next_collection_at=dataset.next_collection_at,
         last_success_at=dataset.last_success_at,
         last_finished_state=dataset.last_finished_state,
+        normalization_failed=bool(dataset.last_normalization_error),
         now=now,
     )
 
@@ -58,8 +59,10 @@ class DatasetAdmin(admin.ModelAdmin):
         "situation",
         "last_success",
         "last_result",
+        "last_normalization",
         "next_collection_at",
     ]
+    readonly_fields = ["last_normalization_at", "last_normalization_error"]
     list_filter = [SituationFilter, "enabled", "license_basis", "format", "source"]
     list_select_related = ["source"]
     search_fields = ["slug", "name"]
@@ -85,6 +88,14 @@ class DatasetAdmin(admin.ModelAdmin):
     @admin.display(description="última coleta com sucesso")
     def last_success(self, obj):
         return obj.last_success_at
+
+    @admin.display(description="última normalização")
+    def last_normalization(self, obj):
+        if obj.last_normalization_error:
+            return obj.last_normalization_error
+        if obj.last_normalization_at is None:
+            return "-"
+        return "Concluída"
 
     @admin.display(description="resultado da última execução")
     def last_result(self, obj):

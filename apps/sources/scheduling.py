@@ -34,6 +34,8 @@ from .models import Dataset, IngestionRun, Source
 from .normalization import NormalizationRefused
 
 RETRY_HOURS = 6
+ERROR_MAX_LENGTH = 300  # o tamanho de `Dataset.last_normalization_error`
+UNEXPECTED_ERROR_TEXT = "Falha inesperada na normalização (veja o log do agendador)."
 ALLOWED_MINUTES = [minute for minute in range(1, 60) if minute % 5]
 SCHEDULABLE_STATUSES = (Source.Status.INTEGRATING, Source.Status.ACTIVE)
 
@@ -119,14 +121,26 @@ def _handle(dataset, client, now, rng, result):
         f"{name}: {run.state}, erro {run.error_code or '-'}, próxima {_stamp(following)}"
     )
     if succeeded:
-        _normalize(dataset, name, result)
+        _normalize(dataset, name, result, now)
 
 
-def _normalize(dataset, name, result):
+def _record_normalization(dataset, now, error=""):
+    """Grava o resultado da normalização no conjunto, para o painel das fontes.
+
+    `update()` troca só estas duas colunas: um `save()` regravaria a linha inteira e desfaria uma
+    edição feita ao mesmo tempo no admin. `error` vazio quer dizer que deu certo.
+    """
+    Dataset.objects.filter(pk=dataset.pk).update(
+        last_normalization_at=now, last_normalization_error=error[:ERROR_MAX_LENGTH]
+    )
+
+
+def _normalize(dataset, name, result, now):
     """Normaliza o bruto de `dataset` se ele tiver normalizador registrado.
 
     Recusa (falha fechada) mostra a mensagem, que é segura por contrato; qualquer outra exceção
-    vira uma linha genérica, porque a mensagem de um erro do banco cita valores da linha.
+    vira uma linha genérica, porque a mensagem de um erro do banco cita valores da linha. O
+    resultado (inclusive o texto) é gravado no conjunto; o texto da exceção nunca é.
     """
     path = settings.NORMALIZERS.get(name)
     if path is None:
@@ -137,13 +151,16 @@ def _normalize(dataset, name, result):
     except NormalizationRefused as error:
         result.lines.append(f"{name}: normalização recusada: {error}")
         result.normalization_failed += 1
+        _record_normalization(dataset, now, str(error))
         return
     except Exception:
         failed = True
     if failed:
         result.lines.append(f"{name}: normalização falhou de forma inesperada")
         result.normalization_failed += 1
+        _record_normalization(dataset, now, UNEXPECTED_ERROR_TEXT)
         return
+    _record_normalization(dataset, now)
     if summary is not None:
         result.lines.append(
             f"{name}: normalizado, linhas lidas {summary.rows_read}, "

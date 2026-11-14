@@ -143,6 +143,21 @@ class Dataset(models.Model):
             "uma data e hora já passadas."
         ),
     )
+    last_normalization_at = models.DateTimeField(
+        "última normalização tentada em",
+        null=True,
+        blank=True,
+        help_text="Escrito pelo agendador depois de cada coleta; vazio se nunca normalizou.",
+    )
+    last_normalization_error = models.CharField(
+        "erro da última normalização",
+        max_length=300,
+        blank=True,
+        help_text=(
+            "Vazio: a última normalização deu certo. Recusa mostra a mensagem do contrato (só "
+            "colunas e contagens); falha inesperada mostra um texto fixo."
+        ),
+    )
 
     class Meta:
         verbose_name = "conjunto de dados"

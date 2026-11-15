@@ -158,6 +158,18 @@ class Dataset(models.Model):
             "colunas e contagens); falha inesperada mostra um texto fixo."
         ),
     )
+    last_alert_situation = models.CharField(
+        "situação do último aviso",
+        max_length=30,
+        blank=True,
+        help_text="Vazio: nenhum aviso aberto. Escrito pelo alerta ativo (Sessão 76).",
+    )
+    last_alert_at = models.DateTimeField(
+        "último aviso enviado em",
+        null=True,
+        blank=True,
+        help_text="Quando o último aviso (alerta, lembrete ou recuperação) foi entregue.",
+    )
 
     class Meta:
         verbose_name = "conjunto de dados"

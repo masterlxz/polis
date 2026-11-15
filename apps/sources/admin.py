@@ -1,8 +1,8 @@
 from django.contrib import admin
-from django.db.models import OuterRef, Subquery
 from django.utils import timezone
 
-from .freshness import Situation, situation
+from . import monitoring
+from .freshness import Situation
 from .models import Dataset, IngestionRun, Source, Tombstone
 
 
@@ -11,18 +11,6 @@ class SourceAdmin(admin.ModelAdmin):
     list_display = ["slug", "name", "institution", "access_type", "status"]
     list_filter = ["status", "access_type"]
     search_fields = ["slug", "name", "institution"]
-
-
-def _situation_of(dataset, now):
-    return situation(
-        enabled=dataset.enabled,
-        interval_hours=dataset.schedule_interval_hours,
-        next_collection_at=dataset.next_collection_at,
-        last_success_at=dataset.last_success_at,
-        last_finished_state=dataset.last_finished_state,
-        normalization_failed=bool(dataset.last_normalization_error),
-        now=now,
-    )
 
 
 class SituationFilter(admin.SimpleListFilter):
@@ -43,7 +31,7 @@ class SituationFilter(admin.SimpleListFilter):
         if wanted not in Situation.values:
             return queryset
         now = timezone.now()
-        pks = [d.pk for d in queryset if _situation_of(d, now) == wanted]
+        pks = [d.pk for d in queryset if monitoring.situation_of(d, now) == wanted]
         return queryset.filter(pk__in=pks)
 
 
@@ -62,28 +50,22 @@ class DatasetAdmin(admin.ModelAdmin):
         "last_normalization",
         "next_collection_at",
     ]
-    readonly_fields = ["last_normalization_at", "last_normalization_error"]
+    readonly_fields = [
+        "last_normalization_at",
+        "last_normalization_error",
+        "last_alert_situation",
+        "last_alert_at",
+    ]
     list_filter = [SituationFilter, "enabled", "license_basis", "format", "source"]
     list_select_related = ["source"]
     search_fields = ["slug", "name"]
 
     def get_queryset(self, request):
-        finished = IngestionRun.objects.filter(dataset=OuterRef("pk")).exclude(
-            state=IngestionRun.State.RUNNING
-        )
-        succeeded = finished.filter(state=IngestionRun.State.SUCCEEDED)
-        latest_success = succeeded.order_by("-finished_at").values("finished_at")[:1]
-        latest = finished.order_by("-finished_at", "-pk")
-        queryset = super().get_queryset(request)
-        return queryset.annotate(
-            last_success_at=Subquery(latest_success),
-            last_finished_state=Subquery(latest.values("state")[:1]),
-            last_error_code=Subquery(latest.values("error_code")[:1]),
-        )
+        return monitoring.annotate(super().get_queryset(request))
 
     @admin.display(description="situação")
     def situation(self, obj):
-        return Situation(_situation_of(obj, timezone.now())).label
+        return monitoring.situation_of(obj, timezone.now()).label
 
     @admin.display(description="última coleta com sucesso")
     def last_success(self, obj):

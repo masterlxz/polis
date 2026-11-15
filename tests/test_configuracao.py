@@ -92,6 +92,7 @@ VARIAVEIS_DE_PRODUCAO = (
     "DJANGO_BEHIND_PROXY",
     "DJANGO_HSTS_SECONDS",
     "DJANGO_CSRF_TRUSTED_ORIGINS",
+    "ALERT_WEBHOOK_URL",
 )
 CHAVE_LONGA = "k7Qz-Xr2mW9vLp4NbT8yHc3JdF6sGa1UeV5oIx0RnMw2Zq8YtKj4Pl7Dh9Sf3AbC6"
 
@@ -102,7 +103,7 @@ def _configuracao(env_extra=None):
         "import json; from config import settings as s; "
         "print(json.dumps({'sessao': s.SESSION_COOKIE_SECURE, 'csrf': s.CSRF_COOKIE_SECURE, "
         "'proxy': s.SECURE_PROXY_SSL_HEADER, 'hsts': s.SECURE_HSTS_SECONDS, "
-        "'origens': s.CSRF_TRUSTED_ORIGINS}))"
+        "'origens': s.CSRF_TRUSTED_ORIGINS, 'alerta': s.ALERT_WEBHOOK_URL}))"
     )
     env = {k: v for k, v in os.environ.items() if k not in VARIAVEIS_DE_PRODUCAO}
     env.update({"DJANGO_SECRET_KEY": "x", **(env_extra or {})})
@@ -129,6 +130,7 @@ def test_sem_variaveis_de_producao_tudo_fica_como_em_desenvolvimento():
         "proxy": None,
         "hsts": 0,
         "origens": [],
+        "alerta": "",
     }
 
 
@@ -178,6 +180,34 @@ def test_origem_csrf_sem_http_ou_https_recusa_subir(valor):
     resultado = _configuracao({"DJANGO_CSRF_TRUSTED_ORIGINS": valor})
     assert resultado.returncode != 0
     assert "DJANGO_CSRF_TRUSTED_ORIGINS" in resultado.stderr
+
+
+def test_url_do_webhook_de_alerta_https_vale_como_esta():
+    valores = _valores({"ALERT_WEBHOOK_URL": "https://ntfy.example.org/polis-alertas"})
+
+    assert valores["alerta"] == "https://ntfy.example.org/polis-alertas"
+
+
+def test_url_do_webhook_so_com_espacos_vale_como_desligado():
+    assert _valores({"ALERT_WEBHOOK_URL": "   "})["alerta"] == ""
+
+
+@pytest.mark.parametrize(
+    "valor", ["http://ntfy.example.org/x", "ntfy.example.org/x", "ftp://x.example.org/segredo"]
+)
+def test_url_do_webhook_que_nao_e_https_recusa_subir_sem_citar_o_valor(valor):
+    resultado = _configuracao({"ALERT_WEBHOOK_URL": valor})
+
+    assert resultado.returncode != 0
+    assert "ALERT_WEBHOOK_URL" in resultado.stderr
+    assert valor not in resultado.stderr
+
+
+def test_url_do_webhook_https_sem_host_recusa_subir():
+    resultado = _configuracao({"ALERT_WEBHOOK_URL": "https:///so-caminho"})
+
+    assert resultado.returncode != 0
+    assert "ALERT_WEBHOOK_URL" in resultado.stderr
 
 
 def test_arquivos_estaticos_sao_coletados_em_staticfiles_na_raiz():

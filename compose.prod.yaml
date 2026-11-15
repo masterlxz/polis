@@ -65,6 +65,11 @@ services:
     <<: *django
     build: !reset null
     command: ["bash", "scripts/agendador.sh"]
+    environment:
+      <<: *django-env
+      # Alerta ativo (Sessão 76): URL https do webhook (a URL carrega o segredo; nunca vai para log).
+      # Vazio = alerta desligado. Só o agendador a recebe: é ele quem roda `collect_due`.
+      ALERT_WEBHOOK_URL: ${ALERT_WEBHOOK_URL:-}
     healthcheck:
       # Vivo = o laço terminou uma volta nos últimos 3 minutos (não diz que a coleta deu certo).
       test: ["CMD-SHELL", "test -n \"$$(find /tmp/batimento -mmin -3 2>/dev/null)\""]

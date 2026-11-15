@@ -147,6 +147,15 @@ def test_normalizacao_concluida_aparece_como_concluida(admin_client, fonte):
     assert "Concluída" in _html(admin_client)
 
 
+def test_os_campos_do_alerta_sao_so_leitura_no_admin():
+    from django.contrib import admin
+
+    somente_leitura = admin.site._registry[Dataset].readonly_fields
+
+    assert "last_alert_situation" in somente_leitura
+    assert "last_alert_at" in somente_leitura
+
+
 def test_os_campos_da_normalizacao_sao_so_leitura_no_admin():
     from django.contrib import admin
 

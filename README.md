@@ -10,6 +10,10 @@ Plataforma aberta de transparência e inteligência cívica: reúne, organiza e 
 
 Requer Docker com o plugin Compose. Copie `.env.example` para `.env` e preencha ao menos `DJANGO_SECRET_KEY` e `POSTGRES_PASSWORD` (sem eles o Compose recusa subir).
 
+> **Para agentes de IA:** os comandos abaixo são para uma pessoa, no PC dela. Na VM de
+> desenvolvimento do agente só `ruff check` e `ruff format --check` rodam; `pytest` e o build do
+> front são proibidos (ADR 0017 do workspace): teste só no GitHub (CI), build só no PC do dono, à mão.
+
 ```bash
 docker compose up -d --wait db          # PostgreSQL 18, só em 127.0.0.1:5432
 docker compose run --rm web python manage.py migrate

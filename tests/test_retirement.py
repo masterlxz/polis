@@ -241,8 +241,12 @@ def test_linha_bruta_com_formato_diferente_tambem_some_e_a_de_outro_candidato_fi
 ):
     """Caracteriza a leniência de `_raw_key` (decisão do dono, mantida): o `int()` direto faz a
     linha bruta do id retirado sumir mesmo com espaço, zero à esquerda ou dígitos de outra
-    escrita. A normalização é estrita, por isso essas linhas entram direto no bruto da carga
-    retida, depois de a carga canônica já ter virado candidatura."""
+    escrita. As linhas entram direto no bruto da carga retida (`bulk_create`), por simplicidade.
+    A divergência real entre `_raw_key` e o parser da normalização (`tse.py`) são os dígitos
+    árabe-índicos: o parser os recusa e o `int()` os aceita. Espaço e zero à esquerda o parser
+    também aceita, com o mesmo valor; estão aqui para fixar que o `int()` os trata igual (e que
+    uma comparação de string crua falharia). Formatos que o `int()` aceita e ficam SEM teste:
+    `_` (`1_000`), `+`, float truncado vindo do JSON e bool."""
     primeira = carga(dataset, [ana(), beto()])
     normalizar()
     ana_fora_do_padrao = {**ana(), campo: formato(ana()[campo])}

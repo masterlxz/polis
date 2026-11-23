@@ -2,6 +2,16 @@
 
 Mais recente no topo.
 
+### 2026-11-23 — Sessão 77 (votos por senador; triagem do Dependabot)
+
+- **Pedido**: abrir o projeto e seguir a recomendação: triar os PRs do Dependabot e fazer a fatia "votos por senador" (plan mode; plano aprovado). Decisões do dono: **rota nova paginada** (contra embutir no perfil) e **secretas na mesma lista** como "Votou (voto secreto)" (contra uma contagem à parte). A coluna única "Voto ou situação" e o 404 para senador sem perfil foram o que eu assumi e o dono aceitou com "segue".
+- **Dependabot**: #114 (gunicorn 27.0.1, psycopg 3.3.9, ruff 0.17.6) mesclado; #117 (postgres 18→19) **fechado**: só trocava o `Dockerfile.backup`, e o `pg_dump` de cliente 19 contra servidor 18 pode não restaurar; #118 adicionou o `ignore` de `postgres` major no `dependabot.yml`. Só a rodada de segunda-feira mostra se o `ignore` pega essa imagem.
+- **Feito**: `GET /internal/v1/senadores/<codigo>/votos/?pagina=` (`apps/legislature/views.py`, `urls.py`); `buscarVotosDoSenador` e o validador em `web/lib/api.js`; seção "Votos" na página do senador (`web/app/senado/senadores/[codigo]/page.js`); ADR 0030, decisão 7. Cada item traz **uma só** chave, `voto` (aberta) ou `participacao` (secreta); o front recusa o item que misture. Partido e UF são os do momento do voto, e a tabela os rotula "à época".
+- **Provas (CI, `workflow_dispatch`)**: vermelho, backend (45233115995): **35 falham, 1.144 passam**; front (45233120715): **16 falham de 181**. Verde: backend (45234124334) **1.179 passam**, front (45234130930) **181 passam**. A 1ª tentativa de verde (45233734312 e 45233739378) teve 1 falha em cada, **dois testes meus**: um tratava `id` (chave da licença) como id interno, e o teste antigo "partido nulo some da página" passou a ver a coluna "Partido (à época)" da tabela nova. **4 mutações** (branches apagadas, todas pegas por teste, não por lint): ordem crescente (45234498582, 3 falhas), secreta vaza `voto` (45234523270, 1), total de páginas arredondando para baixo (45234545894, 1), front aceitando as duas chaves (45234570045, 3).
+- **Achado**: o `\d` do Python casa dígitos de outras escritas (`٣`). As rotas existentes usam `\d{1,9}` e esse dígito chegaria ao banco; a rota nova usa `[0-9]`. **Não corrigi as rotas antigas** (fora de escopo): `deputados/`, `senadores/<codigo>/` e `senado/votacoes/<codigo>/`.
+- **Não verificado**: a página com um senador real no Compose (votos abertos e secretos, paginação); o plano da consulta por `senate_id` no Postgres (a tabela só acumula e o `unique (voting, senate_id)` não serve a esse filtro; índice só se medir); teclado, zoom e leitor de tela; nada é público (P-16).
+- **Fica**: conferência no Compose; votações da Câmara; trocar `\d` por `[0-9]` nas 3 rotas antigas; as pendências da Sessão 76 (serviço do webhook, fator 2 do "atrasado", alerta do backup, restaurar backup real, design system).
+
 ### 2026-11-14 — Sessão 76 (Etapa 0: alerta ativo das fontes por webhook)
 
 - **Pedido**: "alerta ativo" (plan mode; plano aprovado, com a migração e a variável de ambiente de produção). Decisões do dono: canal **webhook genérico**, escopo **só as fontes** (sem backup) e **avisar ao mudar com lembrete diário**. Regra minha, **a confirmar**: ruim = atrasado, coleta falhou ou normalização falhou; lembrete após 24 h; recuperação avisa.

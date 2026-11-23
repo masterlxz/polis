@@ -272,7 +272,18 @@ def test_pessoa_inexistente_da_404_sem_repetir_o_pedido(client, pessoa_simples):
 
 @pytest.mark.parametrize(
     "ciclo_sq",
-    ["2026-abc", "2026-", "-1000000001", "26-1000000001", "2026-1000000000001", "2026_1", "20261"],
+    [
+        "2026-abc",
+        "2026-",
+        "-1000000001",
+        "26-1000000001",
+        "2026-1000000000001",
+        "2026_1",
+        "20261",
+        # Dígitos árabe-índicos: valem 2026 e 1000000001 em int(), mas não são 0-9.
+        "٢٠٢٦-1000000001",
+        "2026-١٠٠٠٠٠٠٠٠١",
+    ],
 )
 def test_id_malformado_da_404(client, pessoa_simples, ciclo_sq):
     _perfil(client)  # controle

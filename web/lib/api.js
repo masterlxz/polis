@@ -313,6 +313,47 @@ export const buscarSenador = cache(async (codigo) => {
   return corpo;
 });
 
+// A votação secreta só pode vir com `participacao` e a aberta só com `voto` (ADR 0030, emenda 7,
+// a decisão 2 por item). O que misturar as formas é recusado inteiro: a página prefere quebrar a
+// mostrar "Votou" como se fosse um voto.
+function itemDoHistoricoValido(item) {
+  if (typeof item?.secreta !== "boolean") return false;
+  const chaveCerta = item.secreta ? "participacao" : "voto";
+  const chaveErrada = item.secreta ? "voto" : "participacao";
+  return (
+    Number.isInteger(item.codigo) &&
+    typeof item.data === "string" &&
+    typeof item.identificacao === "string" &&
+    typeof item.ementa === "string" &&
+    typeof item.resultado === "string" &&
+    textoOuNulo(item.partido) &&
+    typeof item.uf === "string" &&
+    typeof item[chaveCerta] === "string" &&
+    !Object.hasOwn(item, chaveErrada)
+  );
+}
+
+function historicoDeVotosValido(corpo) {
+  return (
+    Number.isInteger(corpo?.senador?.id_senado) &&
+    typeof corpo.senador.nome === "string" &&
+    Array.isArray(corpo.votos) &&
+    corpo.votos.every(itemDoHistoricoValido) &&
+    Number.isInteger(corpo.pagina) &&
+    Number.isInteger(corpo.total_paginas) &&
+    (corpo.atribuicao === null || atribuicaoValida(corpo.atribuicao))
+  );
+}
+
+// Chamada só depois de o perfil existir: 404 aqui é incoerência da API, então vira erro.
+export async function buscarVotosDoSenador(codigo, pagina) {
+  const corpo = await lerDaApi(`/internal/v1/senadores/${codigo}/votos/?pagina=${pagina}`);
+  if (!historicoDeVotosValido(corpo)) {
+    throw new ErroDaApi("a API devolveu um histórico de votos fora do formato esperado");
+  }
+  return corpo;
+}
+
 // Mesmo desenho de `buscarPerfil`: uma chamada por requisição, nunca em cache de dado.
 export const buscarDeputado = cache(async (id) => {
   if (!idDeDeputadoValido(id)) return null;

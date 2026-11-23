@@ -1,8 +1,14 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { buscarSenador } from "../../../../lib/api.js";
-import { dataHoraBrasilia } from "../../../../lib/formatar.js";
-import { partidoParaExibir } from "../../../../lib/siglas.js";
+import { buscarSenador, buscarVotosDoSenador, prepararPagina } from "../../../../lib/api.js";
+import { dataBr, dataHoraBrasilia } from "../../../../lib/formatar.js";
+import {
+  NOTA_DA_SIGLA,
+  descreverSigla,
+  partidoParaExibir,
+  siglaConhecida,
+} from "../../../../lib/siglas.js";
 import Atribuicao from "../../../pessoas/[id]/Atribuicao.js";
 
 // Sem cache: quem a fonte tirar da lista de exercício precisa aparecer na hora (ADR 0027).
@@ -41,10 +47,80 @@ function Situacao({ senador }) {
   );
 }
 
-export default async function Senador({ params }) {
+function Navegacao({ caminho, pagina, totalPaginas }) {
+  const temAnterior = pagina > 1 && pagina <= totalPaginas;
+  const temProxima = pagina < totalPaginas;
+  if (!temAnterior && !temProxima) return null;
+  return (
+    <nav aria-label="Páginas de votos" className="paginas">
+      {temAnterior && <a href={`${caminho}?pagina=${pagina - 1}`}>Anterior</a>}
+      <span>{`Página ${pagina} de ${totalPaginas}`}</span>
+      {temProxima && <a href={`${caminho}?pagina=${pagina + 1}`}>Próxima</a>}
+    </nav>
+  );
+}
+
+function SemVotos({ caminho, totalPaginas }) {
+  if (totalPaginas === 0) return <p role="status">Nenhum voto coletado ainda.</p>;
+  return (
+    <p role="status">
+      {"Nenhum voto nesta página. "}
+      <a href={caminho}>Voltar para a primeira página</a>
+    </p>
+  );
+}
+
+// Na votação secreta a coluna traz `participacao` ("Votou"): diz que votou, não como (ADR 0029).
+// Partido e UF são os do momento do voto, não os do perfil.
+function Votos({ caminho, historico }) {
+  const { votos, pagina, total_paginas: totalPaginas, atribuicao } = historico;
+  const temSiglaNova = votos.some((item) => !siglaConhecida(item.voto ?? item.participacao));
+  return (
+    <section aria-labelledby="senador-votos" className="candidatura">
+      <h2 id="senador-votos">Votos</h2>
+      {votos.length === 0 ? (
+        <SemVotos caminho={caminho} totalPaginas={totalPaginas} />
+      ) : (
+        <table className="tabela">
+          <caption>Votos no Senado, da votação mais recente para a mais antiga</caption>
+          <thead>
+            <tr>
+              <th scope="col">Votação</th>
+              <th scope="col">Data</th>
+              <th scope="col">Partido (à época)</th>
+              <th scope="col">UF (à época)</th>
+              <th scope="col">Voto ou situação</th>
+            </tr>
+          </thead>
+          <tbody>
+            {votos.map((item) => (
+              <tr key={item.codigo}>
+                <td>
+                  <Link href={`/senado/votacoes/${item.codigo}/`}>{item.identificacao}</Link>
+                  {item.ementa && <p className="ementa">{item.ementa}</p>}
+                </td>
+                <td>{dataBr(item.data) ?? item.data}</td>
+                <td>{partidoParaExibir(item.partido)}</td>
+                <td>{item.uf}</td>
+                <td>{descreverSigla(item.voto ?? item.participacao)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      {temSiglaNova && <p className="nota">{NOTA_DA_SIGLA}</p>}
+      <Navegacao caminho={caminho} pagina={pagina} totalPaginas={totalPaginas} />
+      {atribuicao && <Atribuicao atribuicao={atribuicao} />}
+    </section>
+  );
+}
+
+export default async function Senador({ params, searchParams }) {
   const { codigo } = await params;
+  const { pagina: paginaBruta } = await searchParams;
   const perfil = await buscarSenador(codigo);
   if (!perfil) notFound();
+  const historico = await buscarVotosDoSenador(codigo, prepararPagina(paginaBruta));
 
   const { senador, atribuicao } = perfil;
   return (
@@ -67,6 +143,7 @@ export default async function Senador({ params }) {
         )}
         <Atribuicao atribuicao={atribuicao} />
       </section>
+      <Votos caminho={`/senado/senadores/${senador.id_senado}/`} historico={historico} />
     </>
   );
 }

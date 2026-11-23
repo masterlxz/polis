@@ -77,6 +77,12 @@ updates:
         update-types:
           - "version-update:semver-major"
           - "version-update:semver-minor"
+      # O servidor de banco está no PostgreSQL 18 (ADR 0006) e o `Dockerfile.backup` precisa casar
+      # com ele (o `pg_dump` de cliente mais novo pode não restaurar em servidor mais velho). O
+      # Dependabot só vê o `Dockerfile.backup`, então um major aqui desalinharia o backup (PR #117).
+      - dependency-name: "postgres"
+        update-types:
+          - "version-update:semver-major"
 
   - package-ecosystem: "github-actions"
     directory: "/"

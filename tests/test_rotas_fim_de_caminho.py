@@ -8,11 +8,20 @@ ver dois). Cada caso pede antes um 200 de controle na URL normal, com o registro
 isso, um 404 poderia ser só "não há registro". O caso com `%0A` usa o MESMO registro do controle,
 e a exigência de zero consultas separa o 404 do resolvedor (não chegou à view) do 404 da view
 (chegou, consultou e não achou).
+
+Um 404 sem consulta, sozinho, não prova que o `\\n` chegou ao resolvedor (o client ou um
+middleware poderia tê-lo descartado). Por isso o teste do client afirma também, na resposta, que
+o `path_info` da requisição termina no `\\n`; e `test_o_resolvedor_recusa_o_caminho_com_n_final`
+chama `resolve()` direto, sem client nem middleware (APPEND_SLASH, CommonMiddleware).
+
+O `$` do Python só casa antes de UM `\\n` final: `\\r\\n` nunca casou, nem com `search`. Os casos
+`%0D%0A` não detectam esse risco; só guardam contra uma futura normalização que apare espaços.
 """
 
 from datetime import UTC, date, datetime
 
 import pytest
+from django.urls import Resolver404, resolve
 from django.utils import timezone
 
 from apps.elections.models import Candidacy, Election, Person
@@ -37,8 +46,9 @@ ROTAS = [
     ("pessoa", f"/internal/v1/pessoas/{CICLO}-{SQ}/"),
 ]
 
-# `%0A` é o `\n` que o `$` aceitaria; `%0D%0A` é `\r\n`, que o `$` nunca aceitou (controle extra).
-FINAIS = ["%0A", "%0D%0A"]
+# (final enviado na URL, o que o servidor entrega ao resolvedor depois de decodificar).
+# `%0A` é o `\n` que o `$` aceitaria; `%0D%0A` é `\r\n`, que o `$` nunca aceitou (só guarda).
+FINAIS = [("%0A", "\n"), ("%0D%0A", "\r\n")]
 
 
 @pytest.fixture
@@ -124,10 +134,10 @@ def registros():
     )
 
 
-@pytest.mark.parametrize("final", FINAIS)
+@pytest.mark.parametrize("final, decodificado", FINAIS)
 @pytest.mark.parametrize("url", [url for _, url in ROTAS], ids=[nome for nome, _ in ROTAS])
 def test_quebra_de_linha_no_fim_do_caminho_da_404_sem_consultar_o_banco(
-    client, registros, url, final, django_assert_num_queries
+    client, registros, url, final, decodificado, django_assert_num_queries
 ):
     controle = client.get(url)
     assert controle.status_code == 200, f"controle: esperava 200 em {url}"
@@ -135,4 +145,15 @@ def test_quebra_de_linha_no_fim_do_caminho_da_404_sem_consultar_o_banco(
     with django_assert_num_queries(0):
         resposta = client.get(url + final)
 
+    # Premissa: o final chegou à requisição (não foi descartado pelo client nem por middleware).
+    assert resposta.wsgi_request.path_info == url + decodificado
     assert resposta.status_code == 404, f"{url}{final} devia ser 404, veio {resposta.status_code}"
+
+
+@pytest.mark.parametrize("url", [url for _, url in ROTAS], ids=[nome for nome, _ in ROTAS])
+def test_o_resolvedor_recusa_o_caminho_com_n_final(url):
+    """Direto no resolvedor, sem client nem middleware: o `\\n` final não casa nenhuma rota."""
+    resolve(url)  # controle positivo: a URL normal resolve (levantaria Resolver404)
+
+    with pytest.raises(Resolver404):
+        resolve(url + "\n")

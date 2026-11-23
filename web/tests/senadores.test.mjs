@@ -50,9 +50,61 @@ function perfil({ senador = {}, atribuicao, ...extra } = {}) {
   };
 }
 
-async function pagina(codigo = CODIGO, resposta = { status: 200, corpo: perfil() }) {
-  api.resposta = () => resposta;
-  const retorno = await fetch(`${front.base}/senado/senadores/${codigo}/`);
+function atribuicaoDosVotos(extra = {}) {
+  return atribuicaoPadrao({
+    conjunto: "Votações do Senado",
+    url_origem: "https://dados.example.org/dadosabertos/votacao.json",
+    ...extra,
+  });
+}
+
+function itemDeVoto(extra = {}) {
+  return {
+    codigo: 7001,
+    data: "2026-11-12",
+    identificacao: "PL 1/2026",
+    ementa: "Dispõe sobre um assunto de teste.",
+    resultado: "A",
+    secreta: false,
+    partido: "XYZ",
+    uf: "SP",
+    voto: "Sim",
+    ...extra,
+  };
+}
+
+// Votação secreta: a sigla vem em `participacao` e a chave `voto` não existe (ADR 0030, emenda 7).
+function itemSecreto(extra = {}) {
+  const item = itemDeVoto({
+    codigo: 7002,
+    identificacao: "MSF 9/2026",
+    secreta: true,
+    participacao: "Votou",
+    ...extra,
+  });
+  delete item.voto;
+  return item;
+}
+
+function historico({ votos = [itemDeVoto()], pagina = 1, total_paginas = 1, atribuicao } = {}) {
+  return {
+    senador: { id_senado: 5012, nome: "Ana do Senado" },
+    votos,
+    pagina,
+    total_paginas,
+    atribuicao: atribuicao === undefined ? atribuicaoDosVotos() : atribuicao,
+  };
+}
+
+// A página chama duas rotas da API: o perfil e o histórico de votos. `resposta` vale para o perfil
+// e `votos` para o histórico; `consulta` é a query string da página do front (ex.: "?pagina=2").
+async function pagina(
+  codigo = CODIGO,
+  resposta = { status: 200, corpo: perfil() },
+  { votos = { status: 200, corpo: historico() }, consulta = "" } = {},
+) {
+  api.resposta = (req) => (req.url.startsWith(`/internal/v1/senadores/${codigo}/votos/`) ? votos : resposta);
+  const retorno = await fetch(`${front.base}/senado/senadores/${codigo}/${consulta}`);
   return { status: retorno.status, html: await retorno.text() };
 }
 
@@ -220,4 +272,199 @@ test("estrutura: um h1, título com o descritor e noindex", async () => {
   assert.equal((html.match(/<h1[ >]/g) ?? []).length, 1);
   assert.match(html, /<title>[^<]*transparência e inteligência cívica[^<]*<\/title>/);
   assert.match(html, /<meta name="robots" content="noindex/);
+});
+
+// --- Votos do senador (ADR 0030, emenda 7) -------------------------------------------------------
+
+const CAMINHO_DOS_VOTOS = `GET /internal/v1/senadores/${CODIGO}/votos/`;
+
+const comVotos = (corpo, consulta = "") =>
+  pagina(CODIGO, { status: 200, corpo: perfil() }, { votos: { status: 200, corpo }, consulta });
+
+test("votos: votação aberta mostra identificação, data, voto e link para a votação", async () => {
+  const { status, html } = await comVotos(historico());
+
+  assert.equal(status, 200);
+  assert.ok(html.includes("PL 1/2026"));
+  assert.ok(html.includes("12/11/2026"));
+  assert.ok(html.includes("Sim"));
+  assert.ok(html.includes("Dispõe sobre um assunto de teste."));
+  assert.ok(html.includes('href="/senado/votacoes/7001/"'));
+});
+
+test("votos: votação secreta mostra 'Votou (voto secreto)' e nunca um voto Sim/Não", async () => {
+  const { status, html } = await comVotos(historico({ votos: [itemSecreto()] }));
+
+  assert.equal(status, 200);
+  assert.ok(html.includes("Votou (voto secreto)"));
+  assert.ok(html.includes("MSF 9/2026"));
+  assert.ok(!/>Sim</.test(html) && !/>Não</.test(html), "a secreta não pode parecer um voto");
+});
+
+test("votos: item que traz `voto` e `participacao` juntos é recusado", async () => {
+  const controle = await comVotos(historico());
+  assert.equal(controle.status, 200, "controle: o histórico válido precisa dar 200");
+
+  const misto = itemDeVoto({ participacao: "Votou" });
+  const { status } = await comVotos(historico({ votos: [misto] }));
+
+  assert.equal(status, 500);
+});
+
+test("votos: votação secreta com `voto` em vez de `participacao` é recusada", async () => {
+  const controle = await comVotos(historico({ votos: [itemSecreto()] }));
+  assert.equal(controle.status, 200, "controle: a secreta com `participacao` precisa dar 200");
+
+  const errado = itemDeVoto({ secreta: true });
+  const { status, html } = await comVotos(historico({ votos: [errado] }));
+
+  assert.equal(status, 500);
+  assert.ok(!html.includes("Sim"));
+});
+
+test("votos: votação aberta com `participacao` em vez de `voto` é recusada", async () => {
+  const errado = itemDeVoto({ participacao: "Votou" });
+  delete errado.voto;
+
+  const { status } = await comVotos(historico({ votos: [errado] }));
+
+  assert.equal(status, 500);
+});
+
+test("votos: partido e UF saem rotulados como os da época do voto", async () => {
+  const { html } = await comVotos(historico({ votos: [itemDeVoto({ partido: "S/Partido" })] }));
+
+  assert.ok(html.includes("à época"));
+  assert.ok(html.includes("Sem partido"));
+  assert.ok(!html.includes("S/Partido"));
+});
+
+test("votos: sigla conhecida ganha o significado da legenda; desconhecida sai crua com a nota", async () => {
+  const conhecida = await comVotos(historico({ votos: [itemDeVoto({ voto: "LS" })] }));
+  assert.ok(conhecida.html.includes("Licença saúde (LS)"));
+  assert.ok(!conhecida.html.includes("ainda não verificou"));
+
+  const nova = await comVotos(historico({ votos: [itemDeVoto({ voto: "XPTO" })] }));
+  assert.ok(nova.html.includes("XPTO"));
+  assert.ok(nova.html.includes("ainda não verificou"));
+});
+
+test("votos: primeira de duas páginas tem 'Próxima' e não tem 'Anterior'", async () => {
+  const { html } = await comVotos(historico({ pagina: 1, total_paginas: 2 }));
+
+  assert.ok(html.includes(`href="/senado/senadores/${CODIGO}/?pagina=2"`));
+  assert.ok(html.includes("Próxima"));
+  assert.ok(!html.includes("Anterior"));
+});
+
+test("votos: última página tem 'Anterior' e não tem 'Próxima'", async () => {
+  const { html } = await comVotos(historico({ pagina: 2, total_paginas: 2 }), "?pagina=2");
+
+  assert.ok(html.includes(`href="/senado/senadores/${CODIGO}/?pagina=1"`));
+  assert.ok(html.includes("Anterior"));
+  assert.ok(!html.includes("Próxima"));
+});
+
+test("votos: a página pedida vai à API; página inválida vira 1", async () => {
+  await comVotos(historico({ pagina: 2, total_paginas: 2 }), "?pagina=2");
+  assert.ok(api.chamadas.includes(`${CAMINHO_DOS_VOTOS}?pagina=2`));
+
+  for (const invalida of ["0", "abc", "-1", "12345"]) {
+    api.chamadas.length = 0;
+    const { status } = await comVotos(historico(), `?pagina=${invalida}`);
+
+    assert.equal(status, 200, `a página não pode quebrar com ?pagina=${invalida}`);
+    assert.ok(api.chamadas.includes(`${CAMINHO_DOS_VOTOS}?pagina=1`), invalida);
+  }
+});
+
+test("votos: sem nenhum voto coletado a página diz isso e o perfil continua", async () => {
+  const { status, html } = await comVotos(
+    historico({ votos: [], pagina: 1, total_paginas: 0, atribuicao: null }),
+  );
+
+  assert.equal(status, 200);
+  assert.ok(html.includes("Nenhum voto coletado"));
+  assert.ok(html.includes("Ana do Senado"));
+});
+
+test("votos: página além da última volta para a primeira", async () => {
+  const { status, html } = await comVotos(
+    historico({ votos: [], pagina: 9, total_paginas: 2, atribuicao: null }),
+    "?pagina=9",
+  );
+
+  assert.equal(status, 200);
+  assert.ok(html.includes("Nenhum voto nesta página"));
+  assert.ok(html.includes(`href="/senado/senadores/${CODIGO}/"`));
+});
+
+test("votos: a atribuição dos votos aparece com o conjunto de votações", async () => {
+  const { html } = await comVotos(historico());
+
+  assert.ok(html.includes("Votações do Senado"));
+  assert.ok(html.includes("https://dados.example.org/dadosabertos/votacao.json"));
+});
+
+test("votos: ementa e identificação com HTML aparecem escapadas", async () => {
+  const { html } = await comVotos(
+    historico({
+      votos: [itemDeVoto({ ementa: "<script>alert(1)</script>", identificacao: "<img src=x>" })],
+    }),
+  );
+
+  assert.ok(!html.includes("<script>alert(1)"));
+  assert.ok(!html.includes("<img src=x>"));
+});
+
+test("votos: chave desconhecida que a API devolva não chega ao HTML", async () => {
+  const corpo = historico({ votos: [itemDeVoto({ interno: "SEGREDO-NO-ITEM" })] });
+  corpo.extra = "SEGREDO-NA-RAIZ";
+  corpo.senador.email = "SEGREDO-NO-SENADOR";
+
+  const { html } = await comVotos(corpo);
+
+  assert.ok(!html.includes("SEGREDO"));
+});
+
+test("votos: API de votos com erro dá 500 genérico, sem o endereço da API", async () => {
+  const controle = await comVotos(historico());
+  assert.equal(controle.status, 200, "controle: com os votos a página precisa existir");
+
+  const { status, html } = await pagina(
+    CODIGO,
+    { status: 200, corpo: perfil() },
+    { votos: { status: 500, corpo: { erro: "boom" } } },
+  );
+
+  assert.equal(status, 500);
+  assert.ok(!html.includes(api.url));
+});
+
+test("votos: 404 dos votos com o perfil existente é incoerência da API e vira 500", async () => {
+  const { status } = await pagina(
+    CODIGO,
+    { status: 200, corpo: perfil() },
+    { votos: { status: 404, corpo: { erro: "não encontrado" } } },
+  );
+
+  assert.equal(status, 500);
+});
+
+test("votos: resposta fora do formato esperado é recusada sem vazar o texto", async () => {
+  const { status, html } = await comVotos({ votos: "SEGREDO-FORA-DO-FORMATO" });
+
+  assert.equal(status, 500);
+  assert.ok(!html.includes("SEGREDO"));
+});
+
+test("votos: perfil 404 não chama a API de votos", async () => {
+  const controle = await comVotos(historico());
+  assert.equal(controle.status, 200, "controle: a página precisa existir");
+  api.chamadas.length = 0;
+
+  const { status } = await pagina(CODIGO, { status: 404, corpo: { erro: "não encontrado" } });
+
+  assert.equal(status, 404);
+  assert.deepEqual(api.chamadas, [CAMINHO_DA_API]);
 });

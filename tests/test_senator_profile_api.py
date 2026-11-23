@@ -138,7 +138,18 @@ def test_senador_inexistente_da_404_sem_repetir_o_pedido(client, senador, codigo
 
 
 @pytest.mark.parametrize(
-    "codigo", ["abc", "-1", "0x1", "1234567890", "58-95", "5895-", "5_895", "5895/1"]
+    "codigo",
+    [
+        "abc",
+        "-1",
+        "0x1",
+        "1234567890",
+        "58-95",
+        "5895-",
+        "5_895",
+        "5895/1",
+        "٥٨٩٥",  # dígitos árabe-índicos: o int() do Python os lê como 5895
+    ],
 )
 def test_codigo_malformado_da_404_sem_consultar_o_banco(
     client, senador, codigo, django_assert_num_queries

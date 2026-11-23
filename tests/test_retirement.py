@@ -211,6 +211,59 @@ def test_linhas_brutas_do_id_somem_das_cargas_retidas_e_as_outras_ficam(dataset)
     assert segunda.raw_records.count() == 1
 
 
+def _com_espacos(valor):
+    return f" {valor} "
+
+
+def _com_zeros_a_esquerda(valor):
+    return f"000{valor}"
+
+
+def _em_digitos_arabe_indicos(valor):
+    return "".join(chr(0x0660 + int(digito)) for digito in valor)
+
+
+@pytest.mark.parametrize(
+    ("campo", "formato"),
+    [
+        ("SQ_CANDIDATO", _com_espacos),
+        ("SQ_CANDIDATO", _com_zeros_a_esquerda),
+        ("SQ_CANDIDATO", _em_digitos_arabe_indicos),
+        ("ANO_ELEICAO", _com_espacos),
+        ("ANO_ELEICAO", _em_digitos_arabe_indicos),
+        ("CD_ELEICAO", _com_zeros_a_esquerda),
+        ("NR_TURNO", _com_zeros_a_esquerda),
+    ],
+    ids=lambda parametro: getattr(parametro, "__name__", parametro).lstrip("_"),
+)
+def test_linha_bruta_com_formato_diferente_tambem_some_e_a_de_outro_candidato_fica(
+    dataset, campo, formato
+):
+    """Caracteriza a leniência de `_raw_key` (decisão do dono, mantida): o `int()` direto faz a
+    linha bruta do id retirado sumir mesmo com espaço, zero à esquerda ou dígitos de outra
+    escrita. A normalização é estrita, por isso essas linhas entram direto no bruto da carga
+    retida, depois de a carga canônica já ter virado candidatura."""
+    primeira = carga(dataset, [ana(), beto()])
+    normalizar()
+    ana_fora_do_padrao = {**ana(), campo: formato(ana()[campo])}
+    beto_fora_do_padrao = {**beto(), campo: formato(beto()[campo])}
+    assert ana_fora_do_padrao[campo] != ana()[campo]  # controle: o formato mudou o valor
+    RawRecord.objects.bulk_create(
+        [
+            RawRecord(run=primeira, item_name="BRASIL.csv", values=ana_fora_do_padrao),
+            RawRecord(run=primeira, item_name="BRASIL.csv", values=beto_fora_do_padrao),
+        ]
+    )
+    assert primeira.raw_records.count() == 4  # controle
+
+    carga(dataset, [beto()])
+    normalizar()
+
+    assert lapidas().get().source_key == ANA
+    restantes = list(primeira.raw_records.order_by("pk").values_list("values", flat=True))
+    assert restantes == [beto(), beto_fora_do_padrao]
+
+
 # --- O que NUNCA apaga ---
 
 

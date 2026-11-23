@@ -146,18 +146,27 @@ test("fora da lista: mostra a data da coleta e a ressalva de que não é o fim d
 });
 
 test("partido nulo some da página; 'S/Partido' vira 'Sem partido'", async () => {
-  const controle = await pagina();
+  // Sem votos: a tabela de votos tem a coluna "Partido (à época)" e esconderia o que se testa aqui.
+  const semVotos = {
+    votos: { status: 200, corpo: historico({ votos: [], total_paginas: 0, atribuicao: null }) },
+  };
+  const controle = await pagina(CODIGO, undefined, semVotos);
   assert.ok(controle.html.includes("Partido"), "controle: com partido o rótulo aparece");
 
-  const nulo = await pagina(CODIGO, { status: 200, corpo: perfil({ senador: { partido: null } }) });
+  const nulo = await pagina(
+    CODIGO,
+    { status: 200, corpo: perfil({ senador: { partido: null } }) },
+    semVotos,
+  );
   assert.equal(nulo.status, 200);
   assert.ok(!nulo.html.includes("Partido"));
   assert.ok(!nulo.html.includes(">null<"));
 
-  const sem = await pagina(CODIGO, {
-    status: 200,
-    corpo: perfil({ senador: { partido: "S/Partido" } }),
-  });
+  const sem = await pagina(
+    CODIGO,
+    { status: 200, corpo: perfil({ senador: { partido: "S/Partido" } }) },
+    semVotos,
+  );
   assert.ok(sem.html.includes("Sem partido"));
   assert.ok(!sem.html.includes("S/Partido"));
 });

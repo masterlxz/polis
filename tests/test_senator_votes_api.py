@@ -194,7 +194,8 @@ def test_nenhuma_chave_participacao_nos_itens_abertos(client, historico):
 
 def test_nada_de_id_interno_nem_execucao_nem_voto_de_outro_senador(client, historico):
     corpo = _ok(client, _url())
-    internos = {"id", "voting", "voting_id", "ingestion_run", "ingestion_run_id", "vote_code"}
+    # `id` fica de fora: é a chave da licença dentro da atribuição, não um id interno.
+    internos = {"pk", "voting", "voting_id", "ingestion_run", "ingestion_run_id", "vote_code"}
 
     assert not set(_todas_as_chaves(corpo)) & internos
     assert str(OUTRO) not in str(corpo)

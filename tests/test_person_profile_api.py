@@ -293,6 +293,28 @@ def test_id_malformado_da_404(client, pessoa_simples, ciclo_sq):
     assert resposta.status_code == 404
 
 
+@pytest.mark.parametrize(
+    "ciclo_sq",
+    [
+        # Dígitos de outras escritas que NÃO casam com a pessoa da fixture: com `\d` na rota daria
+        # 404 do mesmo jeito (pessoa inexistente), mas só depois de ir ao banco.
+        "٢٠٢٦-٩٩٩",
+        "٣٠٣٠-١",
+        # Largura total casa com a fixture: com `\d` na rota daria 200.
+        "２０２６-1000000001",
+    ],
+)
+def test_digito_nao_ascii_da_404_sem_consultar_o_banco(
+    client, pessoa_simples, ciclo_sq, django_assert_num_queries
+):
+    _perfil(client)  # controle
+
+    with django_assert_num_queries(0):
+        resposta = client.get(f"/internal/v1/pessoas/{ciclo_sq}/")
+
+    assert resposta.status_code == 404
+
+
 @pytest.mark.parametrize("metodo", ["post", "put", "patch", "delete"])
 def test_so_aceita_leitura(client, pessoa_simples, metodo):
     _perfil(client)  # controle

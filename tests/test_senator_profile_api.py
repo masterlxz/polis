@@ -149,6 +149,11 @@ def test_senador_inexistente_da_404_sem_repetir_o_pedido(client, senador, codigo
         "5_895",
         "5895/1",
         "٥٨٩٥",  # dígitos árabe-índicos: o int() do Python os lê como 5895
+        # zero à esquerda: o int() leria 5895 (outra URL para o mesmo senador); o 0 não é código
+        "05895",
+        "0001",
+        "0",
+        "0999999",  # não casa com a fixture: o 404 vem da rota, não da ausência do registro
     ],
 )
 def test_codigo_malformado_da_404_sem_consultar_o_banco(

@@ -310,6 +310,11 @@ def test_votacao_inexistente_da_404(client, aberta, codigo):
         "7_001",
         "7001/1",
         "٧٠٠١",  # dígitos árabe-índicos: o int() do Python os lê como 7001
+        # zero à esquerda: o int() leria 7001 (outra URL para a mesma votação); o 0 não é código
+        "07001",
+        "0001",
+        "0",
+        "0999999",  # não casa com a fixture: o 404 vem da rota, não da ausência do registro
     ],
 )
 def test_codigo_malformado_da_404_sem_consultar_o_banco(

@@ -174,7 +174,21 @@ def test_deputado_inexistente_da_404_sem_repetir_o_pedido(client, deputado, url)
 
 @pytest.mark.parametrize(
     "legislatura_id",
-    ["abc", "57-", "-1", "57-0x1", "57-1234567890", "1234567890-1", "57_1", "571", "57-1-2"],
+    [
+        "abc",
+        "57-",
+        "-1",
+        "57-0x1",
+        "57-1234567890",
+        "1234567890-1",
+        "57_1",
+        "571",
+        "57-1-2",
+        # dígitos árabe-índicos (o int() do Python os lê como 57-204554), em cada grupo e nos dois
+        "٥٧-204554",
+        "57-٢٠٤٥٥٤",
+        "٥٧-٢٠٤٥٥٤",
+    ],
 )
 def test_id_malformado_da_404_sem_consultar_o_banco(
     client, deputado, legislatura_id, django_assert_num_queries

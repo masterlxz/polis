@@ -299,7 +299,18 @@ def test_votacao_inexistente_da_404(client, aberta, codigo):
 
 
 @pytest.mark.parametrize(
-    "codigo", ["abc", "-1", "0x1", "1234567890", "70-01", "7001-", "7_001", "7001/1"]
+    "codigo",
+    [
+        "abc",
+        "-1",
+        "0x1",
+        "1234567890",
+        "70-01",
+        "7001-",
+        "7_001",
+        "7001/1",
+        "٧٠٠١",  # dígitos árabe-índicos: o int() do Python os lê como 7001
+    ],
 )
 def test_codigo_malformado_da_404_sem_consultar_o_banco(
     client, aberta, codigo, django_assert_num_queries

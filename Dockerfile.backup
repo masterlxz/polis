@@ -3,7 +3,7 @@
 # `rclone` fala com qualquer armazenamento S3-compatível: o binário vem da imagem oficial
 # `rclone/rclone` com tag fixa (o do Debian é antigo, sem `serve s3`, que o CI usa como S3
 # descartável). O `age` vem do Debian da imagem base (versão do repositório). Roda sem root.
-FROM postgres:18
+FROM postgres:19
 
 COPY --from=rclone/rclone:1.75.2 /usr/local/bin/rclone /usr/local/bin/rclone
 

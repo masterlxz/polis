@@ -4,7 +4,7 @@ from . import views
 
 # O padrão só casa legislatura e id da Câmara de 1 a 9 dígitos (cabem no int32 do parser);
 # qualquer outra coisa cai no 404 padrão, sem chegar ao banco.
-# Em todas as rotas, [0-9] e não \d: o \d do Python casa dígitos de outras escritas
+# Nas rotas deste arquivo, [0-9] e não \d: o \d do Python casa dígitos de outras escritas
 # (o int() os lê), que chegariam ao banco.
 urlpatterns = [
     re_path(

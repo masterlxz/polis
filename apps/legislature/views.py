@@ -20,7 +20,7 @@ from collections import Counter
 from django.http import JsonResponse
 from django.views.decorators.http import require_safe
 
-from .models import Deputy, SenateVoting, Senator
+from .models import Deputy, SenateVote, SenateVoting, Senator
 
 VOTINGS_PER_PAGE = 50
 # Só dígitos ASCII, de 1 a 4: `\d` aceitaria dígitos de outras escritas.
@@ -202,3 +202,62 @@ def senate_voting_detail(request, code):
         },
         json_dumps_params={"ensure_ascii": False},
     )
+
+
+@require_safe
+def senator_votes(request, senate_id):
+    """Histórico de votos de um senador, mais recente primeiro, 50 por página (ADR 0030, emenda 7).
+
+    Cada item é uma votação com o voto dele. Na votação secreta a sigla sai como `participacao` e
+    a chave `voto` não existe; na aberta sai `voto` e não existe `participacao` (decisão 2 do ADR
+    0030, por item). Partido e UF são os do momento do voto, não os do perfil. Senador fora de
+    `Senator` dá 404, como o perfil, mesmo que tenha votado.
+    """
+    page_text = request.GET.get("pagina", "1")
+    if not _PAGE_PATTERN.fullmatch(page_text) or int(page_text) == 0:
+        return JsonResponse(
+            {"erro": "página inválida"}, status=400, json_dumps_params={"ensure_ascii": False}
+        )
+    page = int(page_text)
+
+    senator = Senator.objects.filter(senate_id=senate_id).first()
+    if senator is None:
+        return JsonResponse({"erro": "não encontrado"}, status=404)
+
+    votes_of_senator = SenateVote.objects.filter(senate_id=senate_id)
+    total = votes_of_senator.count()
+    start = (page - 1) * VOTINGS_PER_PAGE
+    votes = list(
+        votes_of_senator.select_related("voting__ingestion_run__dataset__source").order_by(
+            "-voting__voted_on", "-voting__session_voting_code"
+        )[start : start + VOTINGS_PER_PAGE]
+    )
+    newest_run = max(
+        (v.voting.ingestion_run for v in votes), key=lambda r: r.started_at, default=None
+    )
+    return JsonResponse(
+        {
+            "senador": {"id_senado": senator.senate_id, "nome": senator.name},
+            "votos": [_senator_vote_item(v) for v in votes],
+            "pagina": page,
+            "total_paginas": (total + VOTINGS_PER_PAGE - 1) // VOTINGS_PER_PAGE,
+            "atribuicao": _attribution(newest_run) if newest_run else None,
+        },
+        json_dumps_params={"ensure_ascii": False},
+    )
+
+
+def _senator_vote_item(vote):
+    voting = vote.voting
+    item = {
+        "codigo": voting.session_voting_code,
+        "data": voting.voted_on.isoformat(),
+        "identificacao": voting.identification,
+        "ementa": voting.summary,
+        "resultado": voting.result,
+        "secreta": voting.secret,
+        "partido": _or_none(vote.party_acronym),
+        "uf": vote.state,
+    }
+    item["participacao" if voting.secret else "voto"] = vote.vote_code
+    return item

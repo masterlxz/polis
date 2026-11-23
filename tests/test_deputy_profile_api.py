@@ -188,6 +188,14 @@ def test_deputado_inexistente_da_404_sem_repetir_o_pedido(client, deputado, url)
         "٥٧-204554",
         "57-٢٠٤٥٥٤",
         "٥٧-٢٠٤٥٥٤",
+        # zero à esquerda: o int() leria 57-204554 (uma segunda URL para o mesmo recurso), então a
+        # rota recusa em cada grupo, isolado, e o 0 sozinho não é id nem legislatura
+        "057-204554",
+        "57-0204554",
+        "0-204554",
+        "57-0",
+        # não casa com a fixture: o 404 vem da rota, não da ausência do registro
+        "057-0999999",
     ],
 )
 def test_id_malformado_da_404_sem_consultar_o_banco(

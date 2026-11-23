@@ -303,7 +303,21 @@ def test_senador_sem_perfil_da_404_mesmo_com_votos(client, run, historico):
     assert resposta.json() == {"erro": "não encontrado"}
 
 
-@pytest.mark.parametrize("codigo", ["abc", "1234567890", "-1", "1.5", "٣"])
+@pytest.mark.parametrize(
+    "codigo",
+    [
+        "abc",
+        "1234567890",
+        "-1",
+        "1.5",
+        "٣",
+        # zero à esquerda: o int() leria 5500 (outra URL para o mesmo senador); o 0 não é código
+        "05500",
+        "0001",
+        "0",
+        "0999999",  # não casa com a fixture: o 404 vem da rota, não da ausência do registro
+    ],
+)
 def test_codigo_malformado_da_404_sem_consultar_o_banco(
     client, historico, codigo, django_assert_num_queries
 ):

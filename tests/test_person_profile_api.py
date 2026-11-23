@@ -315,6 +315,28 @@ def test_digito_nao_ascii_da_404_sem_consultar_o_banco(
     assert resposta.status_code == 404
 
 
+@pytest.mark.parametrize(
+    "ciclo_sq",
+    [
+        # Zero à esquerda no SQ: o int() leria 1000000001 (outra URL para a mesma pessoa).
+        "2026-01000000001",
+        "2026-0001",
+        "2026-0",
+        # Não casa com a fixture: o 404 vem da rota, não da ausência do registro.
+        "2026-0999999999",
+    ],
+)
+def test_zero_a_esquerda_no_sq_da_404_sem_consultar_o_banco(
+    client, pessoa_simples, ciclo_sq, django_assert_num_queries
+):
+    _perfil(client)  # controle
+
+    with django_assert_num_queries(0):
+        resposta = client.get(f"/internal/v1/pessoas/{ciclo_sq}/")
+
+    assert resposta.status_code == 404
+
+
 @pytest.mark.parametrize("metodo", ["post", "put", "patch", "delete"])
 def test_so_aceita_leitura(client, pessoa_simples, metodo):
     _perfil(client)  # controle

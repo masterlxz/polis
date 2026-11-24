@@ -261,7 +261,21 @@ test("`em_exercicio` que não é booleano é recusado", async () => {
   assert.equal(status, 500);
 });
 
-for (const invalido of ["abc", "1234567890", "-1", "5012x", "50.12"]) {
+// A rota do Django (`apps/legislature/urls.py`) só casa `[1-9][0-9]{0,8}`: sem zero à esquerda, sem
+// `0` e só dígitos ASCII. O front recusa o mesmo, sem chamar a API. "05012" é o código da fixture
+// com um zero na frente; "0042" não tem relação com ela; "٥٠١٢" é 5012 em dígitos árabe-índicos.
+for (const invalido of [
+  "abc",
+  "1234567890",
+  "-1",
+  "5012x",
+  "50.12",
+  "05012",
+  "0042",
+  "0",
+  "00",
+  "٥٠١٢",
+]) {
   test(`código malformado dá 404 sem chamar a API: ${invalido}`, async () => {
     const controle = await pagina();
     assert.equal(controle.status, 200, "controle: o código válido precisa dar 200");
@@ -271,6 +285,21 @@ for (const invalido of ["abc", "1234567890", "-1", "5012x", "50.12"]) {
 
     assert.equal(status, 404);
     assert.deepEqual(api.chamadas, [], "o front chamou a API com código inválido");
+  });
+}
+
+// Nenhum código que a rota aceita pode ser recusado: o menor, o de 9 dígitos e um com zero no meio.
+for (const canonico of ["1", "5895", "100200", "999999999"]) {
+  test(`código canônico segue para a API (perfil e votos): ${canonico}`, async () => {
+    api.chamadas.length = 0;
+
+    const { status } = await pagina(canonico);
+
+    assert.equal(status, 200);
+    assert.deepEqual(api.chamadas, [
+      `GET /internal/v1/senadores/${canonico}/`,
+      `GET /internal/v1/senadores/${canonico}/votos/?pagina=1`,
+    ]);
   });
 }
 
@@ -378,7 +407,9 @@ test("votos: a página pedida vai à API; página inválida vira 1", async () =>
   await comVotos(historico({ pagina: 2, total_paginas: 2 }), "?pagina=2");
   assert.ok(api.chamadas.includes(`${CAMINHO_DOS_VOTOS}?pagina=2`));
 
-  for (const invalida of ["0", "abc", "-1", "12345"]) {
+  // "02" e "0002" valiam 2 com o `[0-9]{1,4}`; a regra do `?pagina=` é `[1-9][0-9]{0,3}` (sem zero
+  // à esquerda), então o front manda a 1. "٢" é 2 em dígito árabe-índico.
+  for (const invalida of ["0", "abc", "-1", "12345", "02", "0002", "٢"]) {
     api.chamadas.length = 0;
     const { status } = await comVotos(historico(), `?pagina=${invalida}`);
 

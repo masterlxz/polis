@@ -296,6 +296,30 @@ for (const [descricao, corpo] of [
   });
 }
 
+// O `id` do resultado vira `href="/pessoas/<id>/"`: só passa o que a rota `pessoas/` aceita
+// (`apps/elections/urls.py`: `[0-9]{4}-[1-9][0-9]{0,11}`). Com zero à esquerda o link seria um 404
+// garantido, então a resposta é recusada inteira, como qualquer id fora do formato.
+for (const id of ["2026-0123", "2026-0", "2026-040002532272", "٢٠٢٦-123", "2026-١٢٣"]) {
+  test(`API devolve id que a rota recusaria: erro 500 e nenhum link: ${id}`, async () => {
+    const controle = await buscar("maria");
+    assert.equal(controle.status, 200, "controle: o formato válido precisa funcionar");
+
+    const { status, html } = await buscar("maria", lista(resultado({ id })));
+
+    assert.equal(status, 500);
+    assert.ok(!html.includes(`/pessoas/${id}/`), "virou link");
+  });
+}
+
+for (const id of ["2026-1", "2024-123", "2026-999999999999", "2026-100200"]) {
+  test(`id canônico devolvido pela API vira link: ${id}`, async () => {
+    const { status, html } = await buscar("maria", lista(resultado({ id })));
+
+    assert.equal(status, 200);
+    assert.match(html, new RegExp(`<a[^>]*href="/pessoas/${id}/"[^>]*>MARIA SILVA</a>`));
+  });
+}
+
 // --- filtros de UF e partido (PR 2 de 2; a API é a do PR #74) -------------------------------------
 
 const SIGLAS = "AC AL AP AM BA CE DF ES GO MA MT MS MG PA PB PR PE PI RJ RN RS RO RR SC SP SE TO".split(

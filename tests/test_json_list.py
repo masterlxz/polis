@@ -357,7 +357,9 @@ def test_decisao_do_dono_sem_justificativa_nao_habilita():
 
 
 def test_o_catalogo_cadastra_deputados_so_com_a_allowlist_e_sem_habilitar():
-    [entrada] = [d for d in catalog.DATASETS if d["source"] == "camara"]
+    [entrada] = [
+        d for d in catalog.DATASETS if d["source"] == "camara" and d["slug"] == "deputados"
+    ]
 
     assert entrada["slug"] == "deputados"
     assert entrada["format"] == "json"

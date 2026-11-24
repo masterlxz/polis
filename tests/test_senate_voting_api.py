@@ -446,7 +446,9 @@ def test_sem_nenhuma_votacao_lista_vazia_e_sem_atribuicao(client, run):
     assert corpo == {"votacoes": [], "pagina": 1, "total_paginas": 0, "atribuicao": None}
 
 
-@pytest.mark.parametrize("pagina", ["0", "-1", "abc", "1.5", "12345", "", " 2"])
+@pytest.mark.parametrize(
+    "pagina", ["0", "-1", "abc", "1.5", "12345", "", " 2", "00", "01", "0001", "09", "007"]
+)
 def test_pagina_malformada_da_400(client, aberta, pagina):
     _ok(client, LISTA)  # controle
 
@@ -454,6 +456,13 @@ def test_pagina_malformada_da_400(client, aberta, pagina):
 
     assert resposta.status_code == 400
     assert resposta.json() == {"erro": "página inválida"}
+
+
+@pytest.mark.parametrize("pagina", ["1", "2", "9999"])
+def test_pagina_na_forma_canonica_segue_valida(client, aberta, pagina):
+    corpo = _ok(client, f"{LISTA}?pagina={pagina}")
+
+    assert corpo["pagina"] == int(pagina)
 
 
 def test_atribuicao_da_lista_e_a_da_coleta_mais_recente_da_pagina(client, run):

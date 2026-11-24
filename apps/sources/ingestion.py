@@ -42,6 +42,7 @@ from .json_list import JsonListError, JsonListReader, fetch_pages
 from .json_senado import fetch_senate_list
 from .json_senado_votacoes import MAX_VOTES, fetch_senate_votings
 from .models import IngestionRun, RawRecord, Source
+from .plain_csv import PlainCsvReader
 from .zip_csv import DuplicateColumnError, InvalidFormatError, MissingColumnError, ZipCsvReader
 
 KEEP_LOADS = 3
@@ -159,6 +160,9 @@ def _load(dataset, run, path, fields, batch_size, keep_loads):
         reader = JsonListReader(path, dataset.allowed_columns, max_items=MAX_VOTES)
     elif dataset.format in (dataset.Format.JSON, dataset.Format.JSON_SENADO):
         reader = JsonListReader(path, dataset.allowed_columns)
+    elif dataset.format == dataset.Format.CSV:
+        # Arquivos anuais da Câmara: `votacoes` tem registro em mais de uma linha física.
+        reader = PlainCsvReader(path, dataset.allowed_columns, allow_multiline_records=True)
     else:
         reader = ZipCsvReader(path, dataset.allowed_columns)
     loaded = 0

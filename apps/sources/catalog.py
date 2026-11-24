@@ -203,4 +203,63 @@ DATASETS = [
         "schedule_interval_hours": 24,
         "earliest_hour_utc": 8,
     },
+    {
+        # Votações da Câmara em 2026, pelo arquivo anual em massa (ADR 0031): 20 colunas, 9.153
+        # votações, 5,6 MB, medido em 2026-11-24 (arquivo regenerado às 06:50 GMT). Sem licença
+        # declarada: a base é a decisão do dono, no admin. Ano fixo no cadastro: virar o ano é um
+        # cadastro novo e uma decisão do dono. Ficam de fora e são descartados na leitura as `uri*`,
+        # o órgão e o evento por id, a abertura da votação e o texto da última apresentação, que
+        # tem quebra de linha e até 3.426 caracteres (ADR 0005). `descricao` tem quebra de linha em
+        # 5 registros: o formato `csv` aceita registro multilinha.
+        "source": "camara",
+        "slug": "votacoes-2026",
+        "name": "Votações da Câmara (2026)",
+        "url": "https://dadosabertos.camara.leg.br/arquivos/votacoes/csv/votacoes-2026.csv",
+        "format": "csv",
+        "allowed_columns": [
+            "id",
+            "data",
+            "dataHoraRegistro",
+            "siglaOrgao",
+            "aprovacao",
+            "votosSim",
+            "votosNao",
+            "votosOutros",
+            "descricao",
+            "ultimaApresentacaoProposicao_idProposicao",
+        ],
+        "internal_columns": [],
+        "license_basis": "owner_decision",
+        "license_id": "",
+        "license_url": "",
+        "license_check_url": "",
+        "schedule_interval_hours": 24,
+        "earliest_hour_utc": 8,
+    },
+    {
+        # Votos nominais da Câmara em 2026 (ADR 0031): 12 colunas, 57.855 votos em 170 votações,
+        # 19,2 MB, medido em 2026-11-24. Só 6 colunas: o partido é o do momento do voto. Nome,
+        # `uri`, `uriPartido`, UF e foto do deputado são descartados na leitura (ADR 0005);
+        # `deputado_idLegislatura` entra porque, com `deputado_id`, é a chave de `Deputy`.
+        "source": "camara",
+        "slug": "votos-2026",
+        "name": "Votos nominais da Câmara (2026)",
+        "url": "https://dadosabertos.camara.leg.br/arquivos/votacoesVotos/csv/votacoesVotos-2026.csv",
+        "format": "csv",
+        "allowed_columns": [
+            "idVotacao",
+            "dataHoraVoto",
+            "voto",
+            "deputado_id",
+            "deputado_siglaPartido",
+            "deputado_idLegislatura",
+        ],
+        "internal_columns": [],
+        "license_basis": "owner_decision",
+        "license_id": "",
+        "license_url": "",
+        "license_check_url": "",
+        "schedule_interval_hours": 24,
+        "earliest_hour_utc": 8,
+    },
 ]

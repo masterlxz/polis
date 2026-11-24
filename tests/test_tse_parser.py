@@ -227,8 +227,11 @@ def test_sq_candidato_zero_e_recusado_porque_a_rota_do_perfil_nao_o_casa(tse, sq
 
 
 @pytest.mark.parametrize("sq", ["1", "250001234567", "9" * 18])
-def test_sq_candidato_positivo_segue_aceito_ate_18_digitos(tse, sq):
-    # O teto efetivo é o de `_DIGITS` (18 dígitos), que é menor que o INT64 (19 dígitos).
+def test_sq_candidato_positivo_hoje_aceito_ate_18_digitos(tse, sq):
+    # CARACTERIZAÇÃO do estado atual, não contrato desejado: o teto efetivo é o de `_DIGITS`
+    # (18 dígitos), menor que o INT64 (19). Há descasamento conhecido com a rota do perfil
+    # (`[1-9][0-9]{0,11}`, 12 dígitos): um SQ de 13 a 18 dígitos passa aqui e não teria página.
+    # Fica para outra tarefa; o caso "9" * 18 não é um valor que se queira garantir.
     resultado = tse.parse_row(linha(SQ_CANDIDATO=sq))
     assert resultado.person["tse_candidate_id"] == int(sq)
 
@@ -240,10 +243,22 @@ def test_sq_candidato_de_19_digitos_segue_recusado(tse, sq):
     assert erro.value.column == "SQ_CANDIDATO"
 
 
-@pytest.mark.parametrize("coluna", ["NR_TURNO", "CD_ELEICAO", "NR_CANDIDATO", "CD_CARGO"])
-def test_zero_segue_aceito_nas_outras_colunas_numericas_obrigatorias(tse, coluna):
-    # Só o SQ_CANDIDATO ganhou mínimo: nada indica que o TSE não use 0 nos códigos.
-    assert tse.parse_row(linha(**{coluna: "0"})) is not None
+@pytest.mark.parametrize(
+    ("coluna", "parte", "campo"),
+    [
+        ("NR_TURNO", "election", "round"),
+        ("CD_ELEICAO", "election", "tse_code"),
+        ("CD_TIPO_ELEICAO", "election", "kind_code"),
+        ("NR_CANDIDATO", "candidacy", "ballot_number"),
+        ("CD_CARGO", "candidacy", "office_code"),
+        ("NR_PARTIDO", "candidacy", "party_number"),
+    ],
+)
+def test_zero_segue_aceito_nas_outras_colunas_numericas_obrigatorias(tse, coluna, parte, campo):
+    # Só o SQ_CANDIDATO ganhou mínimo: nada indica que o TSE não use 0 nos códigos. O valor 0
+    # tem de chegar ao campo, não só "não levantar". ANO_ELEICAO fica de fora: 0 ali é ano inválido.
+    resultado = tse.parse_row(linha(**{coluna: "0"}))
+    assert getattr(resultado, parte)[campo] == 0
 
 
 @pytest.mark.parametrize(

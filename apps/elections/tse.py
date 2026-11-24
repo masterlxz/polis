@@ -134,6 +134,7 @@ def parse_row(values):
     person = {
         "cycle_year": year,
         # Mínimo 1: a rota do perfil (`urls.py`) só casa SQ de 1 em diante; um 0 não teria página.
+        # O teto 12 (rota) x 18 (`_DIGITS`) é descasamento conhecido, para outra tarefa.
         "tse_candidate_id": _required_int(values, "SQ_CANDIDATO", INT64, minimum=1),
         "public_name": _required_text(values, "NM_URNA_CANDIDATO", _limit(Person, "public_name")),
         "social_name": _optional_text(values, "NM_SOCIAL_CANDIDATO", _limit(Person, "social_name")),

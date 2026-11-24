@@ -217,6 +217,33 @@ def test_numero_invalido_ou_fora_da_faixa_e_recusado(tse, numero):
         assert erro.value.column == coluna
 
 
+@pytest.mark.parametrize("sq", ["0", "00", "000", "0000000000000000"])
+def test_sq_candidato_zero_e_recusado_porque_a_rota_do_perfil_nao_o_casa(tse, sq):
+    # A rota `pessoas/<ciclo>-<sq>/` só casa `[1-9][0-9]{0,11}`: um SQ 0 viraria uma pessoa sem
+    # página. Zero com zeros à esquerda vale o mesmo, pois o `int()` o reduz a 0.
+    with pytest.raises(tse.RowError) as erro:
+        tse.parse_row(linha(SQ_CANDIDATO=sq))
+    assert erro.value.column == "SQ_CANDIDATO"
+
+
+@pytest.mark.parametrize("sq", ["1", "250001234567", str(2**63 - 1)])
+def test_sq_candidato_positivo_ate_o_maximo_de_64_bits_segue_aceito(tse, sq):
+    resultado = tse.parse_row(linha(SQ_CANDIDATO=sq))
+    assert resultado.person["tse_candidate_id"] == int(sq)
+
+
+def test_sq_candidato_acima_do_maximo_de_64_bits_segue_recusado(tse):
+    with pytest.raises(tse.RowError) as erro:
+        tse.parse_row(linha(SQ_CANDIDATO=str(2**63)))
+    assert erro.value.column == "SQ_CANDIDATO"
+
+
+@pytest.mark.parametrize("coluna", ["NR_TURNO", "CD_ELEICAO", "NR_CANDIDATO", "CD_CARGO"])
+def test_zero_segue_aceito_nas_outras_colunas_numericas_obrigatorias(tse, coluna):
+    # Só o SQ_CANDIDATO ganhou mínimo: nada indica que o TSE não use 0 nos códigos.
+    assert tse.parse_row(linha(**{coluna: "0"})) is not None
+
+
 @pytest.mark.parametrize(
     "data",
     ["31/02/2026", "2026-10-04", "4/10/2026", "04/10/26", "00/00/0000", "04-10-2026", "abc"],

@@ -226,15 +226,17 @@ def test_sq_candidato_zero_e_recusado_porque_a_rota_do_perfil_nao_o_casa(tse, sq
     assert erro.value.column == "SQ_CANDIDATO"
 
 
-@pytest.mark.parametrize("sq", ["1", "250001234567", str(2**63 - 1)])
-def test_sq_candidato_positivo_ate_o_maximo_de_64_bits_segue_aceito(tse, sq):
+@pytest.mark.parametrize("sq", ["1", "250001234567", "9" * 18])
+def test_sq_candidato_positivo_segue_aceito_ate_18_digitos(tse, sq):
+    # O teto efetivo é o de `_DIGITS` (18 dígitos), que é menor que o INT64 (19 dígitos).
     resultado = tse.parse_row(linha(SQ_CANDIDATO=sq))
     assert resultado.person["tse_candidate_id"] == int(sq)
 
 
-def test_sq_candidato_acima_do_maximo_de_64_bits_segue_recusado(tse):
+@pytest.mark.parametrize("sq", ["1" + "0" * 18, str(2**63 - 1), str(2**63)])
+def test_sq_candidato_de_19_digitos_segue_recusado(tse, sq):
     with pytest.raises(tse.RowError) as erro:
-        tse.parse_row(linha(SQ_CANDIDATO=str(2**63)))
+        tse.parse_row(linha(SQ_CANDIDATO=sq))
     assert erro.value.column == "SQ_CANDIDATO"
 
 

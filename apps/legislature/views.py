@@ -23,8 +23,9 @@ from django.views.decorators.http import require_safe
 from .models import Deputy, SenateVote, SenateVoting, Senator
 
 VOTINGS_PER_PAGE = 50
-# Só dígitos ASCII, de 1 a 4: `\d` aceitaria dígitos de outras escritas.
-_PAGE_PATTERN = re.compile(r"[0-9]{1,4}")
+# Só a forma canônica, de 1 a 9999: sem zero à esquerda (nem `0`) e só dígitos ASCII (`\d`
+# aceitaria dígitos de outras escritas). Mesma regra das rotas (`[1-9][0-9]{0,N}`).
+_PAGE_PATTERN = re.compile(r"[1-9][0-9]{0,3}")
 
 
 def _or_none(value):
@@ -110,7 +111,7 @@ def senate_voting_list(request):
     para ao ver a lista vazia. A atribuição é a da coleta mais recente entre as votações da página.
     """
     page_text = request.GET.get("pagina", "1")
-    if not _PAGE_PATTERN.fullmatch(page_text) or int(page_text) == 0:
+    if not _PAGE_PATTERN.fullmatch(page_text):
         return JsonResponse(
             {"erro": "página inválida"}, status=400, json_dumps_params={"ensure_ascii": False}
         )
@@ -214,7 +215,7 @@ def senator_votes(request, senate_id):
     `Senator` dá 404, como o perfil, mesmo que tenha votado.
     """
     page_text = request.GET.get("pagina", "1")
-    if not _PAGE_PATTERN.fullmatch(page_text) or int(page_text) == 0:
+    if not _PAGE_PATTERN.fullmatch(page_text):
         return JsonResponse(
             {"erro": "página inválida"}, status=400, json_dumps_params={"ensure_ascii": False}
         )

@@ -327,7 +327,9 @@ def test_codigo_malformado_da_404_sem_consultar_o_banco(
         assert client.get(f"/internal/v1/senadores/{codigo}/votos/").status_code == 404
 
 
-@pytest.mark.parametrize("pagina", ["0", "-1", "abc", "", "12345", "1.5", "٢"])
+@pytest.mark.parametrize(
+    "pagina", ["0", "-1", "abc", "", "12345", "1.5", "٢", "00", "01", "0001", "09", "007"]
+)
 def test_pagina_malformada_da_400(client, historico, pagina):
     _ok(client, _url())  # controle
 
@@ -335,6 +337,13 @@ def test_pagina_malformada_da_400(client, historico, pagina):
 
     assert resposta.status_code == 400
     assert resposta.json() == {"erro": "página inválida"}
+
+
+@pytest.mark.parametrize("pagina", ["1", "2", "9999"])
+def test_pagina_na_forma_canonica_segue_valida(client, historico, pagina):
+    corpo = _ok(client, f"{_url()}?pagina={pagina}")
+
+    assert corpo["pagina"] == int(pagina)
 
 
 @pytest.mark.parametrize("metodo", ["post", "put", "patch", "delete"])

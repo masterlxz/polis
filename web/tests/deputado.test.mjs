@@ -197,7 +197,31 @@ test("API que não responde estoura o tempo limite e dá erro 500", async () => 
   }
 });
 
-for (const invalido of ["57-abc", "571", "57-", "-1", "57-1234567890", "1234567890-1", "abc-123"]) {
+// A rota do Django (`apps/legislature/urls.py`) só casa `[1-9][0-9]{0,8}-[1-9][0-9]{0,8}`: sem zero
+// à esquerda, sem `0` e só dígitos ASCII. O front recusa o mesmo, sem gastar uma chamada à API.
+// "057-204554" e "57-0204554" são o id da fixture com um zero na frente; "58-1" não tem nada a ver
+// com ela. Os dígitos árabe-índicos (٥٧ = 57) são guarda de regressão: passam também com o código
+// antigo (o `\d` do JS já era só ASCII), por isso não estão entre as falhas do controle.
+const IDS_FORA_DA_ROTA = [
+  "57-abc",
+  "571",
+  "57-",
+  "-1",
+  "57-1234567890",
+  "1234567890-1",
+  "abc-123",
+  "057-204554",
+  "57-0204554",
+  "0-1",
+  "57-0",
+  "0-0",
+  "00-1",
+  "58-01",
+  "٥٧-204554",
+  "57-٢٠٤٥٥٤",
+];
+
+for (const invalido of IDS_FORA_DA_ROTA) {
   test(`id malformado dá 404 sem chamar a API: ${invalido}`, async () => {
     const controle = await pagina();
     assert.equal(controle.status, 200, "controle: a página precisa existir");
@@ -207,6 +231,19 @@ for (const invalido of ["57-abc", "571", "57-", "-1", "57-1234567890", "12345678
 
     assert.equal(status, 404);
     assert.equal(api.chamadas.length, antes, "chamou a API com um id inválido");
+  });
+}
+
+// Nenhum id que a rota aceita pode ser recusado pelo front: o menor, um de 9 dígitos em cada parte
+// e um com zero no meio (zero só é proibido na frente).
+for (const canonico of ["1-1", "58-10", "999999999-999999999", "57-100200"]) {
+  test(`id canônico segue para a API: ${canonico}`, async () => {
+    api.chamadas.length = 0;
+
+    const { status } = await pagina(canonico);
+
+    assert.equal(status, 200);
+    assert.deepEqual(api.chamadas, [`GET /internal/v1/deputados/${canonico}/`]);
   });
 }
 

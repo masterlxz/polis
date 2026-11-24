@@ -171,7 +171,18 @@ test("lista: a página pedida segue para a API", async () => {
   assert.deepEqual(api.chamadas, [`GET ${CAMINHO_DA_LISTA}?pagina=2`]);
 });
 
-for (const invalida of ["abc", "0", "-1", "99999", "1.5", ""]) {
+test("lista: página de 4 dígitos (a maior) segue para a API", async () => {
+  api.chamadas.length = 0;
+
+  await abrir("/senado/votacoes/?pagina=9999", { status: 200, corpo: lista({ pagina: 9999 }) });
+
+  assert.deepEqual(api.chamadas, [`GET ${CAMINHO_DA_LISTA}?pagina=9999`]);
+});
+
+// "02" e "0002" valiam 2 com o `[0-9]{1,4}`; a regra do `?pagina=` é `[1-9][0-9]{0,3}` (sem zero à
+// esquerda), então vira a 1. "٢" (2 em dígito árabe-índico) é guarda de regressão: passa também com
+// o código antigo.
+for (const invalida of ["abc", "0", "-1", "99999", "1.5", "", "02", "0002", "٢"]) {
   test(`lista: página inválida vira a primeira: "${invalida}"`, async () => {
     api.chamadas.length = 0;
 
@@ -377,7 +388,11 @@ for (const [nome, montar] of Object.entries(misturadas)) {
 
 // --- Detalhe: erros e estrutura ------------------------------------------------------------------
 
-for (const invalido of ["abc", "0x1", "1234567890", "70-01", "-1"]) {
+// A rota do Django (`apps/legislature/urls.py`) só casa `[1-9][0-9]{0,8}`: sem zero à esquerda, sem
+// `0` e só dígitos ASCII. O front recusa o mesmo, sem chamar a API. "07001" é o código da fixture com
+// um zero na frente; "0042" não tem relação com ela. "٧٠٠١" (7001 em dígitos árabe-índicos) é guarda
+// de regressão: passa também com o código antigo (o `\d` do JS já era só ASCII).
+for (const invalido of ["abc", "0x1", "1234567890", "70-01", "-1", "07001", "0042", "0", "00", "٧٠٠١"]) {
   test(`código malformado dá 404 sem chamar a API: ${invalido}`, async () => {
     const controle = await detalhe();
     assert.equal(controle.status, 200, "controle: a página precisa existir");
@@ -387,6 +402,18 @@ for (const invalido of ["abc", "0x1", "1234567890", "70-01", "-1"]) {
 
     assert.equal(status, 404);
     assert.equal(api.chamadas.length, antes, "chamou a API com um código inválido");
+  });
+}
+
+// Nenhum código que a rota aceita pode ser recusado: o menor, o de 9 dígitos e um com zero no meio.
+for (const canonico of ["1", "5895", "100200", "999999999"]) {
+  test(`código canônico segue para a API: ${canonico}`, async () => {
+    api.chamadas.length = 0;
+
+    const { status } = await detalhe(aberta(), canonico);
+
+    assert.equal(status, 200);
+    assert.deepEqual(api.chamadas, [`GET ${CAMINHO_DA_LISTA}${canonico}/`]);
   });
 }
 

@@ -1,11 +1,14 @@
 // Cliente da API interna do Django (ADR 0015, decisão 2). Só roda no servidor.
 import { cache } from "react";
 
-// Ciclo de 4 dígitos e SQ_CANDIDATO de 1 a 12 dígitos: o mesmo formato da rota do Django.
-// O id da URL só segue para a API depois de casar aqui; o resto vira 404 sem chamar a API.
-const PADRAO_DO_ID = /^\d{4}-\d{1,12}$/;
-// Legislatura e id da Câmara, de 1 a 9 dígitos cada: o mesmo formato da rota do Django.
-const PADRAO_DO_ID_DO_DEPUTADO = /^\d{1,9}-\d{1,9}$/;
+// Os padrões abaixo copiam os das rotas do Django (`apps/elections/urls.py` e
+// `apps/legislature/urls.py`). O [0-9] explícito só espelha a rota: o `\d` do JS sem a flag `u` já
+// casava só ASCII. O que mudou de fato é a recusa de zero à esquerda e de `0` nos ids. O id da URL
+// só segue para a API depois de casar aqui; o resto vira 404 sem chamar a API.
+// Ciclo de 4 dígitos e SQ_CANDIDATO de 1 a 12 dígitos, sem zero à esquerda (o ciclo não tem essa regra).
+const PADRAO_DO_ID = /^[0-9]{4}-[1-9][0-9]{0,11}$/;
+// Legislatura e id da Câmara, de 1 a 9 dígitos cada, sem zero à esquerda.
+const PADRAO_DO_ID_DO_DEPUTADO = /^[1-9][0-9]{0,8}-[1-9][0-9]{0,8}$/;
 const TEMPO_LIMITE_PADRAO_MS = 5000;
 
 export function idValido(id) {
@@ -154,19 +157,20 @@ function perfilDeDeputadoValido(perfil) {
   );
 }
 
-// Código da votação do Senado, de 1 a 9 dígitos: o mesmo formato da rota do Django.
-const PADRAO_DO_CODIGO_DA_VOTACAO = /^\d{1,9}$/;
-// Página da lista: de 1 a 4 dígitos ASCII, como a API aceita (ADR 0030).
-const PADRAO_DA_PAGINA = /^[0-9]{1,4}$/;
+// Código do Senado (da votação e do senador), de 1 a 9 dígitos sem zero à esquerda: o padrão das
+// rotas `senado/votacoes/<code>/` e `senadores/<senate_id>/` do Django.
+const PADRAO_DO_CODIGO_DO_SENADO = /^[1-9][0-9]{0,8}$/;
+// Página da lista: de 1 a 4 dígitos ASCII, sem zero à esquerda (a regra do `?pagina=` da API, ADR 0030).
+const PADRAO_DA_PAGINA = /^[1-9][0-9]{0,3}$/;
 
 export function codigoDeVotacaoValido(codigo) {
-  return PADRAO_DO_CODIGO_DA_VOTACAO.test(codigo);
+  return PADRAO_DO_CODIGO_DO_SENADO.test(codigo);
 }
 
 // A página que vai à API: a que o usuário pediu, se válida; qualquer outra coisa vira a 1.
 export function prepararPagina(valor) {
   const texto = primeiroTexto(valor);
-  return PADRAO_DA_PAGINA.test(texto) && Number(texto) > 0 ? Number(texto) : 1;
+  return PADRAO_DA_PAGINA.test(texto) ? Number(texto) : 1;
 }
 
 // GET na API interna: `null` no 404; qualquer outra falha vira `ErroDaApi` sem o endereço.
@@ -284,9 +288,9 @@ export const buscarVotacaoDoSenado = cache(async (codigo) => {
   return corpo;
 });
 
-// Código do senador no Senado, de 1 a 9 dígitos: o mesmo formato da rota do Django.
+// Código do senador no Senado: o mesmo padrão do código da votação.
 export function codigoDeSenadorValido(codigo) {
-  return PADRAO_DO_CODIGO_DA_VOTACAO.test(codigo);
+  return PADRAO_DO_CODIGO_DO_SENADO.test(codigo);
 }
 
 function perfilDeSenadorValido(corpo) {

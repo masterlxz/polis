@@ -217,6 +217,50 @@ def test_numero_invalido_ou_fora_da_faixa_e_recusado(tse, numero):
         assert erro.value.column == coluna
 
 
+@pytest.mark.parametrize("sq", ["0", "00", "000", "0000000000000000"])
+def test_sq_candidato_zero_e_recusado_porque_a_rota_do_perfil_nao_o_casa(tse, sq):
+    # A rota `pessoas/<ciclo>-<sq>/` só casa `[1-9][0-9]{0,11}`: um SQ 0 viraria uma pessoa sem
+    # página. Zero com zeros à esquerda vale o mesmo, pois o `int()` o reduz a 0.
+    with pytest.raises(tse.RowError) as erro:
+        tse.parse_row(linha(SQ_CANDIDATO=sq))
+    assert erro.value.column == "SQ_CANDIDATO"
+
+
+@pytest.mark.parametrize("sq", ["1", "250001234567", "9" * 18])
+def test_sq_candidato_positivo_hoje_aceito_ate_18_digitos(tse, sq):
+    # CARACTERIZAÇÃO do estado atual, não contrato desejado: o teto efetivo é o de `_DIGITS`
+    # (18 dígitos), menor que o INT64 (19). Há descasamento conhecido com a rota do perfil
+    # (`[1-9][0-9]{0,11}`, 12 dígitos): um SQ de 13 a 18 dígitos passa aqui e não teria página.
+    # Fica para outra tarefa; o caso "9" * 18 não é um valor que se queira garantir.
+    resultado = tse.parse_row(linha(SQ_CANDIDATO=sq))
+    assert resultado.person["tse_candidate_id"] == int(sq)
+
+
+@pytest.mark.parametrize("sq", ["1" + "0" * 18, str(2**63 - 1), str(2**63)])
+def test_sq_candidato_de_19_digitos_segue_recusado(tse, sq):
+    with pytest.raises(tse.RowError) as erro:
+        tse.parse_row(linha(SQ_CANDIDATO=sq))
+    assert erro.value.column == "SQ_CANDIDATO"
+
+
+@pytest.mark.parametrize(
+    ("coluna", "parte", "campo"),
+    [
+        ("NR_TURNO", "election", "round"),
+        ("CD_ELEICAO", "election", "tse_code"),
+        ("CD_TIPO_ELEICAO", "election", "kind_code"),
+        ("NR_CANDIDATO", "candidacy", "ballot_number"),
+        ("CD_CARGO", "candidacy", "office_code"),
+        ("NR_PARTIDO", "candidacy", "party_number"),
+    ],
+)
+def test_zero_segue_aceito_nas_outras_colunas_numericas_obrigatorias(tse, coluna, parte, campo):
+    # Só o SQ_CANDIDATO ganhou mínimo: nada indica que o TSE não use 0 nos códigos. O valor 0
+    # tem de chegar ao campo, não só "não levantar". ANO_ELEICAO fica de fora: 0 ali é ano inválido.
+    resultado = tse.parse_row(linha(**{coluna: "0"}))
+    assert getattr(resultado, parte)[campo] == 0
+
+
 @pytest.mark.parametrize(
     "data",
     ["31/02/2026", "2026-10-04", "4/10/2026", "04/10/26", "00/00/0000", "04-10-2026", "abc"],

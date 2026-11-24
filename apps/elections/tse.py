@@ -76,14 +76,14 @@ def _optional_text(values, column, limit):
     return value
 
 
-def _integer(value, column, maximum):
-    if not _DIGITS.fullmatch(value) or int(value) > maximum:
+def _integer(value, column, maximum, minimum=0):
+    if not _DIGITS.fullmatch(value) or not minimum <= int(value) <= maximum:
         raise RowError(column)
     return int(value)
 
 
-def _required_int(values, column, maximum):
-    return _integer(_text(values, column), column, maximum)
+def _required_int(values, column, maximum, minimum=0):
+    return _integer(_text(values, column), column, maximum, minimum)
 
 
 def _optional_int(values, column, maximum):
@@ -133,7 +133,9 @@ def parse_row(values):
     }
     person = {
         "cycle_year": year,
-        "tse_candidate_id": _required_int(values, "SQ_CANDIDATO", INT64),
+        # Mínimo 1: a rota do perfil (`urls.py`) só casa SQ de 1 em diante; um 0 não teria página.
+        # O teto 12 (rota) x 18 (`_DIGITS`) é descasamento conhecido, para outra tarefa.
+        "tse_candidate_id": _required_int(values, "SQ_CANDIDATO", INT64, minimum=1),
         "public_name": _required_text(values, "NM_URNA_CANDIDATO", _limit(Person, "public_name")),
         "social_name": _optional_text(values, "NM_SOCIAL_CANDIDATO", _limit(Person, "social_name")),
     }

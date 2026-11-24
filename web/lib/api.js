@@ -2,9 +2,9 @@
 import { cache } from "react";
 
 // Os padrões abaixo copiam os das rotas do Django (`apps/elections/urls.py` e
-// `apps/legislature/urls.py`): [0-9] explícito (só ASCII) e sem zero à esquerda nem `0` nos ids,
-// porque a rota recusa o que o `int()` do Python aceitaria. O id da URL só segue para a API depois
-// de casar aqui; o resto vira 404 sem chamar a API.
+// `apps/legislature/urls.py`). O [0-9] explícito só espelha a rota: o `\d` do JS sem a flag `u` já
+// casava só ASCII. O que mudou de fato é a recusa de zero à esquerda e de `0` nos ids. O id da URL
+// só segue para a API depois de casar aqui; o resto vira 404 sem chamar a API.
 // Ciclo de 4 dígitos e SQ_CANDIDATO de 1 a 12 dígitos, sem zero à esquerda (o ciclo não tem essa regra).
 const PADRAO_DO_ID = /^[0-9]{4}-[1-9][0-9]{0,11}$/;
 // Legislatura e id da Câmara, de 1 a 9 dígitos cada, sem zero à esquerda.

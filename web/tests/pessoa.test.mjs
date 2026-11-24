@@ -258,7 +258,8 @@ test("API que não responde estoura o tempo limite e dá erro 500", async () => 
 // A rota do Django (`apps/elections/urls.py`) só casa `[0-9]{4}-[1-9][0-9]{0,11}`: o SQ não tem
 // zero à esquerda nem é `0`, e só dígitos ASCII. O front recusa o mesmo, sem chamar a API.
 // "2026-040002532272" é o id da fixture com um zero na frente; "2024-0123" não tem relação com ela;
-// os dígitos árabe-índicos (٢٠٢٦ = 2026) são o `\d` do Python, que a rota não aceita.
+// os dígitos árabe-índicos (٢٠٢٦ = 2026) são guarda de regressão: passam também com o código antigo
+// (o `\d` do JS já era só ASCII), por isso não estão entre as falhas do controle.
 const IDS_FORA_DA_ROTA = [
   "2026-abc",
   "20261",

@@ -263,7 +263,8 @@ test("`em_exercicio` que não é booleano é recusado", async () => {
 
 // A rota do Django (`apps/legislature/urls.py`) só casa `[1-9][0-9]{0,8}`: sem zero à esquerda, sem
 // `0` e só dígitos ASCII. O front recusa o mesmo, sem chamar a API. "05012" é o código da fixture
-// com um zero na frente; "0042" não tem relação com ela; "٥٠١٢" é 5012 em dígitos árabe-índicos.
+// com um zero na frente; "0042" não tem relação com ela. "٥٠١٢" (5012 em dígitos árabe-índicos) é
+// guarda de regressão: passa também com o código antigo (o `\d` do JS já era só ASCII).
 for (const invalido of [
   "abc",
   "1234567890",
@@ -408,7 +409,8 @@ test("votos: a página pedida vai à API; página inválida vira 1", async () =>
   assert.ok(api.chamadas.includes(`${CAMINHO_DOS_VOTOS}?pagina=2`));
 
   // "02" e "0002" valiam 2 com o `[0-9]{1,4}`; a regra do `?pagina=` é `[1-9][0-9]{0,3}` (sem zero
-  // à esquerda), então o front manda a 1. "٢" é 2 em dígito árabe-índico.
+  // à esquerda), então o front manda a 1. "٢" (2 em dígito árabe-índico) é guarda de regressão:
+  // passa também com o código antigo.
   for (const invalida of ["0", "abc", "-1", "12345", "02", "0002", "٢"]) {
     api.chamadas.length = 0;
     const { status } = await comVotos(historico(), `?pagina=${invalida}`);

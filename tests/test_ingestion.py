@@ -71,12 +71,12 @@ def make_dataset(status=Source.Status.INTEGRATING, **kwargs):
     kwargs.setdefault("enabled", True)
     kwargs.setdefault("license_basis", Dataset.LicenseBasis.DECLARED)
     kwargs.setdefault("license_id", "cc-by")
+    kwargs.setdefault("format", Dataset.Format.ZIP_CSV)
     return Dataset.objects.create(
         source=fonte,
         slug="consulta-cand",
         name="Consulta de candidatos",
         url="https://cdn.example.org/consulta_cand_2026.zip",
-        format=Dataset.Format.ZIP_CSV,
         **kwargs,
     )
 
@@ -552,3 +552,66 @@ def test_erro_inesperado_deixa_o_detalhe_vazio(monkeypatch):
     run = IngestionRun.objects.get()
     assert run.error_code == IngestionRun.ErrorCode.OTHER
     assert run.error_detail == ""
+
+
+# --- CSV simples (formato `csv`; ADR 0031): os arquivos anuais da Câmara, com BOM UTF-8 ---
+
+CABECALHO_CSV = "idVotacao;voto;deputado_id;deputado_nome"
+PERMITIDAS_CSV = ["idVotacao", "voto", "deputado_id"]
+
+
+def csv_ok(*linhas, cabecalho=CABECALHO_CSV):
+    texto = cabecalho + "\r\n" + "".join(f"{linha}\r\n" for linha in linhas)
+    return b"\xef\xbb\xbf" + texto.encode("utf-8")
+
+
+def dataset_csv(**kwargs):
+    kwargs.setdefault("format", Dataset.Format.CSV)
+    kwargs.setdefault("allowed_columns", PERMITIDAS_CSV)
+    return make_dataset(**kwargs)
+
+
+def test_csv_simples_grava_so_a_allowlist_com_o_nome_do_arquivo_baixado():
+    cliente = FakeClient(
+        csv_ok("2641546-7;Sim;204379;CANARIO-NAO-VAZAR", "2641546-7;Não;160976;OUTRO")
+    )
+    run = ingest(dataset_csv(), cliente)
+    assert run.state == IngestionRun.State.SUCCEEDED
+    assert run.error_code == ""
+    assert (run.rows_read, run.rows_loaded) == (2, 2)
+    assert run.dropped_columns == ["deputado_nome"]
+    nome = cliente.destinos[0].name
+    gravados = [(r.item_name, r.values) for r in RawRecord.objects.filter(run=run).order_by("pk")]
+    assert gravados == [
+        (nome, {"idVotacao": "2641546-7", "voto": "Sim", "deputado_id": "204379"}),
+        (nome, {"idVotacao": "2641546-7", "voto": "Não", "deputado_id": "160976"}),
+    ]
+    assert "CANARIO-NAO-VAZAR" not in repr(gravados)
+
+
+def test_csv_simples_com_coluna_permitida_faltando_falha_com_schema_e_nao_grava_nada():
+    dados = csv_ok("2641546-7;Sim", cabecalho="idVotacao;voto")
+    run = ingest(dataset_csv(), FakeClient(dados))
+    assert run.state == IngestionRun.State.FAILED
+    assert run.error_code == IngestionRun.ErrorCode.SCHEMA
+    assert run.rows_loaded == 0
+    assert RawRecord.objects.count() == 0
+
+
+def test_csv_simples_com_registro_multilinha_entra_e_guarda_o_texto_como_veio():
+    dados = csv_ok('"2645346-18";"linha um\r\nlinha dois"', cabecalho="id;descricao")
+    run = ingest(dataset_csv(allowed_columns=["id", "descricao"]), FakeClient(dados))
+    assert run.state == IngestionRun.State.SUCCEEDED
+    assert run.error_code == ""
+    assert RawRecord.objects.get().values == {
+        "id": "2645346-18",
+        "descricao": "linha um\r\nlinha dois",
+    }
+
+
+def test_csv_simples_com_linha_de_largura_errada_falha_com_malformed_row():
+    run = ingest(dataset_csv(), FakeClient(csv_ok("2641546-7;Sim;204379;X", "2641546-8;Não")))
+    assert run.state == IngestionRun.State.FAILED
+    assert run.error_code == IngestionRun.ErrorCode.MALFORMED_ROW
+    assert run.rows_loaded == 0
+    assert RawRecord.objects.count() == 0

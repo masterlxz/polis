@@ -1,6 +1,8 @@
 from django.core.management.base import BaseCommand, CommandError
+from django.utils import timezone
 
 from apps.elections import normalization
+from apps.sources.models import Dataset
 from apps.sources.normalization import NormalizationRefused as SharedRefused
 
 
@@ -45,6 +47,15 @@ class Command(BaseCommand):
                 "A normalização falhou de forma inesperada; nada foi gravado."
             ) from None
 
+        # Só no sucesso: a carga mais recente foi normalizada, então a recusa que o agendador
+        # gravou antes deixou de valer (senão o painel e o aviso de coleta falhada seguem dizendo
+        # que as retiradas estão paradas). Recusa e falha inesperada não gravam nada aqui: quem
+        # registra esses resultados é o agendador. `update()` troca só estas duas colunas, como
+        # `scheduling._record_normalization`, para não desfazer uma edição feita ao mesmo tempo
+        # no admin.
+        Dataset.objects.filter(pk=dataset.pk).update(
+            last_normalization_at=timezone.now()  # MUTAÇÃO DO COORDENADOR: não limpa o erro
+        )
         self.stdout.write(
             f"Execução {run.pk}: linhas lidas {result.rows_read}, "
             f"candidaturas únicas {result.unique}, criadas {result.created}, "

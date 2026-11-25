@@ -1,0 +1,593 @@
+"""API interna das votações da Câmara (ADR 0031; formato no ADR 0032).
+
+`GET /internal/v1/camara/votacoes/` (lista paginada) e `GET /internal/v1/camara/votacoes/<id>/`
+(detalhe com os votos). Dados sintéticos. O que mais importa: o id da votação é TEXTO (`2641546-7`)
+e a rota o recusa sem consultar o banco; `voto` vazio sai `null` (é "sem posição", nunca string
+vazia nem chave ausente); só 1,9% das votações têm voto nominal, e a lista diz quais; o nome do
+deputado vem de `Deputy`, pela junção (legislatura, id da Câmara) na leitura, e só para quem tem
+perfil. Só saem campos de listas explícitas, com a atribuição da fonte. Os testes de 404, 400 e 405
+pedem antes um 200 de controle: sem isso, uma rota que não existe passaria por "erro esperado".
+
+Valores de referência lidos do código: 50 por página (`VOTINGS_PER_PAGE` em `apps/legislature/
+views.py`) e `varchar(20)` do `camara_voting_id` (`CamaraVoting` em `apps/legislature/models.py`).
+"""
+
+from datetime import UTC, date, datetime, timedelta
+
+import pytest
+
+from apps.legislature.models import CamaraVote, CamaraVoting, Deputy
+from apps.sources.models import Dataset, IngestionRun, Source
+
+pytestmark = pytest.mark.django_db
+
+LISTA = "/internal/v1/camara/votacoes/"
+NOMINAL = "2641546-7"
+SEM_VOTOS = "2641546-8"
+LEGISLATURA = 57
+COLETADO_EM = datetime(2026, 11, 24, 9, 0, tzinfo=UTC)
+URL_ORIGEM = "https://example.org/arquivos/votacoes/csv/votacoes-2026.csv"
+
+CHAVES_LISTA = {"votacoes", "pagina", "total_paginas", "atribuicao"}
+CHAVES_ITEM_DA_LISTA = {
+    "id",
+    "data",
+    "orgao",
+    "aprovacao",
+    "totais_da_fonte",
+    "descricao",
+    "id_proposicao",
+    "tem_votos_nominais",
+}
+CHAVES_DETALHE = {"votacao", "votos", "contagem_por_voto", "atribuicao"}
+CHAVES_VOTACAO = CHAVES_ITEM_DA_LISTA - {"tem_votos_nominais"}
+CHAVES_TOTAIS = {"sim", "nao", "outros"}
+CHAVES_VOTO = {"legislatura", "id_camara", "partido", "voto", "tem_perfil", "nome"}
+CHAVES_CONTAGEM = {"voto", "quantidade"}
+CHAVES_ATRIBUICAO = {"fonte", "conjunto", "coletado_em", "url_origem", "licenca"}
+
+
+def _criar_run(started_at=COLETADO_EM):
+    source, _ = Source.objects.get_or_create(
+        slug="camara",
+        defaults={
+            "name": "Câmara dos Deputados: Dados Abertos",
+            "institution": "Câmara dos Deputados",
+            "official_url": "https://example.org",
+            "access_type": Source.AccessType.FILE,
+        },
+    )
+    dataset, _ = Dataset.objects.get_or_create(
+        source=source,
+        slug="votacoes-2026",
+        defaults={
+            "name": "Votações da Câmara em 2026",
+            "url": URL_ORIGEM,
+            "format": Dataset.Format.CSV,
+            "license_basis": Dataset.LicenseBasis.OWNER_DECISION,
+            "license_justification": "Decisão do dono de teste.",
+        },
+    )
+    return IngestionRun.objects.create(
+        dataset=dataset, source_url=dataset.url, started_at=started_at
+    )
+
+
+@pytest.fixture
+def run():
+    return _criar_run()
+
+
+def _votacao(run, codigo, **extra):
+    campos = {
+        "camara_voting_id": codigo,
+        "voted_on": date(2026, 3, 10),
+        "organ_acronym": "PLEN",
+        "approval": "1",
+        "total_yes": 300,
+        "total_no": 150,
+        "total_other": 2,
+        "description": "Aprovada a Emenda nº 1.",
+        "proposition_id": 2651254,
+        "ingestion_run": run,
+        **extra,
+    }
+    return CamaraVoting.objects.create(**campos)
+
+
+def _voto(votacao, camara_id, texto, legislatura=LEGISLATURA, **extra):
+    campos = {
+        "voting": votacao,
+        "camara_id": camara_id,
+        "legislature_id": legislatura,
+        "party_acronym": "XYZ",
+        "vote": texto,
+        "ingestion_run": votacao.ingestion_run,
+        **extra,
+    }
+    return CamaraVote.objects.create(**campos)
+
+
+def _deputado(run, camara_id, legislatura=LEGISLATURA, **extra):
+    campos = {
+        "legislature_id": legislatura,
+        "camara_id": camara_id,
+        "name": f"Deputado {legislatura}-{camara_id}",
+        "party_acronym": "XYZ",
+        "state": "SP",
+        "ingestion_run": run,
+        **extra,
+    }
+    return Deputy.objects.create(**campos)
+
+
+@pytest.fixture
+def nominal(run):
+    votacao = _votacao(run, NOMINAL)
+    _voto(votacao, 3, "Não")
+    _voto(votacao, 1, "Sim")
+    _voto(votacao, 4, "Abstenção")
+    _voto(votacao, 2, "Sim")
+    return votacao
+
+
+@pytest.fixture
+def sem_votos(run):
+    return _votacao(run, SEM_VOTOS, voted_on=date(2026, 3, 11))
+
+
+def _ok(client, url):
+    resposta = client.get(url)
+    assert resposta.status_code == 200, f"controle: esperava 200 em {url}"
+    return resposta.json()
+
+
+def _detalhe(client, codigo):
+    return _ok(client, f"{LISTA}{codigo}/")
+
+
+def _todas_as_chaves(valor):
+    if isinstance(valor, dict):
+        for chave, filho in valor.items():
+            yield chave
+            yield from _todas_as_chaves(filho)
+    elif isinstance(valor, list):
+        for filho in valor:
+            yield from _todas_as_chaves(filho)
+
+
+# --- Detalhe -------------------------------------------------------------------------------------
+
+
+def test_detalhe_so_com_as_chaves_das_listas_explicitas(client, nominal):
+    corpo = _detalhe(client, NOMINAL)
+
+    assert set(corpo) == CHAVES_DETALHE
+    assert set(corpo["votacao"]) == CHAVES_VOTACAO
+    assert set(corpo["votacao"]["totais_da_fonte"]) == CHAVES_TOTAIS
+    assert all(set(item) == CHAVES_VOTO for item in corpo["votos"])
+    assert all(set(item) == CHAVES_CONTAGEM for item in corpo["contagem_por_voto"])
+    assert set(corpo["atribuicao"]) == CHAVES_ATRIBUICAO
+
+
+def test_votacao_com_os_campos_da_fonte(client, nominal):
+    assert _detalhe(client, NOMINAL)["votacao"] == {
+        "id": NOMINAL,
+        "data": "2026-03-10",
+        "orgao": "PLEN",
+        "aprovacao": "1",
+        "totais_da_fonte": {"sim": 300, "nao": 150, "outros": 2},
+        "descricao": "Aprovada a Emenda nº 1.",
+        "id_proposicao": 2651254,
+    }
+
+
+def test_aprovacao_vazia_sai_null_e_zero_sai_como_vem(client, run):
+    _votacao(run, "10-1", approval="")
+    _votacao(run, "10-2", approval="0", total_yes=0, total_no=0, total_other=0, proposition_id=0)
+
+    vazia = _detalhe(client, "10-1")["votacao"]
+    zero = _detalhe(client, "10-2")["votacao"]
+
+    assert vazia["aprovacao"] is None
+    assert zero["aprovacao"] == "0"
+    # zero é valor, não ausência: totais e proposição `0` saem como vêm (ADR 0031)
+    assert zero["totais_da_fonte"] == {"sim": 0, "nao": 0, "outros": 0}
+    assert zero["id_proposicao"] == 0
+
+
+def test_votos_saem_ordenados_por_legislatura_e_id_da_camara(client, run):
+    votacao = _votacao(run, NOMINAL)
+    _voto(votacao, 5, "Sim")
+    _voto(votacao, 9, "Sim", legislatura=56)
+    _voto(votacao, 2, "Não")
+
+    votos = _detalhe(client, NOMINAL)["votos"]
+
+    assert [(v["legislatura"], v["id_camara"]) for v in votos] == [(56, 9), (57, 2), (57, 5)]
+    assert votos[1] == {
+        "legislatura": 57,
+        "id_camara": 2,
+        "partido": "XYZ",
+        "voto": "Não",
+        "tem_perfil": False,
+        "nome": None,
+    }
+
+
+def test_voto_vazio_sai_null_nunca_string_vazia_nem_chave_ausente(client, run):
+    votacao = _votacao(run, NOMINAL)
+    _voto(votacao, 1, "Sim")
+    _voto(votacao, 2, "")
+
+    resposta = client.get(f"{LISTA}{NOMINAL}/")
+    votos = resposta.json()["votos"]
+
+    assert [v["voto"] for v in votos] == ["Sim", None]
+    assert all("voto" in v for v in votos)
+    assert '"voto": ""' not in resposta.content.decode()
+
+
+def test_partido_vazio_sai_null_e_s_partido_sai_como_vem(client, run):
+    votacao = _votacao(run, NOMINAL)
+    _voto(votacao, 1, "Sim", party_acronym="")
+    _voto(votacao, 2, "Sim", party_acronym="S/Partido")
+
+    votos = _detalhe(client, NOMINAL)["votos"]
+
+    assert [v["partido"] for v in votos] == [None, "S/Partido"]
+
+
+def test_contagem_por_voto_soma_certo_e_separa_o_vazio(client, run):
+    votacao = _votacao(run, NOMINAL)
+    for camara_id, texto in enumerate(
+        ["Sim", "Sim", "Sim", "Não", "Não", "", "", "Obstrução", "Abstenção"], start=1
+    ):
+        _voto(votacao, camara_id, texto)
+
+    contagem = _detalhe(client, NOMINAL)["contagem_por_voto"]
+
+    # Quantidade desc; no empate, o voto em ordem de texto e o vazio (`null`) por último.
+    assert contagem == [
+        {"voto": "Sim", "quantidade": 3},
+        {"voto": "Não", "quantidade": 2},
+        {"voto": None, "quantidade": 2},
+        {"voto": "Abstenção", "quantidade": 1},
+        {"voto": "Obstrução", "quantidade": 1},
+    ]
+    assert sum(item["quantidade"] for item in contagem) == 9
+
+
+def test_contagem_vem_dos_votos_e_nao_dos_totais_da_fonte(client, nominal):
+    # Totais da fonte: 300, 150 e 2. A contagem é do que o polis tem: 2 "Sim", 1 "Não" e 1
+    # "Abstenção".
+    corpo = _detalhe(client, NOMINAL)
+
+    assert corpo["votacao"]["totais_da_fonte"] == {"sim": 300, "nao": 150, "outros": 2}
+    assert corpo["contagem_por_voto"] == [
+        {"voto": "Sim", "quantidade": 2},
+        {"voto": "Abstenção", "quantidade": 1},
+        {"voto": "Não", "quantidade": 1},
+    ]
+
+
+def test_votacao_sem_votos_nominais_devolve_votos_vazio(client, sem_votos):
+    corpo = _detalhe(client, SEM_VOTOS)
+
+    assert corpo["votos"] == []
+    assert corpo["contagem_por_voto"] == []
+    assert corpo["votacao"]["totais_da_fonte"] == {"sim": 300, "nao": 150, "outros": 2}
+
+
+def test_nada_de_id_interno_nem_execucao_no_detalhe(client, nominal):
+    corpo = _detalhe(client, NOMINAL)
+    # `atribuicao.licenca.id` é o id da licença (contrato de todas as APIs), não id interno; por
+    # isso a busca é fora da atribuição.
+    chaves = set(_todas_as_chaves({k: v for k, v in corpo.items() if k != "atribuicao"}))
+    texto = client.get(f"{LISTA}{NOMINAL}/").content.decode()
+
+    assert not chaves & {"pk", "voting", "voting_id", "ingestion_run", "uri", "foto", "uf"}
+    assert f'"id": {nominal.pk},' not in texto
+
+
+def test_atribuicao_do_detalhe_traz_fonte_conjunto_data_origem_e_licenca_nula(client, nominal):
+    atribuicao = _detalhe(client, NOMINAL)["atribuicao"]
+
+    assert atribuicao["fonte"] == "Câmara dos Deputados: Dados Abertos"
+    assert atribuicao["conjunto"] == "Votações da Câmara em 2026"
+    assert datetime.fromisoformat(atribuicao["coletado_em"]) == COLETADO_EM
+    assert atribuicao["url_origem"] == URL_ORIGEM
+    assert atribuicao["licenca"] == {"id": None, "url": None}
+
+
+def test_votacao_inexistente_da_404(client, nominal):
+    _detalhe(client, NOMINAL)  # controle
+
+    # o formato é válido e não coincide com a fixture: o 404 vem da view, depois da consulta
+    assert client.get(f"{LISTA}999-1/").status_code == 404
+    assert client.get(f"{LISTA}2641546-70/").status_code == 404
+
+
+@pytest.mark.parametrize(
+    "codigo",
+    [
+        "abc",
+        "01-2",  # zero à esquerda: o parser o aceitaria, a rota não (ADR 0032)
+        "0-1",
+        "2641546",
+        "2641546-",
+        "-7",
+        "2641546--7",
+        "2641546-7-8",
+        "2641546-a",
+        "2641546_7",
+        "2641546-7%0A",  # `\n` no fim do id
+        "2641546-7%20",
+        "0999-1",  # não casa com a fixture: o 404 vem da rota, não da ausência do registro
+        "1234567890-1234567890",  # 21 caracteres: o varchar(20) do banco é o limite
+        "12345678901-1",  # 11 dígitos antes do hífen: o parser aceita até 10
+        "1-12345678901",  # 11 dígitos depois do hífen
+        "1" * 50 + "-1",
+        "٢٦٤١٥٤٦-٧",  # dígitos árabe-índicos: o int() do Python os lê como 2641546-7
+        "2641546-٧",
+    ],
+)
+def test_id_malformado_da_404_sem_consultar_o_banco(
+    client, nominal, codigo, django_assert_num_queries
+):
+    _detalhe(client, NOMINAL)  # controle
+
+    with django_assert_num_queries(0):
+        resposta = client.get(f"{LISTA}{codigo}/")
+
+    assert resposta.status_code == 404
+
+
+def test_quebra_de_linha_depois_da_barra_final_da_404_sem_consultar_o_banco(
+    client, nominal, django_assert_num_queries
+):
+    _detalhe(client, NOMINAL)  # controle
+
+    with django_assert_num_queries(0):
+        resposta = client.get(f"{LISTA}{NOMINAL}/%0A")
+
+    # Premissa: o `\n` chegou à requisição (não foi descartado pelo client nem por middleware).
+    assert resposta.wsgi_request.path_info == f"{LISTA}{NOMINAL}/\n"
+    assert resposta.status_code == 404
+
+
+@pytest.mark.parametrize(
+    "codigo",
+    [
+        "1234567890-123456789",  # 20 caracteres, o máximo do varchar(20)
+        "1-0",
+        "2641546-07",  # zero à esquerda depois do hífen: o parser o aceita
+    ],
+)
+def test_id_no_limite_do_formato_resolve(client, run, codigo):
+    assert len(codigo) <= 20
+    _votacao(run, codigo)
+
+    assert _detalhe(client, codigo)["votacao"]["id"] == codigo
+
+
+def test_o_detalhe_custa_tres_consultas_mesmo_com_muitos_votos(
+    client, run, django_assert_num_queries
+):
+    votacao = _votacao(run, NOMINAL)
+    for camara_id in range(1, 82):
+        _voto(votacao, camara_id, "Sim")
+        if camara_id % 2:
+            _deputado(run, camara_id)
+    _detalhe(client, NOMINAL)  # controle (e aquece o que o Django guarda em cache)
+
+    # votação com a atribuição, votos, e os deputados dos pares (uma consulta só, sem N+1)
+    with django_assert_num_queries(3):
+        client.get(f"{LISTA}{NOMINAL}/")
+
+
+def test_o_detalhe_sem_votos_nao_consulta_deputados(client, sem_votos, django_assert_num_queries):
+    _detalhe(client, SEM_VOTOS)  # controle
+
+    with django_assert_num_queries(2):
+        client.get(f"{LISTA}{SEM_VOTOS}/")
+
+
+# --- Junção com o perfil do deputado (`tem_perfil` e `nome`) -------------------------------------
+
+
+def _perfis(corpo):
+    return {
+        (v["legislatura"], v["id_camara"]): (v["tem_perfil"], v["nome"]) for v in corpo["votos"]
+    }
+
+
+def test_tem_perfil_e_nome_so_para_quem_esta_em_deputy(client, run, nominal):
+    _deputado(run, 1, name="Ana")
+    _deputado(run, 3, name="Carla")
+
+    assert _perfis(_detalhe(client, NOMINAL)) == {
+        (57, 1): (True, "Ana"),
+        (57, 2): (False, None),
+        (57, 3): (True, "Carla"),
+        (57, 4): (False, None),
+    }
+
+
+def test_mesmo_id_da_camara_em_outra_legislatura_nao_casa(client, run):
+    votacao = _votacao(run, NOMINAL)
+    _voto(votacao, 3, "Sim", legislatura=57)
+    _voto(votacao, 1, "Sim", legislatura=56)
+    _voto(votacao, 2, "Sim", legislatura=56)
+    # Existem, mas em outra legislatura que a do voto (ou numa que não votou): outro deputado.
+    _deputado(run, 3, legislatura=56, name="Outro Deputado")
+    _deputado(run, 1, legislatura=57, name="Outra Ana")
+    _deputado(run, 2, legislatura=56, name="Bruno")
+
+    assert _perfis(_detalhe(client, NOMINAL)) == {
+        (57, 3): (False, None),
+        (56, 1): (False, None),
+        (56, 2): (True, "Bruno"),
+    }
+
+
+def test_deputado_fora_da_lista_de_exercicio_ainda_tem_perfil(client, run, nominal):
+    _deputado(run, 1, name="Ana", in_office=False, left_list_at=COLETADO_EM)
+
+    assert _perfis(_detalhe(client, NOMINAL))[(57, 1)] == (True, "Ana")
+
+
+def test_sem_nenhum_deputy_ninguem_tem_perfil_e_nenhum_nome(client, nominal):
+    perfis = _perfis(_detalhe(client, NOMINAL))
+
+    assert set(perfis.values()) == {(False, None)}
+
+
+def test_voto_vazio_de_quem_tem_perfil_sai_null_com_o_nome(client, run):
+    votacao = _votacao(run, NOMINAL)
+    _voto(votacao, 1, "")
+    _deputado(run, 1, name="Ana")
+
+    voto = _detalhe(client, NOMINAL)["votos"][0]
+
+    assert (voto["voto"], voto["tem_perfil"], voto["nome"]) == (None, True, "Ana")
+
+
+# --- Lista ---------------------------------------------------------------------------------------
+
+
+def test_lista_mais_recente_primeiro_e_id_da_votacao_desempata(client, run):
+    _votacao(run, "100-5", voted_on=date(2026, 1, 5))
+    _votacao(run, "100-1", voted_on=date(2026, 3, 1))
+    _votacao(run, "100-2", voted_on=date(2026, 3, 1))
+    _votacao(run, "100-4", voted_on=date(2025, 12, 1))
+
+    corpo = _ok(client, LISTA)
+
+    assert [v["id"] for v in corpo["votacoes"]] == ["100-2", "100-1", "100-5", "100-4"]
+
+
+def test_lista_so_com_as_chaves_explicitas(client, nominal, sem_votos):
+    corpo = _ok(client, LISTA)
+
+    assert set(corpo) == CHAVES_LISTA
+    assert all(set(item) == CHAVES_ITEM_DA_LISTA for item in corpo["votacoes"])
+    assert all(set(item["totais_da_fonte"]) == CHAVES_TOTAIS for item in corpo["votacoes"])
+    assert set(corpo["atribuicao"]) == CHAVES_ATRIBUICAO
+
+
+def test_item_da_lista_com_os_campos_da_fonte(client, nominal):
+    assert _ok(client, LISTA)["votacoes"] == [
+        {
+            "id": NOMINAL,
+            "data": "2026-03-10",
+            "orgao": "PLEN",
+            "aprovacao": "1",
+            "totais_da_fonte": {"sim": 300, "nao": 150, "outros": 2},
+            "descricao": "Aprovada a Emenda nº 1.",
+            "id_proposicao": 2651254,
+            "tem_votos_nominais": True,
+        }
+    ]
+
+
+def test_tem_votos_nominais_so_para_quem_tem_algum_voto(client, nominal, sem_votos):
+    itens = {v["id"]: v["tem_votos_nominais"] for v in _ok(client, LISTA)["votacoes"]}
+
+    assert itens == {NOMINAL: True, SEM_VOTOS: False}
+
+
+def test_votacao_com_so_um_voto_vazio_tem_votos_nominais(client, run):
+    # a fonte publica a presença: 466 votos sem posição na votação real `2645346-18`
+    _voto(_votacao(run, "2645346-18"), 1, "")
+
+    assert _ok(client, LISTA)["votacoes"][0]["tem_votos_nominais"] is True
+
+
+def test_aprovacao_vazia_sai_null_na_lista(client, run):
+    _votacao(run, "10-1", approval="")
+    _votacao(run, "10-2", approval="0", voted_on=date(2026, 3, 9))
+
+    itens = {v["id"]: v["aprovacao"] for v in _ok(client, LISTA)["votacoes"]}
+
+    assert itens == {"10-1": None, "10-2": "0"}
+
+
+def test_lista_pagina_de_50_em_50(client, run):
+    for numero in range(1, 52):  # 51 votações, uma por dia
+        _votacao(run, f"{numero}-1", voted_on=date(2026, 1, 1) + timedelta(days=numero))
+
+    primeira = _ok(client, LISTA)
+    segunda = _ok(client, f"{LISTA}?pagina=2")
+
+    assert (primeira["pagina"], primeira["total_paginas"]) == (1, 2)
+    assert len(primeira["votacoes"]) == 50
+    assert primeira["votacoes"][0]["id"] == "51-1"  # a mais recente
+    assert [v["id"] for v in segunda["votacoes"]] == ["1-1"]  # a mais antiga
+    assert segunda["pagina"] == 2
+
+
+def test_pagina_alem_da_ultima_devolve_lista_vazia(client, nominal):
+    corpo = _ok(client, f"{LISTA}?pagina=9")
+
+    assert corpo["votacoes"] == []
+    assert (corpo["pagina"], corpo["total_paginas"]) == (9, 1)
+
+
+def test_sem_nenhuma_votacao_lista_vazia_e_sem_atribuicao(client, run):
+    corpo = _ok(client, LISTA)
+
+    assert corpo == {"votacoes": [], "pagina": 1, "total_paginas": 0, "atribuicao": None}
+
+
+@pytest.mark.parametrize(
+    "pagina", ["0", "-1", "abc", "1.5", "12345", "", " 2", "00", "01", "0001", "09", "007"]
+)
+def test_pagina_malformada_da_400(client, nominal, pagina):
+    _ok(client, LISTA)  # controle
+
+    resposta = client.get(LISTA, {"pagina": pagina})
+
+    assert resposta.status_code == 400
+    assert resposta.json() == {"erro": "página inválida"}
+
+
+@pytest.mark.parametrize("pagina", ["1", "2", "9999"])
+def test_pagina_na_forma_canonica_segue_valida(client, nominal, pagina):
+    corpo = _ok(client, f"{LISTA}?pagina={pagina}")
+
+    assert corpo["pagina"] == int(pagina)
+
+
+def test_atribuicao_da_lista_e_a_da_coleta_mais_recente_da_pagina(client, run):
+    nova = _criar_run(started_at=datetime(2026, 11, 25, 9, 0, tzinfo=UTC))
+    _votacao(run, "1-1", voted_on=date(2026, 1, 1))
+    _votacao(nova, "2-1", voted_on=date(2025, 1, 1))  # mais antiga, mas vista pela coleta mais nova
+
+    atribuicao = _ok(client, LISTA)["atribuicao"]
+
+    assert datetime.fromisoformat(atribuicao["coletado_em"]) == nova.started_at
+
+
+def test_a_lista_custa_duas_consultas_mesmo_com_votos(client, run, django_assert_num_queries):
+    for numero in range(1, 30):
+        votacao = _votacao(run, f"{numero}-1")
+        if numero % 2:
+            _voto(votacao, 1, "Sim")
+            _voto(votacao, 2, "Não")
+    _ok(client, LISTA)  # controle
+
+    # a contagem e a página (a marca `tem_votos_nominais` vem na mesma consulta, sem N+1)
+    with django_assert_num_queries(2):
+        client.get(LISTA)
+
+
+# --- As duas rotas -------------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("metodo", ["post", "put", "patch", "delete"])
+def test_so_aceita_leitura(client, nominal, metodo):
+    for url in (LISTA, f"{LISTA}{NOMINAL}/"):
+        _ok(client, url)  # controle
+
+        assert getattr(client, metodo)(url).status_code == 405

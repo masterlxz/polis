@@ -624,6 +624,42 @@ def test_nome_de_classe_enorme_e_cortado_no_log(agendador, ingest, registrar_nor
     assert "X" * 81 not in linha
 
 
+@pytest.mark.parametrize("nome", ["linha\nfalsa", "com espaço"], ids=["quebra-de-linha", "espaco"])
+def test_nome_de_classe_que_nao_e_identificador_vira_interrogacao_e_nao_forja_linha(
+    agendador, ingest, registrar_normalizador, nome
+):
+    classe = type(nome, (Exception,), {})
+    registrar_normalizador("camara/deputados", FakeNormalizador(erro=classe("falhou")))
+    make_dataset()
+
+    resultado = coletar(agendador)
+
+    linhas = [linha for linha in resultado.lines if "falhou de forma inesperada" in linha]
+    assert len(linhas) == 1
+    assert linhas[0] == "camara/deputados: normalização falhou de forma inesperada (?)"
+    assert "\n" not in "".join(resultado.lines)
+
+
+def test_comando_mostra_o_nome_da_classe_e_nao_o_valor_da_linha_nem_traceback(
+    comando, ingest, registrar_normalizador
+):
+    cpf = "123.456.789-09"
+    erro = IntegrityError(f"DETAIL: Key (cpf)=({cpf}) already exists.")
+    registrar_normalizador("camara/deputados", FakeNormalizador(erro=erro))
+    make_dataset()
+    saida = StringIO()
+
+    with pytest.raises(CommandError) as falha:
+        call_command("collect_due", stdout=saida)
+
+    texto = saida.getvalue()
+    assert "camara/deputados: normalização falhou de forma inesperada (IntegrityError)" in texto
+    assert cpf not in texto
+    assert "already exists" not in texto
+    assert "Traceback" not in texto
+    assert str(falha.value) == "1 normalização(ões) não concluída(s); veja a saída."
+
+
 def test_um_conjunto_que_recusa_nao_impede_o_outro(agendador, ingest, registrar_normalizador):
     from apps.sources.normalization import NormalizationRefused
 

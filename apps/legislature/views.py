@@ -351,7 +351,9 @@ def camara_voting_detail(request, voting_id):
     `voto` vazio é "sem posição registrada": sai `null`, nunca string vazia nem chave ausente.
     `nome` só sai para quem tem `Deputy` (junção por legislatura e id na leitura; o voto não guarda
     nome, ADR 0005). `contagem_por_voto` é calculada pelo polis a partir dos itens, separada de
-    `totais_da_fonte`, que ficam como a fonte os mandou.
+    `totais_da_fonte`, que ficam como a fonte os mandou (0/0/0 numa votação sem voto nominal não é
+    uma contagem: a fonte não informou). `atribuicao` é a do conjunto de votações e
+    `atribuicao_dos_votos` a do conjunto de votos (nula se não há votos).
     """
     voting = (
         CamaraVoting.objects.select_related("ingestion_run__dataset__source")
@@ -361,9 +363,18 @@ def camara_voting_detail(request, voting_id):
     if voting is None:
         return JsonResponse({"erro": "não encontrado"}, status=404)
 
-    votes = list(voting.votes.order_by("legislature_id", "camara_id"))
+    votes = list(
+        voting.votes.select_related("ingestion_run__dataset__source").order_by(
+            "legislature_id", "camara_id"
+        )
+    )
     names = _deputy_names_by_pair({(v.legislature_id, v.camara_id) for v in votes})
     counts = Counter(_or_none(v.vote) for v in votes)
+    # Os votos vêm de outro conjunto (`camara/votos-2026`) que a votação (`camara/votacoes-2026`):
+    # a fonte dos votos é citada à parte, pela coleta mais recente entre eles (ADR 0008, decisão 3).
+    newest_votes_run = max(
+        (v.ingestion_run for v in votes), key=lambda r: r.started_at, default=None
+    )
     return JsonResponse(
         {
             "votacao": _camara_voting_fields(voting),
@@ -383,6 +394,7 @@ def camara_voting_detail(request, voting_id):
                 for vote, quantity in sorted(counts.items(), key=_vote_count_order)
             ],
             "atribuicao": _attribution(voting.ingestion_run),
+            "atribuicao_dos_votos": _attribution(newest_votes_run) if newest_votes_run else None,
         },
         json_dumps_params={"ensure_ascii": False},
     )

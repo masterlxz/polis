@@ -13,6 +13,11 @@ urlpatterns = [
         views.deputy_profile,
         name="deputy-profile",
     ),
+    re_path(
+        r"^deputados/(?P<legislature>[1-9][0-9]{0,8})-(?P<camara_id>[1-9][0-9]{0,8})/votos/$",
+        views.deputy_votes,
+        name="deputy-votes",
+    ),
     # Código do Senado de 1 a 9 dígitos (cabe no int32 do parser); o resto é 404 sem banco.
     re_path(
         r"^senadores/(?P<senate_id>[1-9][0-9]{0,8})/$",

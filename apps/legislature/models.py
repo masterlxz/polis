@@ -257,6 +257,11 @@ class CamaraVote(models.Model):
                 fields=["voting", "camara_id"], name="camara_vote_unique_per_voting"
             ),
         ]
+        # A unique acima começa por `voting` e não serve ao histórico de um deputado, que filtra
+        # por (legislatura, id da Câmara).
+        indexes = [
+            models.Index(fields=["legislature_id", "camara_id"], name="camara_vote_leg_camara_idx"),
+        ]
 
     def __str__(self):
         return f"{self.camara_id}: {self.vote or 'sem posição'}"

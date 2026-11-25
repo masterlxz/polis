@@ -387,6 +387,68 @@ def test_limite_vale_tambem_sem_content_length(server, clock, tmp_path):
     assert list(tmp_path.iterdir()) == []
 
 
+# --- Limite por chamada (`max_bytes` em `download`; ADR 0031, "limites conhecidos") ---
+# O cliente destes testes tem o teto padrão de 2 GiB, folgado: quem recusa é o limite da chamada.
+
+
+def test_limite_por_chamada_recusa_tamanho_declarado_acima_dele_e_nao_deixa_arquivo(
+    server, clock, tmp_path
+):
+    # CORPO tem 1000 bytes e o servidor declara Content-Length: 1000; o limite é 999.
+    with pytest.raises(DownloadError):
+        make_client(clock).download(url(server), tmp_path / "a.zip", max_bytes=len(CORPO) - 1)
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_limite_por_chamada_vale_tambem_sem_content_length_e_nao_deixa_arquivo(
+    server, clock, tmp_path
+):
+    server.script = [Resposta(body=b"x" * 5000, chunked=True)]
+    with pytest.raises(DownloadError):
+        make_client(clock).download(url(server), tmp_path / "a.zip", max_bytes=4999)
+    assert list(tmp_path.iterdir()) == []
+
+
+@pytest.mark.parametrize("chunked", [False, True], ids=["com_tamanho", "em_fluxo"])
+def test_arquivo_exatamente_no_limite_por_chamada_e_aceito(server, clock, tmp_path, chunked):
+    server.script = [Resposta(chunked=chunked)]
+    destino = tmp_path / "a.zip"
+    resultado = make_client(clock).download(url(server), destino, max_bytes=len(CORPO))
+    assert destino.read_bytes() == CORPO
+    assert resultado.size_bytes == len(CORPO)
+
+
+@pytest.mark.parametrize("argumentos", [{}, {"max_bytes": None}], ids=["omitido", "none"])
+def test_sem_limite_por_chamada_vale_o_teto_do_cliente(server, clock, tmp_path, argumentos):
+    # O arquivo (1000 bytes) está acima de um limite por chamada de 500 e abaixo do teto do
+    # cliente (5000): sem o argumento, só o teto do cliente conta.
+    destino = tmp_path / "a.zip"
+    resultado = make_client(clock, max_bytes=5000).download(url(server), destino, **argumentos)
+    assert resultado.size_bytes == len(CORPO)
+    assert destino.read_bytes() == CORPO
+
+
+def test_teto_do_cliente_continua_valendo_quando_o_limite_por_chamada_e_maior(
+    server, clock, tmp_path
+):
+    # O limite por chamada só reduz o teto: 10_000 não alarga os 500 do cliente.
+    with pytest.raises(DownloadError):
+        make_client(clock, max_bytes=500).download(
+            url(server), tmp_path / "a.zip", max_bytes=10_000
+        )
+    assert list(tmp_path.iterdir()) == []
+
+
+@pytest.mark.parametrize("invalido", [0, -1, True, False, 1.5, "10"])
+def test_limite_por_chamada_invalido_levanta_value_error_antes_de_abrir_rede(
+    server, clock, tmp_path, invalido
+):
+    with pytest.raises(ValueError):
+        make_client(clock).download(url(server), tmp_path / "a.zip", max_bytes=invalido)
+    assert server.requests == []
+    assert list(tmp_path.iterdir()) == []
+
+
 # --- Segurança dos erros (mesma regra do leitor de ZIP) ---
 
 

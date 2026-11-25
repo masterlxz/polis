@@ -41,13 +41,17 @@ class FakeClient:
         self.error = error
         self.calls = []
         self.destinos = []
+        self.max_bytes_usados = []
 
-    def download(self, url, destination):
+    def download(self, url, destination, *, max_bytes=None):
         self.calls.append(url)
         self.destinos.append(Path(destination))
+        self.max_bytes_usados.append(max_bytes)
         if self.error is not None:
             raise self.error
         dados = self.arquivos.pop(0) if len(self.arquivos) > 1 else self.arquivos[0]
+        if max_bytes is not None and len(dados) > max_bytes:
+            raise DownloadError("host.example.org anunciou arquivo acima do limite de bytes.")
         Path(destination).write_bytes(dados)
         return DownloadResult(
             path=Path(destination),
@@ -324,9 +328,9 @@ class FakeCkanClient(FakeClient):
         self.ckan = ckan
         self.ckan_error = ckan_error
 
-    def download(self, url, destination):
+    def download(self, url, destination, *, max_bytes=None):
         if url != CKAN_URL:
-            return super().download(url, destination)
+            return super().download(url, destination, max_bytes=max_bytes)
         self.calls.append(url)
         if self.ckan_error is not None:
             raise self.ckan_error

@@ -10,6 +10,8 @@ download termina bem e o teste falha por não levantar `DownloadError`. O socket
 """
 
 import socket
+import ssl
+import subprocess
 import threading
 import time
 
@@ -29,9 +31,10 @@ PREENCHIMENTO = b"a" * 80
 class Gotejador:
     """Servidor TCP cru: lê o pedido e escreve `imediato` de uma vez e `lento` 1 byte por vez."""
 
-    def __init__(self, imediato, lento):
+    def __init__(self, imediato, lento, contexto_tls=None):
         self.imediato = imediato
         self.lento = lento
+        self.contexto_tls = contexto_tls
         self.encerrar = threading.Event()
         self.escutando = socket.socket()
         self.escutando.bind(("127.0.0.1", 0))
@@ -50,6 +53,8 @@ class Gotejador:
     def _servir(self, conexao):
         with conexao:
             try:
+                if self.contexto_tls is not None:
+                    conexao = self.contexto_tls.wrap_socket(conexao, server_side=True)
                 pedido = b""
                 while b"\r\n\r\n" not in pedido:
                     dados = conexao.recv(4096)
@@ -66,7 +71,9 @@ class Gotejador:
 
     @property
     def url(self):
-        return f"http://127.0.0.1:{self.porta}/arquivo.zip"
+        esquema = "http" if self.contexto_tls is None else "https"
+        host = "127.0.0.1" if self.contexto_tls is None else "localhost"
+        return f"{esquema}://{host}:{self.porta}/arquivo.zip"
 
     def fechar(self):
         self.encerrar.set()
@@ -77,14 +84,35 @@ class Gotejador:
 def gotejador():
     criados = []
 
-    def criar(imediato, lento):
-        servidor = Gotejador(imediato, lento)
+    def criar(imediato, lento, contexto_tls=None):
+        servidor = Gotejador(imediato, lento, contexto_tls)
         criados.append(servidor)
         return servidor
 
     yield criar
     for servidor in criados:
         servidor.fechar()
+
+
+@pytest.fixture
+def tls(tmp_path, monkeypatch):
+    """Contexto de servidor com certificado autoassinado de `localhost` (gerado com `openssl`).
+
+    O cliente confia nele por `SSL_CERT_FILE`, lido quando o `PoliteClient` é construído (o
+    contexto padrão carrega as CAs do ambiente). Sem `openssl` no ambiente o teste é pulado.
+    """
+    certificado, chave = tmp_path / "cert.pem", tmp_path / "chave.pem"
+    try:
+        base = "openssl req -x509 -newkey rsa:2048 -nodes -days 1 -subj /CN=localhost".split()
+        extensao = ["-addext", "subjectAltName=DNS:localhost"]
+        saida = ["-keyout", str(chave), "-out", str(certificado)]
+        subprocess.run(base + extensao + saida, check=True, capture_output=True)  # noqa: S603
+    except FileNotFoundError:
+        pytest.skip("openssl não encontrado")
+    contexto = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    contexto.load_cert_chain(certificado, chave)
+    monkeypatch.setenv("SSL_CERT_FILE", str(certificado))
+    return contexto
 
 
 class RelogioParado:
@@ -101,7 +129,7 @@ def cliente(**kwargs):
     relogio = RelogioParado()
     kwargs.setdefault("total_timeout", PRAZO)
     return PoliteClient(
-        allowed_schemes=("http",),
+        allowed_schemes=("http", "https"),
         timeout=30.0,
         sleep=relogio.sleep,
         clock=relogio.monotonic,
@@ -214,3 +242,31 @@ def test_prazo_vencido_antes_da_conexao_corta_o_socket_ao_registrar():
             assert lado_do_cliente.recv(1) == b""
     finally:
         watchdog.stop()
+
+
+# --- Mesmos cortes sobre TLS (o socket registrado é o `SSLSocket`) ---
+
+
+# Se o host TLS goteja a linha do tamanho do pedaço, o cliente corta no prazo.
+def test_tls_linha_de_tamanho_do_pedaco_gotejada_e_cortada_pelo_prazo(gotejador, tls, tmp_path):
+    servidor = gotejador(HEADERS_CHUNKED, b"0" * 80 + b"1\r\nx\r\n0\r\n\r\n", tls)
+    mensagem, demorou = baixar_e_medir(servidor, tmp_path / "a.zip")
+    assert mensagem == "Download de localhost acima do prazo de 0.3 segundos."
+    assert demorou < LIMITE_DE_ESPERA
+    assert list(tmp_path.iterdir()) == []
+
+
+# Se o host TLS goteja o corpo, o cliente corta no prazo.
+def test_tls_corpo_gotejado_e_cortado_pelo_prazo(gotejador, tls, tmp_path):
+    servidor = gotejador(b"HTTP/1.1 200 OK\r\nContent-Length: 100\r\n\r\n", b"x" * 100, tls)
+    mensagem, demorou = baixar_e_medir(servidor, tmp_path / "a.zip")
+    assert mensagem == "Download de localhost acima do prazo de 0.3 segundos."
+    assert demorou < LIMITE_DE_ESPERA
+
+
+# Se o host TLS responde rápido e íntegro, baixa normal (o certificado é verificado de verdade).
+def test_tls_download_normal_passa(gotejador, tls, tmp_path):
+    servidor = gotejador(HEADERS + b"abcd", b"", tls)
+    resultado = cliente().download(servidor.url, tmp_path / "a.zip")
+    assert (tmp_path / "a.zip").read_bytes() == b"abcd"
+    assert resultado.size_bytes == 4

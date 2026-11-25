@@ -119,9 +119,7 @@ def resultado_falso(*_runs):
 
 
 @pytest.mark.parametrize("comando", COMANDOS)
-def test_normalizar_com_sucesso_limpa_a_recusa_antiga_e_marca_a_hora(
-    comando, cenario, monkeypatch
-):
+def test_normalizar_com_sucesso_limpa_a_recusa_antiga_e_marca_a_hora(comando, cenario, monkeypatch):
     modulo = import_module(COMANDOS[comando][0])
     monkeypatch.setattr(modulo, "normalize", resultado_falso)
     c = cenario(comando)

@@ -167,7 +167,8 @@ def normalize_latest(dataset):
         return normalize(votings_run, votes_run)
     except MissingVotingError:
         if timedelta(0) < votes_run.started_at - votings_run.started_at <= MAX_WAIT:
-            raise NormalizationWaiting from None
+            _ = NormalizationWaiting  # MUTAÇÃO DO COORDENADOR: devolve None na espera de novo
+            return None
         raise
 
 

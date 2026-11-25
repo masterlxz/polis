@@ -298,7 +298,9 @@ class RespostaQueFecha:
 
 
 # Se o servidor TLS goteja o aperto de mão (começa um registro de 16 KiB e entrega 1 byte por
-# vez), o cliente corta no prazo. O `socket` TLS ainda nem foi registrado no watchdog.
+# vez), o cliente corta no prazo. REGRESSÃO, não prova da thread: o CPython já usa o `timeout`
+# do socket (aqui `min(timeout, total_timeout)`) como prazo único do handshake, e o CI mostrou
+# este teste passando antes da thread. O socket TLS ainda nem foi registrado no watchdog.
 def test_aperto_de_mao_tls_gotejado_e_cortado_pelo_prazo(gotejador, tmp_path):
     servidor = gotejador(b"\x16\x03\x03\x40\x00", b"\x00" * 60, ler_pedido=False)
     inicio = time.monotonic()

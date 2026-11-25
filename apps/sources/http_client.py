@@ -33,9 +33,15 @@ Regras que este módulo aplica:
     pela conexão ao ficar pronta); a leitura bloqueada acorda e o erro vira o do prazo. Vale para
     tudo depois que a conexão (e o TLS) fica pronta; a thread nasce antes da abertura e, se vencer
     antes, o socket é cortado ao ser registrado;
-  - NÃO coberto: DNS, conexão TCP e aperto de mão TLS só têm o `timeout` por operação (o socket
-    recebe `min(timeout, total_timeout)`), porque o socket TLS só existe depois do aperto de mão.
-    Um host que goteja o aperto de mão ainda ganha até algumas operações de `timeout`.
+  - abertura (DNS, conexão TCP, aperto de mão TLS e cabeçalhos): o `opener.open` roda numa thread
+    de trabalho (`_Handoff`, nome `polis-abertura`) e a principal espera no máximo `total_timeout`
+    em tempo real. Estourou: o watchdog marca o prazo, corta o socket se já existir, e a thread é
+    ABANDONADA (o `getaddrinfo` não tem timeout nem cancelamento; ela só termina quando o
+    resolvedor do SO desistir, dezenas de segundos). Se ela terminar depois com uma resposta, é
+    ela quem a fecha. Custo: uma thread a mais por download. O aperto de mão TLS, sozinho, já
+    era limitado pelo `timeout` do socket como prazo ÚNICO do handshake inteiro (CPython; o teste
+    de CI o confirma), então o ganho real desta thread é o DNS e a conexão TCP com vários
+    endereços (N x `timeout`), que antes só tinham o teto do resolvedor do SO.
 
 Segurança dos erros: as mensagens citam só o host e o status (e, quando o limite de bytes recusa,
 o número do limite), nunca a URL completa (a query pode ter token), o corpo da resposta nem o
@@ -75,6 +81,7 @@ BLOCKED_STATUSES = frozenset({401, 403, 451})
 BACKOFF_STATUSES = frozenset({429, 503})
 CHUNK_SIZE = 1024 * 1024
 WATCHDOG_THREAD_NAME = "polis-prazo-total"
+OPEN_THREAD_NAME = "polis-abertura"
 
 
 class _Watchdog:
@@ -93,7 +100,7 @@ class _Watchdog:
         self._sock = None
         self._timer = None
         if seconds != math.inf:
-            self._timer = threading.Timer(min(seconds, threading.TIMEOUT_MAX), self._fire)
+            self._timer = threading.Timer(min(seconds, threading.TIMEOUT_MAX), self.expire)
             self._timer.name = WATCHDOG_THREAD_NAME
             self._timer.daemon = True
             self._timer.start()
@@ -106,7 +113,8 @@ class _Watchdog:
         if expired:
             self._cut(sock)
 
-    def _fire(self):
+    def expire(self):
+        """O prazo venceu: marca e corta o socket, se a conexão já existir."""
         with self._lock:
             self.expired = True
             sock = self._sock
@@ -124,6 +132,52 @@ class _Watchdog:
         if self._timer is not None:
             self._timer.cancel()
             self._timer.join()
+
+
+class _Handoff:
+    """Entrega o resultado de uma thread de trabalho à principal, que pode desistir de esperar.
+
+    `getaddrinfo` (DNS) é uma chamada de C bloqueante, sem timeout e sem como cancelar de fora:
+    só dá para parar de esperar por ela. A principal chama `wait`; se o prazo estoura, a thread é
+    marcada como abandonada e, se ela terminar depois com uma resposta, é ela quem a fecha (senão
+    a conexão vazaria). A decisão "terminou a tempo" ou "foi abandonada" é tomada sob o mesmo lock.
+    """
+
+    def __init__(self):
+        self._lock = threading.Lock()
+        self._done = threading.Event()
+        self._abandoned = False
+        self._result = None
+        self._error = None
+
+    def run(self, function, argument):
+        try:
+            result = function(argument)
+        except BaseException as error:  # a principal relança: um erro inesperado não some
+            with self._lock:
+                self._error = error
+                self._done.set()
+            return
+        with self._lock:
+            self._result = result
+            abandoned = self._abandoned
+            self._done.set()
+        if abandoned and result[0] is not None:
+            result[0].close()
+
+    def wait(self, timeout):
+        """True se a thread terminou a tempo; False se estourou (e agora está abandonada)."""
+        self._done.wait(timeout)
+        with self._lock:
+            if self._done.is_set():
+                return True
+            self._abandoned = True
+            return False
+
+    def result(self):
+        if self._error is not None:
+            raise self._error
+        return self._result
 
 
 class _WatchedConnectionMixin:
@@ -264,7 +318,7 @@ class PoliteClient:
             started = self._clock()
             watchdog = self._watchdog = _Watchdog(self._total_timeout)
             try:
-                response, status, retry_after, network_failed = self._open(url)
+                response, status, retry_after, network_failed = self._open(url, watchdog)
                 if response is not None:
                     return self._save(response, host, Path(destination), limit, started, watchdog)
             finally:
@@ -290,7 +344,23 @@ class PoliteClient:
                 self._sleep(wait)
         self._last_request[host] = self._clock()
 
-    def _open(self, url):
+    def _open(self, url, watchdog):
+        """Abre `url` numa thread e espera no máximo o prazo total (DNS, TCP, TLS e cabeçalhos).
+
+        Estourou: o watchdog marca o prazo (e corta o socket, se já existir) e a thread é
+        abandonada; `download` converte isso na mensagem do prazo.
+        """
+        handoff = _Handoff()
+        threading.Thread(
+            target=handoff.run, args=(self._open_blocking, url), name=OPEN_THREAD_NAME, daemon=True
+        ).start()
+        limit = None if self._total_timeout == math.inf else self._total_timeout
+        if not handoff.wait(None if limit is None else min(limit, threading.TIMEOUT_MAX)):
+            watchdog.expire()
+            return None, None, None, True
+        return handoff.result()
+
+    def _open_blocking(self, url):
         """Devolve (resposta, status, Retry-After, falha de rede); nunca levanta."""
         request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})  # noqa: S310
         response = status = retry_after = None

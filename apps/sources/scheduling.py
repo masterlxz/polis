@@ -141,7 +141,8 @@ def _normalize(dataset, name, result, now):
 
     Recusa (falha fechada) mostra a mensagem, que é segura por contrato; qualquer outra exceção
     vira uma linha genérica, porque a mensagem de um erro do banco cita valores da linha: o log
-    leva só o nome da classe da exceção (`__name__`, cortado), nunca a mensagem, os argumentos,
+    leva só o nome da classe da exceção (`__name__`, cortado; `?` se não for um identificador,
+    para um nome com quebra de linha não forjar outra linha), nunca a mensagem, os argumentos,
     `__context__` nem `__cause__`. O resultado (inclusive o texto) é gravado no conjunto; o texto
     da exceção nunca é, nem o nome da classe.
     """
@@ -159,7 +160,8 @@ def _normalize(dataset, name, result, now):
         return
     except Exception as error:
         failed = True
-        error_class = type(error).__name__[:CLASS_NAME_MAX_LENGTH]  # só o nome: nunca a exceção
+        class_name = type(error).__name__  # só o nome: nunca a exceção
+        error_class = (class_name if class_name.isidentifier() else "?")[:CLASS_NAME_MAX_LENGTH]
     if failed:
         result.lines.append(f"{name}: normalização falhou de forma inesperada ({error_class})")
         result.normalization_failed += 1

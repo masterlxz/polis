@@ -423,28 +423,131 @@ def test_a_frase_sai_tambem_com_a_mensagem_do_disjuntor_e_a_do_erro_inesperado(f
     assert sender.textos[0].count(FRASE_DAS_RETIRADAS) == 1
 
 
-@pytest.mark.django_db
-def test_com_a_ultima_coleta_falhada_o_aviso_do_tse_nao_leva_a_frase(fonte_tse):
-    # FAILED vence NORMALIZATION_FAILED (freshness.py): o aviso mostra o código do erro da
-    # coleta, não a recusa. As retiradas seguem paradas e o texto não diz (decisão aceita).
-    conjunto = _em_dia(fonte_tse, "consulta-cand-2026")
-    _recusar(conjunto)
+def _coleta_falhou(conjunto, codigo=IngestionRun.ErrorCode.DOWNLOAD):
     fim = NOW - timedelta(minutes=30)
     IngestionRun.objects.create(
         dataset=conjunto,
         source_url=conjunto.url,
         state=IngestionRun.State.FAILED,
-        error_code=IngestionRun.ErrorCode.DOWNLOAD,
+        error_code=codigo,
         started_at=fim - timedelta(minutes=1),
         finished_at=fim,
     )
+
+
+@pytest.mark.django_db
+def test_com_a_ultima_coleta_falhada_e_a_normalizacao_recusada_o_aviso_leva_a_frase(fonte_tse):
+    # FAILED vence NORMALIZATION_FAILED (freshness.py, decisão mantida): a situação e o rótulo do
+    # erro da coleta continuam sendo os da coleta, e a frase diz que as retiradas seguem paradas.
+    # A mensagem da normalização não entra no aviso de coleta falhou.
+    conjunto = _em_dia(fonte_tse, "consulta-cand-2026")
+    _recusar(conjunto)
+    _coleta_falhou(conjunto)
     sender = FakeSender()
 
     _enviar(sender)
 
-    assert "ALERTA tse/consulta-cand-2026: Última coleta falhou" in sender.textos[0]
+    aviso = "ALERTA tse/consulta-cand-2026: Última coleta falhou (Falha de download)"
+    assert sender.textos[0] == f"{aviso} {FRASE_DAS_RETIRADAS}"
     assert MENSAGEM_DA_RECUSA not in sender.textos[0]
-    assert FRASE_DAS_RETIRADAS not in sender.textos[0]
+
+
+@pytest.mark.django_db
+def test_o_lembrete_da_coleta_falhada_do_tse_com_normalizacao_recusada_leva_a_frase(fonte_tse):
+    conjunto = _em_dia(fonte_tse, "consulta-cand-2026")
+    _recusar(conjunto)
+    _coleta_falhou(conjunto)
+    sender = FakeSender()
+    _enviar(sender)
+
+    _enviar(sender, now=NOW + timedelta(hours=24))
+
+    lembrete = "LEMBRETE tse/consulta-cand-2026: Última coleta falhou (Falha de download)"
+    assert sender.textos[1] == f"{lembrete} {FRASE_DAS_RETIRADAS}"
+
+
+@pytest.mark.django_db
+def test_coleta_falhada_do_tse_sem_normalizacao_recusada_nao_leva_a_frase(fonte_tse):
+    conjunto = _em_dia(fonte_tse, "consulta-cand-2026")
+    _coleta_falhou(conjunto)
+    sender = FakeSender()
+
+    _enviar(sender)
+
+    assert sender.textos[0] == (
+        "ALERTA tse/consulta-cand-2026: Última coleta falhou (Falha de download)"
+    )
+
+
+@pytest.mark.django_db
+def test_coleta_falhada_fora_da_lista_com_normalizacao_recusada_nao_leva_a_frase(fonte):
+    conjunto = _em_dia(fonte, "consulta-cand-2026")
+    _recusar(conjunto)
+    _coleta_falhou(conjunto)
+    sender = FakeSender()
+
+    _enviar(sender)
+
+    assert sender.textos[0] == (
+        "ALERTA fonte/consulta-cand-2026: Última coleta falhou (Falha de download)"
+    )
+
+
+@pytest.mark.django_db
+def test_a_frase_da_coleta_falhada_vem_da_lista_e_o_rotulo_do_erro_e_o_do_codigo(
+    fonte, fonte_tse, settings
+):
+    settings.RETIREMENT_DATASETS = frozenset({"fonte/com-retirada"})
+    com_retirada = _em_dia(fonte, "com-retirada")
+    _recusar(com_retirada)
+    _coleta_falhou(com_retirada, IngestionRun.ErrorCode.SCHEMA)
+    tse = _em_dia(fonte_tse, "consulta-cand-2026")
+    _recusar(tse)
+    _coleta_falhou(tse, IngestionRun.ErrorCode.BLOCKED)
+    sender = FakeSender()
+
+    _enviar(sender)
+
+    linhas = sender.textos[0].split("\n")
+    linha_da_fonte = next(t for t in linhas if "fonte/com-retirada" in t)
+    linha_do_tse = next(t for t in linhas if TSE in t)
+    assert linha_da_fonte.endswith(
+        f"Última coleta falhou (Esquema diferente do esperado) {FRASE_DAS_RETIRADAS}"
+    )
+    assert linha_do_tse.endswith("Última coleta falhou (Bloqueado pela fonte)")
+
+
+def test_coleta_falhada_sem_codigo_de_erro_leva_a_frase_sem_rotulo():
+    # O banco exige código em execução que falhou; a regra de texto não depende disso.
+    from apps.sources import alerts
+
+    conjunto = Dataset(
+        source=Source(slug="tse"),
+        slug="consulta-cand-2026",
+        last_normalization_error=MENSAGEM_DA_RECUSA,
+    )
+    conjunto.last_error_code = ""
+
+    linha = alerts._line(conjunto, alerts.ALERT, Situation.FAILED)
+
+    assert linha == f"ALERTA tse/consulta-cand-2026: Última coleta falhou {FRASE_DAS_RETIRADAS}"
+
+
+@pytest.mark.django_db
+def test_a_recuperacao_da_coleta_falhada_do_tse_nao_leva_a_frase(fonte_tse):
+    conjunto = _em_dia(fonte_tse, "consulta-cand-2026")
+    _recusar(conjunto)
+    _coleta_falhou(conjunto)
+    sender = FakeSender()
+    _enviar(sender)
+    _sucesso(conjunto, ha_horas=0)
+    Dataset.objects.filter(pk=conjunto.pk).update(last_normalization_error="")
+
+    _enviar(sender, now=NOW + timedelta(minutes=5))
+
+    assert FRASE_DAS_RETIRADAS in sender.textos[0]
+    assert "RECUPERADO tse/consulta-cand-2026" in sender.textos[1]
+    assert FRASE_DAS_RETIRADAS not in sender.textos[1]
 
 
 @pytest.mark.django_db

@@ -924,6 +924,70 @@ def test_conjunto_sem_normalizador_nao_mexe_no_resultado_da_normalizacao(
     assert dataset.last_normalization_at is None
 
 
+# --- Normalização que espera outra coleta (Câmara-votações; P-21, Sessão 88) ---
+# `NormalizationWaiting` não é sucesso (não limpa a recusa de antes) nem recusa (não grava erro
+# novo): o resultado gravado fica como está, e a linha do log diz que aguarda.
+
+LINHA_DE_ESPERA = "camara/deputados: normalização aguardando outra coleta"
+
+
+def test_normalizacao_que_espera_nao_mexe_na_recusa_nem_na_hora_gravadas(
+    agendador, ingest, registrar_normalizador
+):
+    from apps.sources.normalization import NormalizationWaiting
+
+    registrar_normalizador(
+        "camara/deputados", FakeNormalizador(erro=NormalizationWaiting("espera"))
+    )
+    dataset = make_dataset()
+    antes = NOW - timedelta(days=1)
+    Dataset.objects.filter(pk=dataset.pk).update(
+        last_normalization_error="Recusada antes.", last_normalization_at=antes
+    )
+
+    resultado = coletar(agendador)
+
+    dataset.refresh_from_db()
+    assert dataset.last_normalization_error == "Recusada antes."
+    assert dataset.last_normalization_at == antes
+    assert LINHA_DE_ESPERA in resultado.lines
+    assert resultado.normalization_failed == 0
+    assert resultado.unexpected == 0
+
+
+def test_normalizacao_que_espera_num_conjunto_sem_resultado_nao_grava_concluida(
+    agendador, ingest, registrar_normalizador
+):
+    from apps.sources.normalization import NormalizationWaiting
+
+    registrar_normalizador(
+        "camara/deputados", FakeNormalizador(erro=NormalizationWaiting("espera"))
+    )
+    dataset = make_dataset()
+
+    resultado = coletar(agendador)
+
+    dataset.refresh_from_db()
+    assert LINHA_DE_ESPERA in resultado.lines  # o normalizador foi chamado e esperou
+    assert dataset.last_normalization_error == ""
+    assert dataset.last_normalization_at is None
+
+
+def test_a_linha_de_espera_nao_cita_a_mensagem_da_excecao(
+    agendador, ingest, registrar_normalizador
+):
+    from apps.sources.normalization import NormalizationWaiting
+
+    segredo = "SEGREDO-DE-TESTE-NAO-PODE-APARECER"
+    registrar_normalizador("camara/deputados", FakeNormalizador(erro=NormalizationWaiting(segredo)))
+    make_dataset()
+
+    resultado = coletar(agendador)
+
+    assert LINHA_DE_ESPERA in resultado.lines
+    assert segredo not in " ".join(resultado.lines)
+
+
 def test_so_o_conjunto_que_recusou_fica_marcado(agendador, ingest, registrar_normalizador):
     fonte = make_source()
     ruim = make_dataset(fonte=fonte, slug="a-ruim")

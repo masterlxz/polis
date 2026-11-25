@@ -31,7 +31,7 @@ from django.utils.module_loading import import_string
 
 from .ingestion import IngestionError, ingest
 from .models import Dataset, IngestionRun, Source
-from .normalization import NormalizationRefused
+from .normalization import NormalizationRefused, NormalizationWaiting
 
 RETRY_HOURS = 6
 ERROR_MAX_LENGTH = 300  # o tamanho de `Dataset.last_normalization_error`
@@ -139,12 +139,13 @@ def _record_normalization(dataset, now, error=""):
 def _normalize(dataset, name, result, now):
     """Normaliza o bruto de `dataset` se ele tiver normalizador registrado.
 
-    Recusa (falha fechada) mostra a mensagem, que é segura por contrato; qualquer outra exceção
-    vira uma linha genérica, porque a mensagem de um erro do banco cita valores da linha: o log
-    leva só o nome da classe da exceção (`__name__`, cortado; `?` se não for um identificador,
-    para um nome com quebra de linha não forjar outra linha), nunca a mensagem, os argumentos,
-    `__context__` nem `__cause__`. O resultado (inclusive o texto) é gravado no conjunto; o texto
-    da exceção nunca é, nem o nome da classe.
+    Espera (`NormalizationWaiting`) só põe uma linha no log e não grava nada; `None` quer dizer
+    "em dia" e grava sucesso. Recusa (falha fechada) mostra a mensagem, que é segura por contrato;
+    qualquer outra exceção vira uma linha genérica, porque a mensagem de um erro do banco cita
+    valores da linha: o log leva só o nome da classe da exceção (`__name__`, cortado; `?` se não
+    for um identificador, para um nome com quebra de linha não forjar outra linha), nunca a
+    mensagem, os argumentos, `__context__` nem `__cause__`. O resultado (inclusive o texto) é
+    gravado no conjunto; o texto da exceção nunca é, nem o nome da classe.
     """
     path = settings.NORMALIZERS.get(name)
     if path is None:
@@ -153,6 +154,11 @@ def _normalize(dataset, name, result, now):
     error_class = ""
     try:
         summary = import_string(path)(dataset)
+    except NormalizationWaiting:
+        # Espera outra coleta: nem sucesso (não limpa uma recusa real de antes) nem recusa (não
+        # grava erro novo). O resultado gravado fica como está; o texto da exceção não é usado.
+        result.lines.append(f"{name}: normalização aguardando outra coleta")
+        return
     except NormalizationRefused as error:
         result.lines.append(f"{name}: normalização recusada: {error}")
         result.normalization_failed += 1

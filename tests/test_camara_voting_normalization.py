@@ -440,6 +440,7 @@ def test_voto_sem_votacao_recusa_quando_a_carga_de_votacoes_e_tao_nova_quanto_a_
 
 def test_normalize_latest_espera_se_a_carga_de_votos_e_mais_nova_e_nao_grava_nada(conjuntos):
     from apps.legislature import camara_voting_normalization as normalizacao
+    from apps.sources.normalization import NormalizationWaiting
 
     agora = timezone.now()
     carga(conjuntos.votacoes, [votacao("2641546-7")], started_at=agora)
@@ -448,8 +449,11 @@ def test_normalize_latest_espera_se_a_carga_de_votos_e_mais_nova_e_nao_grava_nad
         [voto("2641546-7"), voto("2650000-3")],
         started_at=agora + timedelta(hours=2),
     )
-    assert normalizacao.normalize_latest(conjuntos.votos) is None
-    assert normalizacao.normalize_latest(conjuntos.votacoes) is None
+    # A espera é um sinal próprio (nem recusa, nem "nada a fazer"): o agendador não grava sucesso.
+    with pytest.raises(NormalizationWaiting):
+        normalizacao.normalize_latest(conjuntos.votos)
+    with pytest.raises(NormalizationWaiting):
+        normalizacao.normalize_latest(conjuntos.votacoes)
     CamaraVoting, CamaraVote = modelos()
     assert (CamaraVoting.objects.count(), CamaraVote.objects.count()) == (0, 0)
 
@@ -469,6 +473,7 @@ def test_normalize_latest_recusa_se_a_carga_de_votacoes_e_mais_nova_e_ainda_falt
 
 def test_depois_que_a_votacao_chega_a_normalizacao_que_esperava_conclui(conjuntos):
     from apps.legislature import camara_voting_normalization as normalizacao
+    from apps.sources.normalization import NormalizationWaiting
 
     agora = timezone.now()
     carga(conjuntos.votacoes, [votacao("2641546-7")], started_at=agora)
@@ -477,7 +482,8 @@ def test_depois_que_a_votacao_chega_a_normalizacao_que_esperava_conclui(conjunto
         [voto("2641546-7"), voto("2650000-3")],
         started_at=agora + timedelta(hours=2),
     )
-    assert normalizacao.normalize_latest(conjuntos.votos) is None
+    with pytest.raises(NormalizationWaiting):
+        normalizacao.normalize_latest(conjuntos.votos)
     carga(
         conjuntos.votacoes,
         [votacao("2641546-7"), votacao("2650000-3")],
@@ -509,9 +515,11 @@ def test_a_espera_acaba_no_prazo_e_a_anomalia_aparece_como_recusa(conjuntos):
 
 def test_dentro_do_prazo_de_48_horas_a_normalizacao_espera(conjuntos):
     from apps.legislature import camara_voting_normalization as normalizacao
+    from apps.sources.normalization import NormalizationWaiting
 
     cargas_com_orfao(conjuntos, timedelta(hours=48))
-    assert normalizacao.normalize_latest(conjuntos.votos) is None
+    with pytest.raises(NormalizationWaiting):
+        normalizacao.normalize_latest(conjuntos.votos)
 
 
 def test_um_segundo_alem_do_prazo_de_48_horas_recusa(conjuntos):

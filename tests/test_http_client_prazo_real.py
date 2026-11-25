@@ -253,7 +253,8 @@ def test_tls_linha_de_tamanho_do_pedaco_gotejada_e_cortada_pelo_prazo(gotejador,
     mensagem, demorou = baixar_e_medir(servidor, tmp_path / "a.zip")
     assert mensagem == "Download de localhost acima do prazo de 0.3 segundos."
     assert demorou < LIMITE_DE_ESPERA
-    assert list(tmp_path.iterdir()) == []
+    # A fixture `tls` também grava o certificado e a chave neste diretório.
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["cert.pem", "chave.pem"]
 
 
 # Se o host TLS goteja o corpo, o cliente corta no prazo.

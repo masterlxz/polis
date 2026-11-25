@@ -206,8 +206,10 @@ def test_duas_votacoes_e_cinco_votos_criam_2_votacoes_e_5_votos(conjuntos):
         ("linha um\nlinha dois", "linha um linha dois"),
         ("linha um\rlinha dois", "linha um linha dois"),
         ("a\r\nb\nc", "a b c"),
+        ("linha um linha dois", "linha um linha dois"),
+        ("linha um linha dois", "linha um linha dois"),
     ],
-    ids=["crlf", "lf", "cr", "misturado"],
+    ids=["crlf", "lf", "cr", "misturado", "separador_de_linha", "separador_de_paragrafo"],
 )
 def test_a_quebra_de_linha_da_descricao_vira_um_espaco(conjuntos, bruto, esperado):
     normalizar_par(conjuntos, [votacao(descricao=bruto)], [voto()])
@@ -341,6 +343,7 @@ def test_voto_que_sumiu_da_carga_nova_continua_no_banco(conjuntos):
         ("id", "2641546"),
         ("id", "x-1"),
         ("id", "٣-1"),
+        ("id", "9999999999-9999999999"),
         ("data", "2026-13-40"),
         ("data", "10/03/2026"),
         ("siglaOrgao", ""),
@@ -353,6 +356,7 @@ def test_voto_que_sumiu_da_carga_nova_continua_no_banco(conjuntos):
         ("ultimaApresentacaoProposicao_idProposicao", "abc"),
         ("ultimaApresentacaoProposicao_idProposicao", ""),
         ("descricao", "x" * 5001),
+        ("descricao", "a\tb"),
     ],
 )
 def test_votacao_invalida_recusa_tudo_e_a_mensagem_cita_a_coluna_e_nunca_o_valor(
@@ -362,7 +366,7 @@ def test_votacao_invalida_recusa_tudo_e_a_mensagem_cita_a_coluna_e_nunca_o_valor
         conjuntos, [votacao(), votacao("2645346-18", **{coluna: valor})], [voto()]
     )
     mensagem = recusa(run_votacoes, run_votos)
-    assert coluna in mensagem
+    assert f"{coluna} (1)" in mensagem
     assert "Nada foi gravado" in mensagem
     assert valor not in mensagem or valor == ""
     CamaraVoting, CamaraVote = modelos()
@@ -373,6 +377,7 @@ def test_votacao_invalida_recusa_tudo_e_a_mensagem_cita_a_coluna_e_nunca_o_valor
     ("coluna", "valor"),
     [
         ("idVotacao", "2641546"),
+        ("idVotacao", "9999999999-9999999999"),
         ("deputado_id", ""),
         ("deputado_id", "-5"),
         ("deputado_id", "0"),
@@ -389,7 +394,7 @@ def test_voto_invalido_recusa_tudo_e_a_mensagem_cita_a_coluna_e_nunca_o_valor(
         conjuntos, [votacao()], [voto(), voto(deputado=160976, **{coluna: valor})]
     )
     mensagem = recusa(run_votacoes, run_votos)
-    assert coluna in mensagem
+    assert f"{coluna} (1)" in mensagem
     assert "Nada foi gravado" in mensagem
     assert valor not in mensagem or valor == ""
     CamaraVoting, CamaraVote = modelos()
@@ -480,6 +485,143 @@ def test_depois_que_a_votacao_chega_a_normalizacao_que_esperava_conclui(conjunto
     )
     resultado = normalizacao.normalize_latest(conjuntos.votacoes)
     assert (resultado.created, resultado.votings_created) == (2, 2)
+
+
+def cargas_com_orfao(conjuntos, atraso_dos_votos):
+    """Votações em `agora`, votos (com um sem votação) `atraso_dos_votos` depois."""
+    agora = timezone.now()
+    carga(conjuntos.votacoes, [votacao("2641546-7")], started_at=agora)
+    carga(
+        conjuntos.votos,
+        [voto("2641546-7"), voto("2650000-3")],
+        started_at=agora + atraso_dos_votos,
+    )
+
+
+def test_a_espera_acaba_no_prazo_e_a_anomalia_aparece_como_recusa(conjuntos):
+    # Votos 3 dias mais novos que as votações: não é a corrida de coletas, é votação que não vem.
+    from apps.legislature import camara_voting_normalization as normalizacao
+
+    cargas_com_orfao(conjuntos, timedelta(days=3))
+    with pytest.raises(normalizacao.NormalizationRefused, match="sem votação"):
+        normalizacao.normalize_latest(conjuntos.votos)
+
+
+def test_dentro_do_prazo_de_48_horas_a_normalizacao_espera(conjuntos):
+    from apps.legislature import camara_voting_normalization as normalizacao
+
+    cargas_com_orfao(conjuntos, timedelta(hours=48))
+    assert normalizacao.normalize_latest(conjuntos.votos) is None
+
+
+def test_um_segundo_alem_do_prazo_de_48_horas_recusa(conjuntos):
+    from apps.legislature import camara_voting_normalization as normalizacao
+
+    cargas_com_orfao(conjuntos, timedelta(hours=48, seconds=1))
+    with pytest.raises(normalizacao.NormalizationRefused, match="sem votação"):
+        normalizacao.normalize_latest(conjuntos.votos)
+
+
+def test_cargas_do_mesmo_instante_com_voto_sem_votacao_recusam(conjuntos):
+    from apps.legislature import camara_voting_normalization as normalizacao
+
+    cargas_com_orfao(conjuntos, timedelta(0))
+    with pytest.raises(normalizacao.NormalizationRefused, match="sem votação"):
+        normalizacao.normalize_latest(conjuntos.votos)
+
+
+# --- teto de linhas por carga ------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("linhas_votacoes", "linhas_votos"),
+    [(50_001, 1), (1, 500_001)],
+    ids=["votacoes_demais", "votos_demais"],
+)
+def test_carga_acima_do_teto_de_linhas_recusa_antes_de_ler(
+    conjuntos, linhas_votacoes, linhas_votos
+):
+    run_votacoes = carga(
+        conjuntos.votacoes, [votacao()], rows_read=linhas_votacoes, rows_loaded=linhas_votacoes
+    )
+    run_votos = carga(conjuntos.votos, [voto()], rows_read=linhas_votos, rows_loaded=linhas_votos)
+    mensagem = recusa(run_votacoes, run_votos)
+    assert "limite de linhas" in mensagem
+    assert "Nada foi gravado" in mensagem
+    assert modelos()[0].objects.count() == 0
+
+
+def test_carga_no_teto_de_linhas_passa(conjuntos):
+    run_votacoes = carga(conjuntos.votacoes, [votacao()], rows_read=50_000, rows_loaded=50_000)
+    run_votos = carga(conjuntos.votos, [voto()], rows_read=500_000, rows_loaded=500_000)
+    assert normalizar_runs(run_votacoes, run_votos).created == 1
+
+
+# --- lotes, e o espelho da detecção de carga já normalizada -----------------------------------
+
+
+def test_a_gravacao_em_lotes_nao_perde_nem_duplica_linhas(conjuntos, monkeypatch):
+    from apps.legislature import camara_voting_normalization as normalizacao
+
+    monkeypatch.setattr(normalizacao, "BATCH_SIZE", 2)
+    codigos = [f"26{n:05d}-1" for n in range(5)]
+    resultado = normalizar_par(
+        conjuntos,
+        [votacao(codigo) for codigo in codigos],
+        [voto(codigo, deputado) for codigo in codigos for deputado in (204379, 160976)],
+    )
+    CamaraVoting, CamaraVote = modelos()
+    assert (resultado.votings_created, resultado.created, resultado.existing) == (5, 10, 0)
+    assert (CamaraVoting.objects.count(), CamaraVote.objects.count()) == (5, 10)
+    assert all(votacao_gravada(codigo).votes.count() == 2 for codigo in codigos)
+
+
+def test_normalize_latest_normaliza_de_novo_quando_so_a_carga_de_votacoes_e_nova(conjuntos):
+    from apps.legislature import camara_voting_normalization as normalizacao
+
+    agora = timezone.now()
+    carga(conjuntos.votacoes, [votacao()], started_at=agora)
+    carga(conjuntos.votos, [voto()], started_at=agora)
+    normalizacao.normalize_latest(conjuntos.votacoes)
+    carga(
+        conjuntos.votacoes,
+        [votacao(descricao="Descrição corrigida.")],
+        started_at=agora + timedelta(hours=1),
+    )
+    assert normalizacao.normalize_latest(conjuntos.votacoes) is not None
+    assert votacao_gravada("2641546-7").description == "Descrição corrigida."
+
+
+@pytest.mark.parametrize(
+    "estado",
+    [
+        {"state": IngestionRun.State.FAILED, "error_code": IngestionRun.ErrorCode.DOWNLOAD},
+        {"state": IngestionRun.State.RUNNING, "finished_at": None},
+    ],
+    ids=["falhou", "em_andamento"],
+)
+def test_execucao_que_nao_terminou_bem_nao_e_a_carga_mais_recente(conjuntos, estado):
+    from apps.legislature import camara_voting_normalization as normalizacao
+
+    agora = timezone.now()
+    cargas(conjuntos, [votacao()], [voto()], started_at=agora)
+    carga(conjuntos.votacoes, [votacao("9999999-9")], started_at=agora, **estado)
+    resultado = normalizacao.normalize_latest(conjuntos.votacoes)
+    assert resultado.votings_created == 1
+    assert modelos()[0].objects.filter(camara_voting_id="9999999-9").count() == 0
+
+
+# --- admin -------------------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("modelo", ["CamaraVoting", "CamaraVote"])
+def test_os_campos_de_busca_do_admin_existem_no_modelo(modelo):
+    from django.contrib import admin
+
+    classe = getattr(__import__("apps.legislature.models", fromlist=[modelo]), modelo)
+    for campo in admin.site._registry[classe].search_fields:
+        caminho = campo.lstrip("=^@")
+        classe.objects.filter(**{f"{caminho}__icontains": "x"}).exists()
 
 
 # --- falha no meio -----------------------------------------------------------------------------

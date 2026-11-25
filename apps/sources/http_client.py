@@ -13,7 +13,12 @@ Regras que este módulo aplica:
 - download em fluxo para um arquivo temporário ao lado do destino, conferindo `Content-Length` e
   `max_bytes` (o do cliente, que cada chamada pode só reduzir); só depois de íntegro é renomeado.
   Falha não deixa arquivo parcial nem altera um arquivo anterior (ADR 0005, decisão 9: falha
-  técnica nunca apaga).
+  técnica nunca apaga);
+- prazo total por download (`total_timeout`, padrão 1800 s), medido com o `clock` injetado a partir
+  de cada abertura de resposta (as pausas de cortesia e a espera de 429 e 503 não contam) até o
+  último byte. O `timeout` por operação de socket não basta: um host que manda 1 byte a cada 29 s
+  nunca o estoura. O prazo é conferido a cada leitura (`read1`), então um download pode passar do
+  prazo por até uma leitura (no pior caso, um `timeout` por operação) antes de ser cortado.
 
 Segurança dos erros: as mensagens citam só o host e o status (e, quando o limite de bytes recusa,
 o número do limite), nunca a URL completa (a query pode ter token), o corpo da resposta nem o
@@ -74,17 +79,21 @@ class PoliteClient:
         backoff_base=3.0,
         backoff_cap=300.0,
         timeout=30.0,
+        total_timeout=1800.0,
         max_bytes=2 * 1024**3,
         allowed_schemes=("https",),
         sleep=time.sleep,
         clock=time.monotonic,
         wall_clock=time.time,
     ):
+        if type(total_timeout) not in (int, float) or not total_timeout > 0:
+            raise ValueError("total_timeout deve ser um número positivo (segundos).")
         self._min_interval = min_interval
         self._max_attempts = max_attempts
         self._backoff_base = backoff_base
         self._backoff_cap = backoff_cap
         self._timeout = timeout
+        self._total_timeout = total_timeout
         self._max_bytes = max_bytes
         self._allowed_schemes = tuple(allowed_schemes)
         self._sleep = sleep
@@ -132,9 +141,10 @@ class PoliteClient:
 
         for attempt in range(1, self._max_attempts + 1):
             self._pause(host)
+            started = self._clock()
             response, status, retry_after, network_failed = self._open(url)
             if response is not None:
-                return self._save(response, host, Path(destination), limit)
+                return self._save(response, host, Path(destination), limit, started)
             if network_failed:
                 raise DownloadError(f"Falha de rede ao acessar {host}.")
             if status in BLOCKED_STATUSES:
@@ -160,7 +170,7 @@ class PoliteClient:
         response = status = retry_after = None
         network_failed = False
         try:
-            response = self._opener.open(request, timeout=self._timeout)
+            response = self._opener.open(request, timeout=min(self._timeout, self._total_timeout))
         except HTTPError as error:
             status = error.code
             retry_after = error.headers.get("Retry-After")
@@ -187,7 +197,7 @@ class PoliteClient:
             return None
         return max(0.0, moment.timestamp() - self._wall_clock())
 
-    def _save(self, response, host, destination, limit):
+    def _save(self, response, host, destination, limit, started):
         declared = _parse_length(response.headers.get("Content-Length"))
         etag = response.headers.get("ETag", "")
         last_modified = response.headers.get("Last-Modified", "")
@@ -206,7 +216,16 @@ class PoliteClient:
         try:
             try:
                 with response, os.fdopen(handle, "wb") as file:
-                    while chunk := response.read(CHUNK_SIZE):
+                    while True:
+                        # `read1`: no máximo uma leitura de socket por volta. `read(CHUNK_SIZE)`
+                        # só volta com 1 MiB ou no fim e encadearia leituras: um host de 1 byte a
+                        # cada 29 s nunca estouraria o `timeout` nem devolveria o controle aqui.
+                        chunk = response.read1(CHUNK_SIZE)
+                        if self._clock() - started > self._total_timeout:
+                            problem = f"acima do prazo de {self._total_timeout:g} segundos"
+                            break
+                        if not chunk:
+                            break
                         received += len(chunk)
                         if received > limit:
                             problem = f"acima do limite de {limit} bytes"

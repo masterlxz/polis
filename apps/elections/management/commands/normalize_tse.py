@@ -48,10 +48,8 @@ class Command(BaseCommand):
 
         # Só no sucesso: a carga mais recente foi normalizada, então a recusa que o agendador
         # gravou antes deixou de valer (senão o painel e o aviso de coleta falhada seguem dizendo
-        # que as retiradas estão paradas). Limite conhecido: se o agendador coletar e recusar uma
-        # carga mais nova enquanto este comando ainda normaliza a anterior (janela de segundos,
-        # coleta 1 vez por dia), isto zera a recusa dela; a próxima passada do agendador a grava
-        # de novo.
+        # que as retiradas estão paradas). A janela de corrida com o agendador está em
+        # `record_success`.
         record_success(dataset)
         self.stdout.write(
             f"Execução {run.pk}: linhas lidas {result.rows_read}, "

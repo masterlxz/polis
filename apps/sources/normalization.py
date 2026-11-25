@@ -28,6 +28,10 @@ def record_success(*datasets):
     que o agendador gravou antes ficava no painel e nos avisos depois de um comando bem-sucedido.
     `update()` troca só estas duas colunas, como `scheduling._record_normalization`, para não
     desfazer uma edição feita ao mesmo tempo no admin.
+
+    Limite conhecido (vale para todos os comandos): se o agendador coletar e recusar uma carga mais
+    nova enquanto o comando ainda normaliza a anterior (janela de segundos), isto zera a recusa
+    dela, e ela só reaparece na próxima coleta bem-sucedida do conjunto (1 vez por dia).
     """
     Dataset.objects.filter(pk__in=[dataset.pk for dataset in datasets]).update(
         last_normalization_at=timezone.now(), last_normalization_error=""

@@ -148,8 +148,8 @@ class Dataset(models.Model):
         null=True,
         blank=True,
         help_text=(
-            "Escrito pelo agendador depois de cada coleta e pelo normalize_tse quando ele dá "
-            "certo; vazio se nunca normalizou."
+            "Escrito pelo agendador depois de cada coleta e pelos comandos normalize_* quando "
+            "dão certo; vazio se nunca normalizou."
         ),
     )
     last_normalization_error = models.CharField(

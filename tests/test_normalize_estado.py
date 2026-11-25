@@ -68,7 +68,7 @@ def criar_carga(conjunto):
 
 @pytest.fixture
 def cenario(db):
-    """Os conjuntos do comando, cada um com carga e a recusa antiga; mais um de outra fonte."""
+    """Os conjuntos do comando, cada um com carga e a recusa antiga; mais dois que ele não toca."""
     antes = timezone.now() - timedelta(days=1)
 
     def montar(comando):
@@ -100,7 +100,11 @@ def cenario(db):
         outro = criar_conjunto(
             outra_fonte, "conjunto", last_normalization_error=RECUSA_DE_OUTRA_FONTE
         )
-        return SimpleNamespace(normalizados=normalizados, outro=outro, antes=antes)
+        # Da MESMA fonte do comando, mas que ele não normaliza: um filtro por fonte o limparia.
+        irmao = criar_conjunto(
+            fontes[conjuntos[0][0]], "irmao", last_normalization_error=RECUSA_DE_OUTRA_FONTE
+        )
+        return SimpleNamespace(normalizados=normalizados, outros=[outro, irmao], antes=antes)
 
     return montar
 
@@ -141,7 +145,8 @@ def test_o_comando_limpa_so_os_conjuntos_que_normalizou(comando, cenario, monkey
 
     rodar(comando)
 
-    assert estado(c.outro)[0] == RECUSA_DE_OUTRA_FONTE
+    for conjunto in c.outros:
+        assert estado(conjunto)[0] == RECUSA_DE_OUTRA_FONTE
 
 
 @pytest.mark.parametrize("comando", COMANDOS)

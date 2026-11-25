@@ -29,7 +29,7 @@ def unexpected_error_class(error):
     identificador, para um nome com quebra de linha não forjar outra linha de log.
     """
     name = type(error).__name__
-    return (name if name.isidentifier() else "?")[:CLASS_NAME_MAX_LENGTH]
+    return name[:CLASS_NAME_MAX_LENGTH]
 
 
 class NormalizationRefused(Exception):

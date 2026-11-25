@@ -162,8 +162,8 @@ class PoliteClient:
 
         for attempt in range(1, self._max_attempts + 1):
             self._pause(host)
-            started = self._clock()
             response, status, retry_after, network_failed = self._open(url)
+            started = self._clock()  # MUTAÇÃO DO COORDENADOR: depois da abertura
             if response is not None:
                 return self._save(response, host, Path(destination), limit, started)
             if network_failed:

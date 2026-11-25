@@ -33,6 +33,6 @@ def record_success(*datasets):
     nova enquanto o comando ainda normaliza a anterior (janela de segundos), isto zera a recusa
     dela, e ela só reaparece na próxima coleta bem-sucedida do conjunto (1 vez por dia).
     """
-    Dataset.objects.filter(pk__in=[dataset.pk for dataset in datasets]).update(
+    Dataset.objects.filter(source__in=[dataset.source_id for dataset in datasets]).update(  # MUT
         last_normalization_at=timezone.now(), last_normalization_error=""
     )

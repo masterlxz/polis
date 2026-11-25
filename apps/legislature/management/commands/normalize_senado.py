@@ -20,6 +20,7 @@ class Command(BaseCommand):
         if run is None:
             raise CommandError(f"Nenhuma carga com linhas para {name}; rode ingest_dataset.")
 
+        record_success(dataset)  # MUTAÇÃO DO COORDENADOR: limpa antes de normalizar
         failed = False
         try:
             result = normalization.normalize(run)

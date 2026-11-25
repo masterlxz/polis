@@ -65,15 +65,21 @@ def corpo(*identificacoes, envelope=None):
 
 
 class FakeApi:
-    """Escreve o corpo combinado no destino ou levanta o erro combinado."""
+    """Escreve o corpo combinado no destino ou levanta o erro combinado.
+
+    Guarda o `max_bytes` de cada chamada, mas não o aplica: o limite em si é do `PoliteClient`
+    (testado em `test_http_client.py` e, com o cliente real, em `test_ingestion.py`).
+    """
 
     def __init__(self, dados=None, erro=None):
         self.dados = dados
         self.erro = erro
         self.calls = []
+        self.max_bytes_usados = []
 
-    def download(self, url, destination):
+    def download(self, url, destination, *, max_bytes=None):
         self.calls.append(url)
+        self.max_bytes_usados.append(max_bytes)
         if self.erro:
             raise self.erro
         Path(destination).write_bytes(self.dados)
@@ -259,6 +265,28 @@ def test_resposta_grande_demais_e_recusada(tmp_path, monkeypatch):
         fetch_senate_list(
             FakeApi(corpo(*[identificacao(i) for i in range(1, 6)])), API, tmp_path / "x"
         )
+
+
+def test_baixa_com_o_teto_de_bytes_do_leitor(tmp_path):
+    from apps.sources import json_senado
+
+    api = FakeApi(corpo(identificacao(1)))
+
+    fetch_senate_list(api, API, tmp_path / "x")
+
+    assert api.calls == [API], "controle: o download aconteceu"
+    assert api.max_bytes_usados == [json_senado.MAX_BYTES]
+
+
+def test_o_teto_passado_ao_download_e_o_valor_atual_da_constante(tmp_path, monkeypatch):
+    from apps.sources import json_senado
+
+    monkeypatch.setattr(json_senado, "MAX_BYTES", 12_345)
+    api = FakeApi(corpo(identificacao(1)))
+
+    fetch_senate_list(api, API, tmp_path / "x")
+
+    assert api.max_bytes_usados == [12_345]
 
 
 def test_itens_demais_sao_recusados(tmp_path, monkeypatch):

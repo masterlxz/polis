@@ -8,20 +8,28 @@ from pathlib import Path
 
 import pytest
 
-from apps.sources.ckan import CkanError, read_license_id
+from apps.sources.ckan import MAX_BYTES, CkanError, read_license_id
 from apps.sources.http_client import BlockedError, DownloadError, DownloadResult
 
 URL = "https://dadosabertos.tse.jus.br/api/3/action/package_show?id=candidatos-2026"
 
 
 class FakeJsonClient:
+    """Escreve o JSON combinado no destino ou levanta o erro combinado.
+
+    Guarda o `max_bytes` de cada chamada, mas não o aplica: o limite em si é do `PoliteClient`
+    (testado em `test_http_client.py` e, com o cliente real, em `test_ingestion.py`).
+    """
+
     def __init__(self, conteudo=None, error=None):
         self.conteudo = conteudo
         self.error = error
         self.calls = []
+        self.max_bytes_usados = []
 
-    def download(self, url, destination):
+    def download(self, url, destination, *, max_bytes=None):
         self.calls.append(url)
+        self.max_bytes_usados.append(max_bytes)
         if self.error is not None:
             raise self.error
         if isinstance(self.conteudo, bytes):
@@ -77,6 +85,21 @@ def test_resposta_grande_demais_levanta_ckan_error(tmp_path):
     grande = pacote(license_id="cc-by", notes="x" * 2000)
     with pytest.raises(CkanError):
         read_license_id(FakeJsonClient(grande), URL, tmp_path, max_bytes=1000)
+
+
+def test_baixa_com_o_teto_padrao_do_leitor(tmp_path):
+    cliente = FakeJsonClient(pacote(license_id="cc-by"))
+
+    assert read_license_id(cliente, URL, tmp_path) == "cc-by"
+    assert cliente.calls == [URL], "controle: o download aconteceu"
+    assert cliente.max_bytes_usados == [MAX_BYTES]
+
+
+def test_baixa_com_o_teto_que_o_chamador_passou(tmp_path):
+    cliente = FakeJsonClient(pacote(license_id="cc-by"))
+
+    assert read_license_id(cliente, URL, tmp_path, max_bytes=1000) == "cc-by"
+    assert cliente.max_bytes_usados == [1000]
 
 
 def test_erro_de_download_e_de_bloqueio_passam_sem_serem_engolidos(tmp_path):

@@ -72,7 +72,7 @@ def _detail(dataset, situation):
         code = ""
         if dataset.last_error_code:
             code = f" ({IngestionRun.ErrorCode(dataset.last_error_code).label})"
-        held = _held_suffix(dataset) if dataset.last_normalization_error else ""
+        held = _held_suffix(dataset)  # MUTAÇÃO DO COORDENADOR: sem a condição do erro
         return f"{code}{held}"
     return ""
 

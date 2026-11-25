@@ -11,8 +11,11 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
+from apps.elections import normalization
+from apps.elections.retirement import RetirementsHeld
 from apps.sources.freshness import Situation
 from apps.sources.models import Dataset, IngestionRun, Source
+from apps.sources.scheduling import UNEXPECTED_ERROR_TEXT
 
 NOW = datetime(2026, 11, 14, 12, 0, tzinfo=UTC)
 RUIM = ["late", "failed", "normalization_failed"]
@@ -351,7 +354,7 @@ def test_o_texto_nunca_leva_a_url_do_conjunto(fonte):
 
 # --- Retiradas paradas (carga do TSE recusada) ---------------------------------------------------
 
-FRASE_DAS_RETIRADAS = "Retiradas pedidas pela fonte ficam paradas até a normalização passar."
+FRASE_DAS_RETIRADAS = "Enquanto isso, nenhuma retirada pedida pela fonte é efetivada."
 TSE = "tse/consulta-cand-2026"
 
 
@@ -370,9 +373,10 @@ def _recusar(conjunto):
     Dataset.objects.filter(pk=conjunto.pk).update(last_normalization_error=MENSAGEM_DA_RECUSA)
 
 
-@pytest.mark.django_db
 def test_a_lista_real_tem_o_tse_e_so_chaves_que_tem_normalizador(settings):
-    assert TSE in settings.RETIREMENT_DATASETS
+    chave_do_normalizador = f"{normalization.SOURCE_SLUG}/{normalization.DATASET_SLUG}"
+
+    assert chave_do_normalizador in settings.RETIREMENT_DATASETS
     assert set(settings.RETIREMENT_DATASETS) <= set(settings.NORMALIZERS)
 
 
@@ -400,6 +404,47 @@ def test_o_lembrete_do_tse_leva_a_mesma_frase(fonte_tse):
 
     assert "LEMBRETE tse/consulta-cand-2026" in sender.textos[1]
     assert sender.textos[1].count(FRASE_DAS_RETIRADAS) == 1
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    "mensagem",
+    [str(RetirementsHeld(25, 20)), UNEXPECTED_ERROR_TEXT],
+    ids=["disjuntor", "erro_inesperado"],
+)
+def test_a_frase_sai_tambem_com_a_mensagem_do_disjuntor_e_a_do_erro_inesperado(fonte_tse, mensagem):
+    conjunto = _em_dia(fonte_tse, "consulta-cand-2026")
+    Dataset.objects.filter(pk=conjunto.pk).update(last_normalization_error=mensagem)
+    sender = FakeSender()
+
+    _enviar(sender)
+
+    assert f"({mensagem})" in sender.textos[0]
+    assert sender.textos[0].count(FRASE_DAS_RETIRADAS) == 1
+
+
+@pytest.mark.django_db
+def test_com_a_ultima_coleta_falhada_o_aviso_do_tse_nao_leva_a_frase(fonte_tse):
+    # FAILED vence NORMALIZATION_FAILED (freshness.py): o aviso mostra o código do erro da
+    # coleta, não a recusa. As retiradas seguem paradas e o texto não diz (decisão aceita).
+    conjunto = _em_dia(fonte_tse, "consulta-cand-2026")
+    _recusar(conjunto)
+    fim = NOW - timedelta(minutes=30)
+    IngestionRun.objects.create(
+        dataset=conjunto,
+        source_url=conjunto.url,
+        state=IngestionRun.State.FAILED,
+        error_code=IngestionRun.ErrorCode.DOWNLOAD,
+        started_at=fim - timedelta(minutes=1),
+        finished_at=fim,
+    )
+    sender = FakeSender()
+
+    _enviar(sender)
+
+    assert "ALERTA tse/consulta-cand-2026: Última coleta falhou" in sender.textos[0]
+    assert MENSAGEM_DA_RECUSA not in sender.textos[0]
+    assert FRASE_DAS_RETIRADAS not in sender.textos[0]
 
 
 @pytest.mark.django_db

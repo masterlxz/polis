@@ -110,6 +110,8 @@ def test_seed_cria_as_tres_fontes_e_os_conjuntos_do_tse_da_camara_e_do_senado():
     assert {str(d) for d in Dataset.objects.all()} == {
         "tse/consulta-cand-2026",
         "camara/deputados",
+        "camara/votacoes-2026",
+        "camara/votos-2026",
         "senado/senadores",
         "senado/votacoes",
     }
@@ -119,7 +121,7 @@ def test_seed_cria_as_tres_fontes_e_os_conjuntos_do_tse_da_camara_e_do_senado():
 def test_os_conjuntos_sem_licenca_declarada_nascem_desabilitados_e_sem_justificativa():
     seed()
     conjuntos = Dataset.objects.filter(source__slug__in=("camara", "senado"))
-    assert conjuntos.count() == 3
+    assert conjuntos.count() == 5
     for conjunto in conjuntos:
         assert conjunto.enabled is False
         assert conjunto.license_basis == Dataset.LicenseBasis.OWNER_DECISION
@@ -159,6 +161,79 @@ def test_votacoes_do_senado_so_leem_a_allowlist_combinada_e_coletam_uma_vez_por_
     assert votacoes.internal_columns == []
     assert votacoes.schedule_interval_hours == 24
     assert votacoes.earliest_hour_utc == 8
+
+
+def test_votacoes_da_camara_leem_so_a_allowlist_e_coletam_uma_vez_por_dia():
+    seed()
+    votacoes = Dataset.objects.get(source__slug="camara", slug="votacoes-2026")
+    assert votacoes.format == Dataset.Format.CSV
+    # Medido em 2026-11-24: 20 colunas, 9.153 votações, 5,6 MB, regeneradas às 06:50 GMT.
+    assert votacoes.url == (
+        "https://dadosabertos.camara.leg.br/arquivos/votacoes/csv/votacoes-2026.csv"
+    )
+    assert votacoes.allowed_columns == [
+        "id",
+        "data",
+        "dataHoraRegistro",
+        "siglaOrgao",
+        "aprovacao",
+        "votosSim",
+        "votosNao",
+        "votosOutros",
+        "descricao",
+        "ultimaApresentacaoProposicao_idProposicao",
+    ]
+    # Minimização (ADR 0005): as `uri*`, o órgão e o evento por id, e a abertura e a
+    # apresentação (texto longo, com quebra de linha) ficam de fora.
+    for fora in (
+        "uri",
+        "uriOrgao",
+        "uriEvento",
+        "idOrgao",
+        "idEvento",
+        "ultimaAberturaVotacao_descricao",
+        "ultimaApresentacaoProposicao_descricao",
+        "ultimaApresentacaoProposicao_uriProposicao",
+    ):
+        assert fora not in votacoes.allowed_columns
+    assert votacoes.internal_columns == []
+    assert votacoes.license_basis == Dataset.LicenseBasis.OWNER_DECISION
+    assert votacoes.enabled is False
+    assert votacoes.schedule_interval_hours == 24
+    assert votacoes.earliest_hour_utc == 8
+
+
+def test_votos_da_camara_leem_so_a_allowlist_e_nunca_a_identidade_do_deputado():
+    seed()
+    votos = Dataset.objects.get(source__slug="camara", slug="votos-2026")
+    assert votos.format == Dataset.Format.CSV
+    # Medido em 2026-11-24: 12 colunas, 57.855 votos, 19,2 MB.
+    assert votos.url == (
+        "https://dadosabertos.camara.leg.br/arquivos/votacoesVotos/csv/votacoesVotos-2026.csv"
+    )
+    assert votos.allowed_columns == [
+        "idVotacao",
+        "dataHoraVoto",
+        "voto",
+        "deputado_id",
+        "deputado_siglaPartido",
+        "deputado_idLegislatura",
+    ]
+    # ADR 0005: nome, uri, uri do partido, UF e foto do deputado nunca entram.
+    for fora in (
+        "uriVotacao",
+        "deputado_nome",
+        "deputado_uri",
+        "deputado_uriPartido",
+        "deputado_siglaUf",
+        "deputado_urlFoto",
+    ):
+        assert fora not in votos.allowed_columns
+    assert votos.internal_columns == []
+    assert votos.license_basis == Dataset.LicenseBasis.OWNER_DECISION
+    assert votos.enabled is False
+    assert votos.schedule_interval_hours == 24
+    assert votos.earliest_hour_utc == 8
 
 
 def test_o_agendador_normaliza_as_votacoes_do_senado_depois_da_coleta():
@@ -221,7 +296,7 @@ def test_segunda_execucao_nao_duplica_nem_cria():
     seed()
     texto = seed()
     assert Source.objects.count() == 3
-    assert Dataset.objects.count() == 4
+    assert Dataset.objects.count() == 6
     assert "0 criad" in texto
 
 

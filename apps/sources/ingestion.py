@@ -1,7 +1,7 @@
 """Carga de um Dataset: baixa, lê só a allowlist, grava a camada bruta e registra a execução.
 
-Liga o cliente HTTP (`PoliteClient`), o leitor (`ZipCsvReader`), o `Dataset`, o `RawRecord` e o
-`IngestionRun`. Decisões que este módulo aplica:
+Liga o cliente HTTP (`PoliteClient`), o leitor do formato (`ZipCsvReader`, `PlainCsvReader` ou os
+de JSON), o `Dataset`, o `RawRecord` e o `IngestionRun`. Decisões que este módulo aplica:
 - ADR 0005, decisão 6 (falha fechada): qualquer problema de esquema ou linha rejeitada desfaz a
   carga inteira (transação); nada é gravado. Tolerância de linhas rejeitadas: zero.
 - ADR 0005, decisão 9: falha técnica nunca apaga a carga anterior.
@@ -42,6 +42,7 @@ from .json_list import JsonListError, JsonListReader, fetch_pages
 from .json_senado import fetch_senate_list
 from .json_senado_votacoes import MAX_VOTES, fetch_senate_votings
 from .models import IngestionRun, RawRecord, Source
+from .plain_csv import PlainCsvReader
 from .zip_csv import DuplicateColumnError, InvalidFormatError, MissingColumnError, ZipCsvReader
 
 KEEP_LOADS = 3
@@ -159,6 +160,11 @@ def _load(dataset, run, path, fields, batch_size, keep_loads):
         reader = JsonListReader(path, dataset.allowed_columns, max_items=MAX_VOTES)
     elif dataset.format in (dataset.Format.JSON, dataset.Format.JSON_SENADO):
         reader = JsonListReader(path, dataset.allowed_columns)
+    elif dataset.format == dataset.Format.CSV:
+        # Arquivos anuais da Câmara (ADR 0031): `votacoes` tem registro em mais de uma linha
+        # física; o leitor limita quantas linhas um registro pode juntar. O nome do arquivo
+        # temporário (`download.zip`) vira o `item_name`: enganoso para um CSV, e nada o lê.
+        reader = PlainCsvReader(path, dataset.allowed_columns, allow_multiline_records=True)
     else:
         reader = ZipCsvReader(path, dataset.allowed_columns)
     loaded = 0

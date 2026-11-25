@@ -59,7 +59,8 @@ function itemDeVoto(extra = {}) {
     data: "2026-11-12",
     orgao: "Plenário",
     descricao: "Aprovada a Medida Provisória nº 1/2026.",
-    aprovacao: "Aprovada",
+    // A API só emite "1", "0" ou null aqui; o significado não foi verificado (ADR 0031 e 0032).
+    aprovacao: "1",
     id_proposicao: 9876543,
     partido: "ABC",
     voto: "Sim",
@@ -98,21 +99,68 @@ function linhaCom(html, texto) {
   return html.split("</tr>").find((trecho) => trecho.includes(texto));
 }
 
-test("votos: uma linha mostra data, órgão, descrição, resultado, partido da época e voto", async () => {
+// O texto de cada `<td>` da linha que contém `texto`, na ordem das colunas.
+function celulas(html, texto) {
+  const linha = linhaCom(html, texto);
+  assert.ok(linha, `não achei a linha com "${texto}"`);
+  return Array.from(linha.matchAll(/<td[^>]*>(.*?)<\/td>/gs), (achado) => achado[1]);
+}
+
+test("votos: cada dado cai na sua coluna (data, órgão, descrição, aprovação, partido, voto)", async () => {
+  const { status, html } = await comVotos(
+    historico({
+      votos: [
+        itemDeVoto({ id: "1-1", descricao: "Descrição A" }),
+        itemDeVoto({
+          id: "2-1",
+          data: "2026-03-05",
+          orgao: "Comissão de Teste",
+          descricao: "Descrição B",
+          aprovacao: "0",
+          partido: "DEF",
+          voto: "Não",
+        }),
+      ],
+    }),
+  );
+
+  assert.equal(status, 200);
+  assert.deepEqual(celulas(html, "Descrição A"), [
+    "12/11/2026",
+    "Plenário",
+    "Descrição A",
+    "1",
+    "ABC",
+    "Sim",
+  ]);
+  assert.deepEqual(celulas(html, "Descrição B"), [
+    "05/03/2026",
+    "Comissão de Teste",
+    "Descrição B",
+    "0",
+    "DEF",
+    "Não",
+  ]);
+  const cabecalho = Array.from(html.matchAll(/<th\s[^>]*>(.*?)<\/th>/g), (achado) => achado[1]);
+  assert.deepEqual(cabecalho, [
+    "Data",
+    "Órgão",
+    "Descrição",
+    "Aprovação (código da fonte)",
+    "Partido (à época)",
+    "Voto",
+  ]);
+});
+
+test("votos: o código da fonte não é traduzido e a nota diz que o significado não foi verificado", async () => {
   const { status, html } = await comVotos(historico());
 
   assert.equal(status, 200);
-  for (const trecho of [
-    "12/11/2026",
-    "Plenário",
-    "Aprovada a Medida Provisória nº 1/2026.",
-    "Aprovada",
-    "ABC",
-    "Sim",
-    "Partido (à época)",
-  ]) {
-    assert.ok(html.includes(trecho), `faltou "${trecho}" no HTML`);
-  }
+  assert.ok(!/<th\s[^>]*>Resultado/.test(html), "a coluna ainda se chama Resultado");
+  assert.match(
+    html,
+    /Códigos como a fonte os manda; o significado de 1\/0 e das siglas de voto não foi verificado\./,
+  );
 });
 
 test("votos: partidos diferentes na mesma página saem cada um na sua linha, não o do perfil", async () => {
@@ -149,22 +197,23 @@ test("votos: `voto` nulo aparece como 'sem posição registrada', nunca vazio ne
   assert.equal(status, 200);
   assert.match(linhaCom(html, "Descrição B"), /sem posição registrada/i);
   assert.ok(!/sem posição registrada/i.test(linhaCom(html, "Descrição A")));
-  assert.ok(!html.includes(">null<"));
+  assert.equal(celulas(html, "Descrição A")[5], "Sim");
+  assert.equal(celulas(html, "Descrição B")[5], "Sem posição registrada");
 });
 
-test("votos: `aprovacao` nula some da linha; a outra linha mantém o resultado", async () => {
+test("votos: `aprovacao` nula deixa a célula vazia; a outra linha mantém o código", async () => {
   const { status, html } = await comVotos(
     historico({
       votos: [
-        itemDeVoto({ id: "1-1", descricao: "Descrição A", aprovacao: "Aprovada" }),
+        itemDeVoto({ id: "1-1", descricao: "Descrição A", aprovacao: "0" }),
         itemDeVoto({ id: "2-1", descricao: "Descrição B", aprovacao: null }),
       ],
     }),
   );
 
   assert.equal(status, 200);
-  assert.ok(linhaCom(html, "Descrição A").includes("Aprovada"));
-  assert.ok(!linhaCom(html, "Descrição B").includes("Aprovada"));
+  assert.equal(celulas(html, "Descrição A")[3], "0");
+  assert.equal(celulas(html, "Descrição B")[3], "");
   assert.ok(!html.includes(">null<"));
 });
 
@@ -172,8 +221,9 @@ test("votos: `partido` nulo não vira 'null' na tela", async () => {
   const { status, html } = await comVotos(historico({ votos: [itemDeVoto({ partido: null })] }));
 
   assert.equal(status, 200);
-  assert.ok(html.includes("Aprovada a Medida Provisória nº 1/2026."));
-  assert.ok(!html.includes(">null<"));
+  const [, , descricao, , partido] = celulas(html, "Aprovada a Medida Provisória nº 1/2026.");
+  assert.equal(descricao, "Aprovada a Medida Provisória nº 1/2026.");
+  assert.equal(partido, "", "o partido nulo tem de deixar a célula vazia");
 });
 
 test("votos: sem link para proposição e sem mostrar o id da proposição", async () => {
@@ -229,7 +279,11 @@ test("votos: a página pedida vai à API; página inválida vira 1", async () =>
     const { status } = await comVotos(historico(), `?pagina=${invalida}`);
 
     assert.equal(status, 200, `a página não pode quebrar com ?pagina=${invalida}`);
-    assert.ok(api.chamadas.includes(`${CAMINHO_DOS_VOTOS}?pagina=1`), invalida);
+    assert.deepEqual(
+      api.chamadas,
+      [CAMINHO_DO_PERFIL, `${CAMINHO_DOS_VOTOS}?pagina=1`],
+      `?pagina=${invalida}`,
+    );
   }
 });
 
@@ -241,6 +295,7 @@ test("votos: sem nenhum voto coletado a página diz isso e o perfil continua", a
   assert.equal(status, 200);
   assert.ok(html.includes("Nenhum voto coletado"));
   assert.ok(html.includes("ANA DA CÂMARA"));
+  assert.ok(!html.includes("não foi verificado"), "a nota dos códigos sem tabela não faz sentido");
 });
 
 test("votos: página além da última volta para a primeira", async () => {
@@ -252,6 +307,9 @@ test("votos: página além da última volta para a primeira", async () => {
   assert.equal(status, 200);
   assert.ok(html.includes("Nenhum voto nesta página"));
   assert.ok(html.includes(`href="/deputados/${ID}/"`));
+  assert.ok(!html.includes("Anterior"), "não há setas na página vazia");
+  assert.ok(!html.includes("Próxima"), "não há setas na página vazia");
+  assert.ok(!html.includes("não foi verificado"), "a nota dos códigos sem tabela não faz sentido");
 });
 
 test("votos: a atribuição dos votos aparece com o conjunto e o link do original", async () => {
@@ -261,6 +319,7 @@ test("votos: a atribuição dos votos aparece com o conjunto e o link do origina
   assert.ok(html.includes('href="https://dados.example.org/api/v2/votacoes/votos.json"'));
 });
 
+// Guarda de regressão, passa antes e depois da implementação (o `Atribuicao` já recusava o link).
 test("votos: link da atribuição que não é http(s) vira texto, sem href", async () => {
   const atribuicao = atribuicaoDosVotos({ url_origem: "javascript:alert(1)" });
   const { status, html } = await comVotos(historico({ atribuicao }));
@@ -269,13 +328,15 @@ test("votos: link da atribuição que não é http(s) vira texto, sem href", asy
   assert.ok(!/href="javascript/i.test(html), "virou href");
 });
 
-test("votos: órgão, descrição e voto com HTML aparecem escapados", async () => {
+test("votos: órgão, descrição, aprovação, partido e voto com HTML aparecem escapados", async () => {
   const { status, html } = await comVotos(
     historico({
       votos: [
         itemDeVoto({
           orgao: "<img src=x>",
           descricao: "<script>alert(1)</script>",
+          aprovacao: "<s>1</s>",
+          partido: "<u>ABC</u>",
           voto: "<b>Sim</b>",
         }),
       ],
@@ -283,12 +344,26 @@ test("votos: órgão, descrição e voto com HTML aparecem escapados", async () 
   );
 
   assert.equal(status, 200);
-  assert.ok(!html.includes("<script>alert(1)"));
-  assert.ok(!html.includes("<img src=x>"));
-  assert.ok(!html.includes("<b>Sim</b>"));
-  assert.ok(html.includes("&lt;script&gt;alert(1)&lt;/script&gt;"));
+  for (const cru of [
+    "<script>alert(1)",
+    "<img src=x>",
+    "<s>1</s>",
+    "<u>ABC</u>",
+    "<b>Sim</b>",
+  ]) {
+    assert.ok(!html.includes(cru), `${cru} saiu sem escapar`);
+  }
+  for (const escapado of [
+    "&lt;script&gt;alert(1)&lt;/script&gt;",
+    "&lt;s&gt;1&lt;/s&gt;",
+    "&lt;u&gt;ABC&lt;/u&gt;",
+    "&lt;b&gt;Sim&lt;/b&gt;",
+  ]) {
+    assert.ok(html.includes(escapado), `faltou ${escapado}`);
+  }
 });
 
+// Guarda de regressão, passa antes e depois da implementação (a página só mostra o que conhece).
 test("votos: chave desconhecida que a API devolva não chega ao HTML", async () => {
   const corpo = historico({ votos: [itemDeVoto({ interno: "SEGREDO-NO-ITEM" })] });
   corpo.extra = "SEGREDO-NA-RAIZ";
@@ -328,6 +403,7 @@ const CORPOS_FORA_DO_FORMATO = {
   "atribuicao que não é objeto": (c) => (c.atribuicao = "SEGREDO-FORA-DO-FORMATO"),
   "atribuicao sem conjunto": (c) => delete c.atribuicao.conjunto,
   "deputado sem nome": (c) => delete c.deputado.nome,
+  "deputado.legislatura em texto": (c) => (c.deputado.legislatura = "57"),
   "deputado.id_camara em texto": (c) => (c.deputado.id_camara = "204554"),
 };
 
@@ -380,6 +456,7 @@ test("votos: 404 dos votos com o perfil existente é incoerência da API e vira 
   assert.equal(status, 500);
 });
 
+// Guarda de regressão, passa antes e depois da implementação (sem ela a página nem chama os votos).
 test("votos: perfil 404 continua 404 e não chama a API de votos", async () => {
   const controle = await comVotos(historico());
   assert.equal(controle.status, 200, "controle: a página precisa existir");

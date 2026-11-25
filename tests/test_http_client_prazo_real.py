@@ -9,6 +9,8 @@ download termina bem e o teste falha por não levantar `DownloadError`. O socket
 `min(timeout, total_timeout)` = 0,3 s por operação, contra um passo de 0,05 s (folga de 6x).
 """
 
+import http.client
+import math
 import socket
 import ssl
 import subprocess
@@ -377,3 +379,48 @@ def test_download_normal_http_nao_deixa_thread_de_abertura(gotejador, tmp_path):
     servidor = gotejador(HEADERS + b"abcd", b"")
     cliente().download(servidor.url, tmp_path / "a.zip")
     assert esperar_sem_threads_de_abertura()
+
+
+# Se uma thread de abertura abandonada acorda depois, o socket dela é registrado no watchdog da
+# SUA requisição (já vencido: corta antes do envio), não no de um download posterior.
+def test_socket_e_registrado_no_watchdog_da_propria_requisicao(gotejador):
+    servidor = gotejador(HEADERS + b"abcd", b"")
+    velho = http_client._Watchdog(math.inf)
+    velho.expire()
+    c = cliente()
+    with pytest.raises((OSError, http.client.HTTPException)):
+        c._opener.open(c._new_request(servidor.url, velho), timeout=2)
+    assert velho._sock is not None
+
+
+# Se não dá para criar a thread de abertura (falta de recurso), é falha de rede, não erro cru.
+def test_falha_ao_criar_a_thread_de_abertura_vira_falha_de_rede(tmp_path, monkeypatch):
+    original = threading.Thread.start
+
+    def start(self):
+        if self.name == http_client.OPEN_THREAD_NAME:
+            raise RuntimeError("can't start new thread")
+        return original(self)
+
+    monkeypatch.setattr(threading.Thread, "start", start)
+    with pytest.raises(DownloadError) as erro:
+        cliente().download("http://127.0.0.1:9/a.zip", tmp_path / "a.zip")
+    assert str(erro.value) == "Falha de rede ao acessar 127.0.0.1."
+
+
+# Se a principal é interrompida (Ctrl-C) na espera, a thread fica abandonada e fecha a resposta.
+def test_interrupcao_na_espera_abandona_a_thread_e_a_resposta_e_fechada():
+    class EsperaInterrompida:
+        def wait(self, timeout):
+            raise KeyboardInterrupt
+
+        def set(self):
+            pass
+
+    handoff = http_client._Handoff()
+    handoff._done = EsperaInterrompida()
+    with pytest.raises(KeyboardInterrupt):
+        handoff.wait(1)
+    resposta = RespostaQueFecha()
+    handoff.run(lambda: (resposta, None, None, False))
+    assert resposta.fechada

@@ -11,8 +11,11 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
+from apps.elections import normalization
+from apps.elections.retirement import RetirementsHeld
 from apps.sources.freshness import Situation
 from apps.sources.models import Dataset, IngestionRun, Source
+from apps.sources.scheduling import UNEXPECTED_ERROR_TEXT
 
 NOW = datetime(2026, 11, 14, 12, 0, tzinfo=UTC)
 RUIM = ["late", "failed", "normalization_failed"]
@@ -345,5 +348,178 @@ def test_o_texto_nunca_leva_a_url_do_conjunto(fonte):
 
     _enviar(sender)
 
+    assert "SEGREDO-NA-URL" not in sender.textos[0]
+    assert "http" not in sender.textos[0]
+
+
+# --- Retiradas paradas (carga do TSE recusada) ---------------------------------------------------
+
+FRASE_DAS_RETIRADAS = "Enquanto isso, nenhuma retirada pedida pela fonte é efetivada."
+TSE = "tse/consulta-cand-2026"
+
+
+@pytest.fixture
+def fonte_tse(db):
+    return Source.objects.create(
+        slug="tse",
+        name="Fonte TSE de teste",
+        institution="Instituição",
+        official_url="https://example.org/tse",
+        access_type=Source.AccessType.API,
+    )
+
+
+def _recusar(conjunto):
+    Dataset.objects.filter(pk=conjunto.pk).update(last_normalization_error=MENSAGEM_DA_RECUSA)
+
+
+def test_a_lista_real_tem_o_tse_e_so_chaves_que_tem_normalizador(settings):
+    chave_do_normalizador = f"{normalization.SOURCE_SLUG}/{normalization.DATASET_SLUG}"
+
+    assert chave_do_normalizador in settings.RETIREMENT_DATASETS
+    assert set(settings.RETIREMENT_DATASETS) <= set(settings.NORMALIZERS)
+
+
+@pytest.mark.django_db
+def test_tse_com_normalizacao_recusada_avisa_que_as_retiradas_estao_paradas(fonte_tse):
+    conjunto = _em_dia(fonte_tse, "consulta-cand-2026")
+    _recusar(conjunto)
+    sender = FakeSender()
+
+    _enviar(sender)
+
+    assert "ALERTA tse/consulta-cand-2026: Normalização falhou" in sender.textos[0]
+    assert MENSAGEM_DA_RECUSA in sender.textos[0]
+    assert sender.textos[0].count(FRASE_DAS_RETIRADAS) == 1
+
+
+@pytest.mark.django_db
+def test_o_lembrete_do_tse_leva_a_mesma_frase(fonte_tse):
+    conjunto = _em_dia(fonte_tse, "consulta-cand-2026")
+    _recusar(conjunto)
+    sender = FakeSender()
+    _enviar(sender)
+
+    _enviar(sender, now=NOW + timedelta(hours=24))
+
+    assert "LEMBRETE tse/consulta-cand-2026" in sender.textos[1]
+    assert sender.textos[1].count(FRASE_DAS_RETIRADAS) == 1
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    "mensagem",
+    [str(RetirementsHeld(25, 20)), UNEXPECTED_ERROR_TEXT],
+    ids=["disjuntor", "erro_inesperado"],
+)
+def test_a_frase_sai_tambem_com_a_mensagem_do_disjuntor_e_a_do_erro_inesperado(fonte_tse, mensagem):
+    conjunto = _em_dia(fonte_tse, "consulta-cand-2026")
+    Dataset.objects.filter(pk=conjunto.pk).update(last_normalization_error=mensagem)
+    sender = FakeSender()
+
+    _enviar(sender)
+
+    assert f"({mensagem})" in sender.textos[0]
+    assert sender.textos[0].count(FRASE_DAS_RETIRADAS) == 1
+
+
+@pytest.mark.django_db
+def test_com_a_ultima_coleta_falhada_o_aviso_do_tse_nao_leva_a_frase(fonte_tse):
+    # FAILED vence NORMALIZATION_FAILED (freshness.py): o aviso mostra o código do erro da
+    # coleta, não a recusa. As retiradas seguem paradas e o texto não diz (decisão aceita).
+    conjunto = _em_dia(fonte_tse, "consulta-cand-2026")
+    _recusar(conjunto)
+    fim = NOW - timedelta(minutes=30)
+    IngestionRun.objects.create(
+        dataset=conjunto,
+        source_url=conjunto.url,
+        state=IngestionRun.State.FAILED,
+        error_code=IngestionRun.ErrorCode.DOWNLOAD,
+        started_at=fim - timedelta(minutes=1),
+        finished_at=fim,
+    )
+    sender = FakeSender()
+
+    _enviar(sender)
+
+    assert "ALERTA tse/consulta-cand-2026: Última coleta falhou" in sender.textos[0]
+    assert MENSAGEM_DA_RECUSA not in sender.textos[0]
+    assert FRASE_DAS_RETIRADAS not in sender.textos[0]
+
+
+@pytest.mark.django_db
+def test_a_frase_vem_da_lista_e_nao_do_nome_do_tse(fonte, fonte_tse, settings):
+    settings.RETIREMENT_DATASETS = frozenset({"fonte/com-retirada"})
+    _recusar(_em_dia(fonte, "com-retirada"))
+    _recusar(_em_dia(fonte_tse, "consulta-cand-2026"))
+    sender = FakeSender()
+
+    _enviar(sender)
+
+    linha_da_fonte = next(t for t in sender.textos[0].split("\n") if "fonte/com-retirada" in t)
+    linha_do_tse = next(t for t in sender.textos[0].split("\n") if TSE in t)
+    assert FRASE_DAS_RETIRADAS in linha_da_fonte
+    assert FRASE_DAS_RETIRADAS not in linha_do_tse
+
+
+@pytest.mark.django_db
+def test_lista_vazia_nao_acrescenta_a_frase_nem_ao_tse(fonte_tse, settings):
+    settings.RETIREMENT_DATASETS = frozenset()
+    _recusar(_em_dia(fonte_tse, "consulta-cand-2026"))
+    sender = FakeSender()
+
+    _enviar(sender)
+
+    assert MENSAGEM_DA_RECUSA in sender.textos[0]
+    assert FRASE_DAS_RETIRADAS not in sender.textos[0]
+
+
+@pytest.mark.django_db
+def test_mesmo_slug_em_outra_fonte_ou_outro_conjunto_do_tse_nao_leva_a_frase(fonte, fonte_tse):
+    _recusar(_em_dia(fonte, "consulta-cand-2026"))
+    _recusar(_em_dia(fonte_tse, "outro-conjunto"))
+    sender = FakeSender()
+
+    _enviar(sender)
+
+    assert "fonte/consulta-cand-2026" in sender.textos[0]
+    assert "tse/outro-conjunto" in sender.textos[0]
+    assert FRASE_DAS_RETIRADAS not in sender.textos[0]
+
+
+@pytest.mark.django_db
+def test_tse_atrasado_nao_leva_a_frase(fonte_tse):
+    _atrasado(fonte_tse, "consulta-cand-2026")
+    sender = FakeSender()
+
+    _enviar(sender)
+
+    assert "ALERTA tse/consulta-cand-2026: Atrasado" in sender.textos[0]
+    assert FRASE_DAS_RETIRADAS not in sender.textos[0]
+
+
+@pytest.mark.django_db
+def test_a_recuperacao_do_tse_nao_leva_a_frase(fonte_tse):
+    conjunto = _em_dia(fonte_tse, "consulta-cand-2026")
+    _recusar(conjunto)
+    sender = FakeSender()
+    _enviar(sender)
+    Dataset.objects.filter(pk=conjunto.pk).update(last_normalization_error="")
+
+    _enviar(sender, now=NOW + timedelta(minutes=5))
+
+    assert FRASE_DAS_RETIRADAS in sender.textos[0]
+    assert "RECUPERADO tse/consulta-cand-2026" in sender.textos[1]
+    assert FRASE_DAS_RETIRADAS not in sender.textos[1]
+
+
+@pytest.mark.django_db
+def test_com_a_frase_o_texto_continua_sem_url(fonte_tse):
+    _recusar(_em_dia(fonte_tse, "consulta-cand-2026"))
+    sender = FakeSender()
+
+    _enviar(sender)
+
+    assert FRASE_DAS_RETIRADAS in sender.textos[0]
     assert "SEGREDO-NA-URL" not in sender.textos[0]
     assert "http" not in sender.textos[0]

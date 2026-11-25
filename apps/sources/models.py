@@ -147,7 +147,10 @@ class Dataset(models.Model):
         "última normalização tentada em",
         null=True,
         blank=True,
-        help_text="Escrito pelo agendador depois de cada coleta; vazio se nunca normalizou.",
+        help_text=(
+            "Escrito pelo agendador depois de cada coleta e pelo normalize_tse quando ele dá "
+            "certo; vazio se nunca normalizou."
+        ),
     )
     last_normalization_error = models.CharField(
         "erro da última normalização",

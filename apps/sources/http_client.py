@@ -102,7 +102,7 @@ class _Watchdog:
         with self._lock:
             self._sock = sock
             expired = self.expired
-        if expired:
+        if expired and sock is None:
             self._cut(sock)
 
     def _fire(self):

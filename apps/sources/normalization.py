@@ -29,6 +29,6 @@ def record_success(*datasets):
     `update()` troca só estas duas colunas, como `scheduling._record_normalization`, para não
     desfazer uma edição feita ao mesmo tempo no admin.
     """
-    Dataset.objects.filter(pk__in=[dataset.pk for dataset in datasets]).update(
+    Dataset.objects.all().update(  # MUTAÇÃO DO COORDENADOR: sem filtro por conjunto
         last_normalization_at=timezone.now(), last_normalization_error=""
     )

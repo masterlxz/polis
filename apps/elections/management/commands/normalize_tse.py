@@ -55,7 +55,7 @@ class Command(BaseCommand):
         # no admin. Limite conhecido: se o agendador coletar e recusar uma carga mais nova enquanto
         # este comando ainda normaliza a anterior (janela de segundos, coleta 1 vez por dia), este
         # `update()` zera a recusa dela; a próxima passada do agendador a grava de novo.
-        Dataset.objects.filter(pk=dataset.pk).update(
+        Dataset.objects.all().update(  # MUTAÇÃO DO COORDENADOR: sem filtro por conjunto
             last_normalization_at=timezone.now(), last_normalization_error=""
         )
         self.stdout.write(

@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 
-import { buscarDeputado } from "../../../lib/api.js";
+import { buscarDeputado, buscarVotosDoDeputado, prepararPagina } from "../../../lib/api.js";
+import { dataBr } from "../../../lib/formatar.js";
 import Atribuicao from "../../pessoas/[id]/Atribuicao.js";
 
 // Sem cache: quem a fonte retirar (lápide, ADR 0005) precisa sumir na hora.
@@ -26,10 +27,77 @@ function Campo({ rotulo, children }) {
   );
 }
 
-export default async function Deputado({ params }) {
+function Navegacao({ caminho, pagina, totalPaginas }) {
+  const temAnterior = pagina > 1 && pagina <= totalPaginas;
+  const temProxima = pagina < totalPaginas;
+  if (!temAnterior && !temProxima) return null;
+  return (
+    <nav aria-label="Páginas de votos" className="paginas">
+      {temAnterior && <a href={`${caminho}?pagina=${pagina - 1}`}>Anterior</a>}
+      <span>{`Página ${pagina} de ${totalPaginas}`}</span>
+      {temProxima && <a href={`${caminho}?pagina=${pagina + 1}`}>Próxima</a>}
+    </nav>
+  );
+}
+
+function SemVotos({ caminho, totalPaginas }) {
+  if (totalPaginas === 0) return <p role="status">Nenhum voto coletado ainda.</p>;
+  return (
+    <p role="status">
+      {"Nenhum voto nesta página. "}
+      <a href={caminho}>Voltar para a primeira página</a>
+    </p>
+  );
+}
+
+// `voto` nulo é a ausência de posição na fonte: a tela diz isso em vez de deixar a célula vazia.
+// Partido é o do momento do voto, não o do perfil.
+function Votos({ caminho, historico }) {
+  const { votos, pagina, total_paginas: totalPaginas, atribuicao } = historico;
+  return (
+    <section aria-labelledby="deputado-votos" className="candidatura">
+      <h2 id="deputado-votos">Votos</h2>
+      {votos.length === 0 ? (
+        <SemVotos caminho={caminho} totalPaginas={totalPaginas} />
+      ) : (
+        <table className="tabela">
+          <caption>Votos registrados na Câmara dos Deputados</caption>
+          <thead>
+            <tr>
+              <th scope="col">Data</th>
+              <th scope="col">Órgão</th>
+              <th scope="col">Descrição</th>
+              <th scope="col">Resultado</th>
+              <th scope="col">Partido (à época)</th>
+              <th scope="col">Voto</th>
+            </tr>
+          </thead>
+          <tbody>
+            {votos.map((item) => (
+              <tr key={item.id}>
+                <td>{dataBr(item.data) ?? item.data}</td>
+                <td>{item.orgao}</td>
+                <td>{item.descricao}</td>
+                <td>{item.aprovacao}</td>
+                <td>{item.partido}</td>
+                <td>{item.voto ?? "Sem posição registrada"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      <Navegacao caminho={caminho} pagina={pagina} totalPaginas={totalPaginas} />
+      {atribuicao && <Atribuicao atribuicao={atribuicao} />}
+    </section>
+  );
+}
+
+export default async function Deputado({ params, searchParams }) {
   const { id } = await params;
+  const { pagina: paginaBruta } = await searchParams;
   const perfil = await buscarDeputado(id);
   if (!perfil) notFound();
+  const historico = await buscarVotosDoDeputado(id, prepararPagina(paginaBruta));
 
   const { deputado, atribuicao } = perfil;
   return (
@@ -47,6 +115,7 @@ export default async function Deputado({ params }) {
         </dl>
         <Atribuicao atribuicao={atribuicao} />
       </section>
+      <Votos caminho={`/deputados/${id}/`} historico={historico} />
     </>
   );
 }

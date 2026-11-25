@@ -14,12 +14,16 @@ só grava que avisou DEPOIS de o envio dar certo: se o webhook estiver fora do a
 perde, e o pior caso é avisar de novo na volta seguinte.
 
 A mensagem leva só `fonte/conjunto`, a situação e, quando há, o rótulo do código de erro da coleta
-ou a mensagem da recusa da normalização (segura por contrato: só colunas e contagens). Nunca a URL
-do conjunto nem a do webhook.
+ou a mensagem da recusa da normalização (segura por contrato: só colunas e contagens). Se o conjunto
+está em `settings.RETIREMENT_DATASETS` (a normalização dele efetiva retiradas pedidas pela fonte),
+o aviso de normalização falhou leva também uma frase fixa dizendo que as retiradas ficam paradas.
+Nunca a URL do conjunto nem a do webhook.
 """
 
 from dataclasses import dataclass
 from datetime import timedelta
+
+from django.conf import settings
 
 from . import monitoring
 from .freshness import Situation
@@ -32,6 +36,8 @@ RECOVERY = "recovery"
 
 REMINDER_AFTER = timedelta(hours=24)
 BAD_SITUATIONS = frozenset({Situation.LATE, Situation.FAILED, Situation.NORMALIZATION_FAILED})
+# Frase fixa, sem dado de linha. Carga recusada não efetiva nenhuma retirada (ADR 0026).
+RETIREMENTS_HELD_TEXT = "Retiradas pedidas pela fonte ficam paradas até a normalização passar."
 
 
 @dataclass
@@ -51,7 +57,8 @@ def decide(*, situation, last_alert_situation, last_alert_at, now):
 
 def _detail(dataset, situation):
     if situation == Situation.NORMALIZATION_FAILED:
-        return f" ({dataset.last_normalization_error})"
+        held = f" {RETIREMENTS_HELD_TEXT}" if str(dataset) in settings.RETIREMENT_DATASETS else ""
+        return f" ({dataset.last_normalization_error}){held}"
     if situation == Situation.FAILED and dataset.last_error_code:
         return f" ({IngestionRun.ErrorCode(dataset.last_error_code).label})"
     return ""

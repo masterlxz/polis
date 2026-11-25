@@ -103,6 +103,11 @@ NORMALIZERS = {
     "senado/votacoes": "apps.legislature.senate_voting_normalization.normalize_latest",
 }
 
+# Conjuntos cuja normalização efetiva retiradas pedidas pela fonte (ADR 0026). Se a normalização
+# deles é recusada, as retiradas ficam paradas, e o alerta (`apps.sources.alerts`) diz isso.
+# Chave como em `NORMALIZERS` ("fonte/conjunto"); fica aqui pelo mesmo motivo.
+RETIREMENT_DATASETS = frozenset({"tse/consulta-cand-2026"})
+
 LANGUAGE_CODE = "pt-br"
 TIME_ZONE = "America/Sao_Paulo"
 USE_I18N = True

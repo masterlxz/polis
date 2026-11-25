@@ -17,7 +17,10 @@ A mensagem leva só `fonte/conjunto`, a situação e, quando há, o rótulo do c
 ou a mensagem da recusa da normalização (segura por contrato: só colunas e contagens). Se o conjunto
 está em `settings.RETIREMENT_DATASETS` (a normalização dele efetiva retiradas pedidas pela fonte),
 o aviso de normalização falhou leva também uma frase fixa dizendo que nenhuma retirada é efetivada.
-Nunca a URL do conjunto nem a do webhook.
+O aviso de coleta falhou leva a mesma frase quando, além disso, a última normalização segue recusada
+(`last_normalization_error` preenchido): a coleta falhada vence a normalização na situação, mas as
+retiradas continuam paradas. Nele a mensagem da recusa não entra, só a frase. Nunca a URL do
+conjunto nem a do webhook.
 """
 
 from dataclasses import dataclass
@@ -55,12 +58,22 @@ def decide(*, situation, last_alert_situation, last_alert_at, now):
     return RECOVERY if last_alert_situation else None
 
 
+def _held_suffix(dataset):
+    """A frase das retiradas paradas, só para conjunto da lista; vazia para os demais."""
+    return f" {RETIREMENTS_HELD_TEXT}" if str(dataset) in settings.RETIREMENT_DATASETS else ""
+
+
 def _detail(dataset, situation):
     if situation == Situation.NORMALIZATION_FAILED:
-        held = f" {RETIREMENTS_HELD_TEXT}" if str(dataset) in settings.RETIREMENT_DATASETS else ""
-        return f" ({dataset.last_normalization_error}){held}"
-    if situation == Situation.FAILED and dataset.last_error_code:
-        return f" ({IngestionRun.ErrorCode(dataset.last_error_code).label})"
+        return f" ({dataset.last_normalization_error}){_held_suffix(dataset)}"
+    if situation == Situation.FAILED:
+        # FAILED vence NORMALIZATION_FAILED (freshness.py), mas uma recusa anterior ainda aberta
+        # segue segurando as retiradas: a frase sai, a mensagem da recusa não.
+        code = ""
+        if dataset.last_error_code:
+            code = f" ({IngestionRun.ErrorCode(dataset.last_error_code).label})"
+        held = _held_suffix(dataset) if dataset.last_normalization_error else ""
+        return f"{code}{held}"
     return ""
 
 

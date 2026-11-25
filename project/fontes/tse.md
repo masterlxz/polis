@@ -119,6 +119,8 @@ Tamanho dos ZIPs (medido, `HEAD`; o campo `size` do CKAN vem **vazio**, então s
 | boletim de urna (AC, 1º turno) | 17,0 MB | (não medido) |
 | `votacao_secao_<UF>` (TO) | (não medido) | 10,2 MB |
 
+**Remedido em 2026-11-25** (`HEAD` e `Range` dos últimos 256 KiB do ZIP, só o índice; nada foi baixado): `consulta_cand_2024.zip` está com **78.688.718 bytes** (eram 64,7 MB em 2026-11-05: o TSE regenerou o arquivo, `Last-Modified` 25 Nov 2026 05:26 GMT), **28 itens (27 CSVs)** e **513.129.169 bytes descomprimidos** (512.920.692 só nos CSVs), razão **6,5**; o maior item é `consulta_cand_2024_BRASIL.csv`, 256,5 MB descomprimidos (40,6 MB comprimidos). O de 2026 (3,3 MB, 23,7 MB descomprimidos) tem razão 7,2. Base dos tetos do polis: 256 MiB de download e 2 GiB descomprimidos (ADR 0031, Sessões 89 e 90).
+
 Os ZIPs de candidatos têm 28 a 30 itens (um CSV por UF, mais `leiame.pdf`). O de prestação de contas de candidatos de 2024 tem 112 itens (despesas pagas e contratadas por UF, entre outros); o tamanho descomprimido total **não foi somado**. O volume de 2026 reflete uma eleição geral ainda em andamento e é menor que o de 2024 em candidatos, mas maior em votação; não investiguei o motivo.
 
 ## Esquemas (medido, só nomes de colunas)

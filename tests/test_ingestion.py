@@ -693,10 +693,10 @@ def test_conjunto_zip_csv_nao_e_alcancado_pelo_teto_do_csv_e_recebe_o_proprio(mo
 
 
 def test_o_teto_do_zip_e_de_256_mib():
-    # Decisão do dono (2026-11-25): ~4x o maior ZIP de candidatos medido (64,7 MB, 2024; o de
+    # Decisão do dono (2026-11-25): ~3,4x o maior ZIP de candidatos medido (78,7 MB, 2024; o de
     # 2026 tem 3,3 MB), em `project/fontes/tse.md`; 8x menor que o teto do cliente (2 GiB).
     assert zip_csv.MAX_DOWNLOAD_BYTES == 256 * 1024**2
-    assert zip_csv.MAX_DOWNLOAD_BYTES > 64_700_000
+    assert zip_csv.MAX_DOWNLOAD_BYTES > 78_688_718  # o maior medido (2026-11-25)
 
 
 def test_conjunto_zip_csv_recusa_download_acima_do_teto_e_nao_grava_nada(monkeypatch):

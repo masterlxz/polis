@@ -49,13 +49,21 @@ _DECODED_BOMS = ("﻿", "ï»¿")
 
 _ZIP_ENCRYPTED_FLAG = 0x1
 
-# Teto do DOWNLOAD do ZIP (não do conteúdo descomprimido, que tem o seu limite no leitor). A
+# Teto do DOWNLOAD do ZIP (não do conteúdo descomprimido, que tem o seu limite abaixo). A
 # ingestão o passa ao cliente HTTP, que recusa pelo `Content-Length` ou ao passar dele durante o
-# fluxo, sem gravar nada. Decisão do dono (2026-11-25): 256 MiB, ~4x o maior ZIP de candidatos
-# medido (64,7 MB, 2024; o de 2026 tem 3,3 MB; `project/fontes/tse.md`), 8x menor que o do cliente.
-# Vale para QUALQUER dataset `zip_csv`: habilitar um ZIP maior (votação por município e zona, 421 MB
-# em 2026; prestação de contas, 1,36 GB em 2024) exige um teto por conjunto ou nova decisão.
+# fluxo, sem gravar nada. Decisão do dono (2026-11-25): 256 MiB, ~3,4x o maior ZIP de candidatos
+# medido (78,7 MB, 2024, em 2026-11-25; o de 2026 tem 3,3 MB; `project/fontes/tse.md`), 8x menor
+# que o do cliente. Vale para QUALQUER dataset `zip_csv`: habilitar um ZIP maior (votação por
+# município e zona, 421 MB em 2026; prestação de contas, 1,36 GB em 2024) exige um teto por
+# conjunto ou nova decisão.
 MAX_DOWNLOAD_BYTES = 256 * 1024**2
+
+# Teto padrão da soma dos tamanhos DESCOMPRIMIDOS declarados dos CSV de um ZIP (a defesa contra
+# zip bomb: o download já é limitado acima, mas um ZIP pequeno pode declarar muito mais). Medido
+# em 2026-11-25 (índice do ZIP, sem baixá-lo): candidatos de 2024, 78,7 MB comprimidos e 513 MB
+# descomprimidos (razão 6,5); de 2026, 3,3 MB e 23,7 MB (razão 7,2). 2 GiB é ~4x o maior medido e
+# cobre o que o teto de download aceita (256 MiB x razão observada = ~1,7 a 1,9 GiB).
+MAX_UNCOMPRESSED_BYTES = 2 * 1024**3
 
 _FOREIGN_ERRORS = (
     zipfile.BadZipFile,
@@ -105,7 +113,7 @@ class ZipCsvReader:
         max_columns=1_000,
         max_line_chars=200_000,
         max_items=1_000,
-        max_uncompressed_bytes=64 * 1024**3,
+        max_uncompressed_bytes=MAX_UNCOMPRESSED_BYTES,
         max_record_lines=None,
     ):
         if isinstance(allowed_columns, str):

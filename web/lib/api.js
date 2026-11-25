@@ -358,6 +358,42 @@ export async function buscarVotosDoSenador(codigo, pagina) {
   return corpo;
 }
 
+// `voto` nulo é "sem posição registrada" na fonte; `aprovacao` e `partido` também podem ser nulos.
+function votoDeDeputadoValido(item) {
+  return (
+    typeof item?.id === "string" &&
+    typeof item.data === "string" &&
+    typeof item.orgao === "string" &&
+    typeof item.descricao === "string" &&
+    textoOuNulo(item.aprovacao) &&
+    Number.isInteger(item.id_proposicao) &&
+    textoOuNulo(item.partido) &&
+    textoOuNulo(item.voto)
+  );
+}
+
+function votosDoDeputadoValidos(corpo) {
+  return (
+    Number.isInteger(corpo?.deputado?.legislatura) &&
+    Number.isInteger(corpo.deputado.id_camara) &&
+    typeof corpo.deputado.nome === "string" &&
+    Array.isArray(corpo.votos) &&
+    corpo.votos.every(votoDeDeputadoValido) &&
+    Number.isInteger(corpo.pagina) &&
+    Number.isInteger(corpo.total_paginas) &&
+    (corpo.atribuicao === null || atribuicaoValida(corpo.atribuicao))
+  );
+}
+
+// Chamada só depois de o perfil existir: 404 aqui é incoerência da API, então vira erro.
+export async function buscarVotosDoDeputado(id, pagina) {
+  const corpo = await lerDaApi(`/internal/v1/deputados/${id}/votos/?pagina=${pagina}`);
+  if (!votosDoDeputadoValidos(corpo)) {
+    throw new ErroDaApi("a API devolveu os votos do deputado fora do formato esperado");
+  }
+  return corpo;
+}
+
 // Mesmo desenho de `buscarPerfil`: uma chamada por requisição, nunca em cache de dado.
 export const buscarDeputado = cache(async (id) => {
   if (!idDeDeputadoValido(id)) return null;

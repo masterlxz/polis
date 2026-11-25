@@ -42,8 +42,23 @@ function perfil({ nome = "ANA DA CÂMARA", partido = "XYZ", atribuicao, ...extra
   };
 }
 
-async function pagina(id = ID, resposta = { status: 200, corpo: perfil() }) {
-  api.resposta = () => resposta;
+// A página chama duas rotas da API: o perfil e os votos. Aqui os votos vêm vazios por padrão (a
+// tabela de votos tem a coluna "Partido (à época)" e esconderia o que estes testes afirmam do
+// perfil); `deputado-votos.test.mjs` cobre a lista.
+const SEM_VOTOS = {
+  status: 200,
+  corpo: {
+    deputado: { legislatura: 57, id_camara: 204554, nome: "ANA DA CÂMARA" },
+    votos: [],
+    pagina: 1,
+    total_paginas: 0,
+    atribuicao: null,
+  },
+};
+
+async function pagina(id = ID, resposta = { status: 200, corpo: perfil() }, votos = SEM_VOTOS) {
+  api.resposta = (req) =>
+    req.url.startsWith(`/internal/v1/deputados/${id}/votos/`) ? votos : resposta;
   const retorno = await fetch(`${front.base}/deputados/${id}/`);
   return { status: retorno.status, html: await retorno.text() };
 }
@@ -243,16 +258,22 @@ for (const canonico of ["1-1", "58-10", "999999999-999999999", "57-100200"]) {
     const { status } = await pagina(canonico);
 
     assert.equal(status, 200);
-    assert.deepEqual(api.chamadas, [`GET /internal/v1/deputados/${canonico}/`]);
+    assert.deepEqual(api.chamadas, [
+      `GET /internal/v1/deputados/${canonico}/`,
+      `GET /internal/v1/deputados/${canonico}/votos/?pagina=1`,
+    ]);
   });
 }
 
-test("id válido: a API recebe exatamente GET /internal/v1/deputados/<id>/", async () => {
+test("id válido: a API recebe exatamente o perfil e os votos (página 1)", async () => {
   api.chamadas.length = 0;
 
   await pagina();
 
-  assert.deepEqual(api.chamadas, [CAMINHO_DA_API]);
+  assert.deepEqual(api.chamadas, [
+    CAMINHO_DA_API,
+    `GET /internal/v1/deputados/${ID}/votos/?pagina=1`,
+  ]);
 });
 
 test("estrutura: idioma pt-BR, um h1, título com o descritor e noindex", async () => {

@@ -2,6 +2,19 @@
 
 Mais recente no topo.
 
+### 2026-11-25 — Sessão 94 (histórico de votos por deputado da Câmara; equipe de 2 workers, rodada 1)
+
+- **Pedido**: o item "histórico de votos por deputado" do "Fica" das Sessões 82 a 93. Equipe multiagente (`/equipe polis`), plan mode. O dono escolheu **API + página do deputado** e **retirada de `CamaraVote` fora desta rodada**; aprovou o plano, inclusive a migração do índice (§4). `git commit -s`.
+- **Feito (2 PRs, rascunho até o dono mesclar; ordem: #192 e depois #194, porque a página dá 500 sem a rota)**:
+  - **#192** `deputy-votes-api`: rota `deputados/<leg>-<id>/votos/`, índice `camara_vote_leg_camara_idx` em `CamaraVote(legislature_id, camara_id)` (migration `0006`, escrita à mão), 55+ testes. Espelha `senator_votes`.
+  - **#194** `deputy-votes-web`: `buscarVotosDoDeputado` e o validador em `web/lib/api.js`, seção "Votos" em `web/app/deputados/[id]/page.js`, testes novos e fixture adaptada de `deputado.test.mjs` (escopo ampliado a pedido do worker: a API falsa devolvia o corpo do perfil para qualquer URL).
+  - ADR 0032, **emenda 1**: contrato, ordem 400/404 herdada, índice, atribuição única (decisão aberta), pontos para o P-16.
+- **Provas (CI)**: #192 (controle `5b9cc75`: **58 falham**, 1.686 antigos passam). Mutações sobre `87eda1e`: `total // 50 + 1` (3 falham: bordas de 50 e 100 votos), filtro do `Deputy` antes do `_PAGE_PATTERN` (2 falham, `404 == 400`), `{0,7}` em cada grupo da rota (1 falha cada). #194 (controle `b373064`: **42 de 276 falham**, 37 novos e 5 antigos adaptados; 3 novos passam por serem guarda de regressão, declarados). Controle do delta de ajustes (testes novos sobre `a6e21a8`): 2 falham (cabeçalho e nota), os 276 outros passam (são reforço). Mutação trocando partido e voto em `page.js`: 3 falham. Todas por asserção; PRs de controle e de mutação fechados e branches apagadas.
+- **Revisão (adversarial + segurança, sem `git checkout`)**: nada crítico. Tratado: lacunas de teste (ordem 400/404, `total_paginas` em 50 e 100, id de 9 dígitos, asserção de vazamento fraca, colunas não fixadas, página além da última sem checar setas); **coluna "Resultado" renomeada** para "Aprovação (código da fonte)" com nota (eu a tinha aprovado sem ler o ADR 0031, que diz que o significado não foi verificado). Segurança: rota atrás da mesma barreira das irmãs, contrato sem chave extra, migration só `AddIndex` e reversível. **Não tratados de propósito**: atribuição única; falha de `/votos/` derrubar o perfil; bidi em `descricao`; siglas de voto cruas.
+- **Erro meu**: aprovei o rótulo "Resultado" na ampliação de escopo sem conferir os ADRs.
+- **Não verificado**: o `CREATE INDEX` e o `EXPLAIN` com dado real; a página contra a API real e vista num navegador; `ruff format`/`ruff check` não rodaram na VM (o CI é o juiz).
+- **Fica**: decisões do dono (uma `atribuicao` basta? ordem 400/404; degradar só a seção de votos; escopo da nota); P-16 sobre `CamaraVote` e a retirada; coleta real da Câmara no PC; página das votações (`web/app/camara/votacoes`, hoje inexistente); teto por conjunto do TSE; rótulo `schema` do teto descomprimido; `error_class = ""` do #148; `ANO_ELEICAO`.
+
 ### 2026-11-25 — Sessão 93 (P-20 parte 2: prazo total na abertura, DNS e TCP; sessão individual)
 
 - **Pedido**: "vamos de prazo de dns", lido como a lacuna que a Sessão 91 deixou ("NÃO coberto: DNS, conexão TCP e aperto de mão TLS"). Plan mode; o dono escolheu a thread de trabalho para a abertura inteira. `git commit -s`.

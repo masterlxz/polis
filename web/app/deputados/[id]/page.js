@@ -80,8 +80,8 @@ function Votos({ caminho, historico }) {
                 <td>{item.orgao}</td>
                 <td>{item.descricao}</td>
                 <td>{item.aprovacao}</td>
-                <td>{item.partido}</td>
                 <td>{item.voto ?? "Sem posição registrada"}</td>
+                <td>{item.partido}</td>
               </tr>
             ))}
           </tbody>

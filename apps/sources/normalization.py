@@ -6,8 +6,33 @@ ou um resumo com `rows_read`, `created` e `existing`. Quando recusa por dado inv
 conflitante (falha fechada, nada gravado), levanta uma subclasse de `NormalizationRefused`,
 cuja mensagem é segura por contrato: só nomes de coluna e contagens, nunca valores de linha.
 Qualquer outra exceção é inesperada e o chamador não deve repetir a mensagem dela.
+
+Os comandos `normalize_*` (à mão) chamam `record_success` quando a normalização dá certo; o
+agendador grava o resultado dele em `scheduling._record_normalization`.
 """
+
+from django.utils import timezone
+
+from .models import Dataset
 
 
 class NormalizationRefused(Exception):
     """A normalização parou antes de gravar. A mensagem é segura: sem valores de linha."""
+
+
+def record_success(*datasets):
+    """Marca que a última normalização de `datasets` deu certo: limpa o erro e grava a hora.
+
+    Para os comandos `normalize_*` à mão, só depois de a normalização dar certo: recusa e falha
+    inesperada não chamam isto (quem registra esses resultados é o agendador). Sem isso a recusa
+    que o agendador gravou antes ficava no painel e nos avisos depois de um comando bem-sucedido.
+    `update()` troca só estas duas colunas, como `scheduling._record_normalization`, para não
+    desfazer uma edição feita ao mesmo tempo no admin.
+
+    Limite conhecido (vale para todos os comandos): se o agendador coletar e recusar uma carga mais
+    nova enquanto o comando ainda normaliza a anterior (janela de segundos), isto zera a recusa
+    dela, e ela só reaparece na próxima coleta bem-sucedida do conjunto (1 vez por dia).
+    """
+    Dataset.objects.filter(pk__in=[dataset.pk for dataset in datasets]).update(
+        last_normalization_at=timezone.now(), last_normalization_error=""
+    )

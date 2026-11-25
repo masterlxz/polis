@@ -1,6 +1,7 @@
 from django.core.management.base import BaseCommand, CommandError
 
 from apps.legislature import normalization
+from apps.sources.normalization import record_success
 
 
 class Command(BaseCommand):
@@ -33,6 +34,7 @@ class Command(BaseCommand):
                 "A normalização falhou de forma inesperada; nada foi gravado."
             ) from None
 
+        record_success(dataset)  # só no sucesso: limpa a recusa que o agendador gravou antes
         self.stdout.write(
             f"Execução {run.pk}: linhas lidas {result.rows_read}, "
             f"deputados únicos {result.unique}, criadas {result.created}, "

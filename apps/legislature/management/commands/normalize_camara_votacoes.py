@@ -1,6 +1,7 @@
 from django.core.management.base import BaseCommand, CommandError
 
 from apps.legislature import camara_voting_normalization as normalization
+from apps.sources.normalization import record_success
 
 
 class Command(BaseCommand):
@@ -38,6 +39,9 @@ class Command(BaseCommand):
                 "A normalização falhou de forma inesperada; nada foi gravado."
             ) from None
 
+        # Só no sucesso: a normalização leu os dois conjuntos, então os dois deixam de ter a
+        # recusa que o agendador gravou antes (ele grava no conjunto cuja coleta disparou o passo).
+        record_success(votings_dataset, votes_dataset)
         self.stdout.write(
             f"Execuções {votings_run.pk} e {votes_run.pk}: linhas lidas {result.rows_read}, "
             f"votos únicos {result.unique}, criadas {result.created}, "

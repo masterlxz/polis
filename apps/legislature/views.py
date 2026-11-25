@@ -411,16 +411,16 @@ def deputy_votes(request, legislature, camara_id):
     `voto` vazio sai `null` e `partido` é o do momento do voto. A atribuição é a da coleta de
     VOTOS mais recente entre os itens da página (o conjunto de votos, não o de votações).
     """
+    deputy = Deputy.objects.filter(legislature_id=legislature, camara_id=camara_id).first()
+    if deputy is None:
+        return JsonResponse({"erro": "não encontrado"}, status=404)
+
     page_text = request.GET.get("pagina", "1")
     if not _PAGE_PATTERN.fullmatch(page_text):
         return JsonResponse(
             {"erro": "página inválida"}, status=400, json_dumps_params={"ensure_ascii": False}
         )
     page = int(page_text)
-
-    deputy = Deputy.objects.filter(legislature_id=legislature, camara_id=camara_id).first()
-    if deputy is None:
-        return JsonResponse({"erro": "não encontrado"}, status=404)
 
     votes_of_deputy = CamaraVote.objects.filter(legislature_id=legislature, camara_id=camara_id)
     total = votes_of_deputy.count()

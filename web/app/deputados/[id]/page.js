@@ -51,7 +51,8 @@ function SemVotos({ caminho, totalPaginas }) {
 }
 
 // `voto` nulo é a ausência de posição na fonte: a tela diz isso em vez de deixar a célula vazia.
-// Partido é o do momento do voto, não o do perfil.
+// `aprovacao` e as siglas de voto saem cruas: o significado delas não foi verificado (ADR 0031 e
+// 0032). Partido é o do momento do voto, não o do perfil.
 function Votos({ caminho, historico }) {
   const { votos, pagina, total_paginas: totalPaginas, atribuicao } = historico;
   return (
@@ -67,7 +68,7 @@ function Votos({ caminho, historico }) {
               <th scope="col">Data</th>
               <th scope="col">Órgão</th>
               <th scope="col">Descrição</th>
-              <th scope="col">Resultado</th>
+              <th scope="col">Aprovação (código da fonte)</th>
               <th scope="col">Partido (à época)</th>
               <th scope="col">Voto</th>
             </tr>
@@ -85,6 +86,12 @@ function Votos({ caminho, historico }) {
             ))}
           </tbody>
         </table>
+      )}
+      {votos.length > 0 && (
+        <p className="nota">
+          Códigos como a fonte os manda; o significado de 1/0 e das siglas de voto não foi
+          verificado.
+        </p>
       )}
       <Navegacao caminho={caminho} pagina={pagina} totalPaginas={totalPaginas} />
       {atribuicao && <Atribuicao atribuicao={atribuicao} />}

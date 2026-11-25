@@ -53,15 +53,21 @@ def pagina(*itens):
 
 
 class FakeApi:
-    """Responde por número de `pagina=` (uma página vazia além das combinadas) ou levanta erro."""
+    """Responde por número de `pagina=` (uma página vazia além das combinadas) ou levanta erro.
+
+    Guarda o `max_bytes` de cada chamada, mas não o aplica: o limite em si é do `PoliteClient`
+    (testado em `test_http_client.py` e, com o cliente real, em `test_ingestion.py`).
+    """
 
     def __init__(self, paginas, erros=None):
         self.paginas = paginas
         self.erros = erros or {}
         self.calls = []
+        self.max_bytes_usados = []
 
-    def download(self, url, destination):
+    def download(self, url, destination, *, max_bytes=None):
         self.calls.append(url)
+        self.max_bytes_usados.append(max_bytes)
         numero = int(parse_qs(urlparse(url).query)["pagina"][0])
         if numero in self.erros:
             raise self.erros[numero]
@@ -300,6 +306,27 @@ def test_teto_de_paginas_no_fetch_levanta_erro_proprio(tmp_path):
 
     with pytest.raises(TooManyPagesError):
         fetch_pages(FakeApi(paginas), API, tmp_path / "juntas.json", page_size=2, max_pages=3)
+
+
+# --- teto de bytes por página no download (o mesmo que o leitor aplica depois) --------------------
+
+
+def test_cada_pagina_e_baixada_com_o_teto_de_pagina(tmp_path):
+    api = FakeApi({1: pagina(item(1), item(2)), 2: pagina(item(3))})
+
+    fetch_pages(api, API, tmp_path / "juntas.json", page_size=2)
+
+    assert len(api.calls) == 2, "controle: as duas páginas foram baixadas"
+    assert api.max_bytes_usados == [json_list.MAX_PAGE_BYTES, json_list.MAX_PAGE_BYTES]
+
+
+def test_o_teto_passado_ao_download_e_o_valor_atual_da_constante(tmp_path, monkeypatch):
+    monkeypatch.setattr(json_list, "MAX_PAGE_BYTES", 12_345)
+    api = FakeApi({1: pagina(item(1))})
+
+    fetch_pages(api, API, tmp_path / "juntas.json", page_size=2)
+
+    assert api.max_bytes_usados == [12_345]
 
 
 # --- mesma carga, portão e cadastro --------------------------------------------------------------

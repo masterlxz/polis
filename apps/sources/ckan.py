@@ -18,11 +18,13 @@ class CkanError(Exception):
 def read_license_id(client, url, workdir, *, max_bytes=MAX_BYTES):
     """Devolve o `license_id` do pacote em `url` ("" se vazio ou ausente).
 
-    Erros de rede e de bloqueio (`DownloadError`, `BlockedError`) passam sem tratamento.
-    Levanta `CkanError` se a resposta for grande demais ou não for um `package_show` válido.
+    Erros de rede e de bloqueio (`DownloadError`, `BlockedError`) passam sem tratamento, e o
+    cliente recusa durante o download (`DownloadError`) a resposta que passa de `max_bytes`.
+    Levanta `CkanError` se a resposta for grande demais (conferência de defesa, depois de
+    baixar) ou não for um `package_show` válido.
     """
     destination = Path(workdir) / "ckan.json"
-    client.download(url, destination)
+    client.download(url, destination, max_bytes=max_bytes)
     if destination.stat().st_size > max_bytes:
         raise CkanError("A resposta do CKAN passa do tamanho permitido.")
     try:

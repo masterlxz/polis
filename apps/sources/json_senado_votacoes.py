@@ -99,7 +99,7 @@ def fetch_senate_votings(client, url, destination):
     """Baixa as votações da janela e grava em `destination` o arquivo achatado (`dados`)."""
     destination = Path(destination)
     raw_file = destination.with_name(destination.name + ".bruto")
-    client.download(_window_url(url), raw_file)
+    client.download(_window_url(url), raw_file, max_bytes=MAX_BYTES)
     try:
         rows = _flatten(_load(raw_file))
     finally:

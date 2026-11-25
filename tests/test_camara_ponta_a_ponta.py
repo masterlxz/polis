@@ -40,7 +40,7 @@ class FakeApi:
     def __init__(self, itens):
         self.itens = itens
 
-    def download(self, url, destination):
+    def download(self, url, destination, *, max_bytes=None):
         dados = json.dumps({"dados": self.itens if "pagina=1" in url else []}).encode()
         Path(destination).write_bytes(dados)
         return DownloadResult(

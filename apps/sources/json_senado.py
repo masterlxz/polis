@@ -52,7 +52,7 @@ def fetch_senate_list(client, url, destination):
     """Baixa `url` e grava em `destination` o arquivo `{"dados": [...]}` desembrulhado."""
     destination = Path(destination)
     raw_file = destination.with_name(destination.name + ".bruto")
-    client.download(url, raw_file)
+    client.download(url, raw_file, max_bytes=MAX_BYTES)
     try:
         items = _senators(raw_file)
     finally:

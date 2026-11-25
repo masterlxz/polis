@@ -15,7 +15,8 @@ from pathlib import Path
 import pytest
 from django.core.management import CommandError, call_command
 
-from apps.sources import plain_csv
+from apps.sources import json_list, json_senado, json_senado_votacoes, plain_csv
+from apps.sources.ckan import MAX_BYTES, read_license_id
 from apps.sources.http_client import BlockedError, DownloadError, DownloadResult, PoliteClient
 from apps.sources.ingestion import IngestionError, ingest
 from apps.sources.management.commands import ingest_dataset
@@ -642,8 +643,9 @@ def test_csv_simples_com_linha_de_largura_errada_falha_com_malformed_row():
 
 
 # --- Teto de bytes do download por formato (ADR 0031, "limites conhecidos") ---
-# O formato `csv` passa `plain_csv.MAX_BYTES` (100 MB) ao `download`; os demais não passam limite
-# (`None`: vale o teto do cliente). Para não alocar 100 MB, os testes trocam `plain_csv.MAX_BYTES`
+# O formato `csv` passa `plain_csv.MAX_BYTES` (100 MB) ao `download`; só o `zip_csv` não passa
+# limite (`None`: vale o teto do cliente); os formatos JSON e o CKAN passam o teto do próprio
+# leitor (testados mais abaixo). Para não alocar 100 MB, os testes trocam `plain_csv.MAX_BYTES`
 # por um valor pequeno: a ingestão o lê na hora da chamada, e o leitor não é afetado, porque o
 # padrão do `PlainCsvReader` foi fixado na definição da classe.
 
@@ -756,3 +758,129 @@ def test_cliente_real_aceita_conjunto_csv_no_teto_exato(servidor_csv, monkeypatc
     assert run.state == IngestionRun.State.SUCCEEDED
     assert run.rows_loaded == len(LINHAS_CSV)
     assert run.size_bytes == len(dados)
+
+
+# --- Teto de bytes do download nos formatos JSON e na checagem do CKAN ---
+# Cada leitor passa ao `download` o próprio teto (o mesmo que checa o `st_size` depois). Aqui, com o
+# `PoliteClient` real e o mesmo servidor local: o teto de cada leitor é trocado por um valor menor
+# que a resposta, e a falha tem de ser `download` (o cliente recusa durante o fluxo ou no
+# `Content-Length`), não `schema` (o leitor recusando o arquivo já baixado inteiro).
+
+FORMATOS_JSON = [
+    pytest.param(
+        Dataset.Format.JSON,
+        json_list,
+        "MAX_PAGE_BYTES",
+        ["id", "nome"],
+        json.dumps({"dados": [{"id": 1, "nome": "ANA"}]}).encode(),
+        id="json",
+    ),
+    pytest.param(
+        Dataset.Format.JSON_SENADO,
+        json_senado,
+        "MAX_BYTES",
+        ["CodigoParlamentar", "NomeParlamentar"],
+        json.dumps(
+            {
+                "ListaParlamentarEmExercicio": {
+                    "Parlamentares": {
+                        "Parlamentar": [
+                            {
+                                "IdentificacaoParlamentar": {
+                                    "CodigoParlamentar": "1",
+                                    "NomeParlamentar": "Senador 1",
+                                }
+                            }
+                        ]
+                    }
+                }
+            }
+        ).encode(),
+        id="json_senado",
+    ),
+    pytest.param(
+        Dataset.Format.JSON_SENADO_VOTACOES,
+        json_senado_votacoes,
+        "MAX_BYTES",
+        ["codigoSessaoVotacao", "codigoParlamentar", "siglaVotoParlamentar"],
+        json.dumps(
+            [
+                {
+                    "codigoSessaoVotacao": 1,
+                    "votos": [{"codigoParlamentar": 10, "siglaVotoParlamentar": "Sim"}],
+                }
+            ]
+        ).encode(),
+        id="json_senado_votacoes",
+    ),
+]
+
+
+def _dataset_no_servidor(srv, formato, permitidas, dados, com_tamanho):
+    srv.corpo = dados
+    srv.com_tamanho = com_tamanho
+    dataset = make_dataset(format=formato, allowed_columns=permitidas)
+    dataset.url = f"http://127.0.0.1:{srv.server_address[1]}/lista.json"
+    dataset.save(update_fields=["url"])
+    return dataset
+
+
+@pytest.mark.parametrize("com_tamanho", [True, False], ids=["com_tamanho", "em_fluxo"])
+@pytest.mark.parametrize(("formato", "modulo", "constante", "permitidas", "dados"), FORMATOS_JSON)
+def test_cliente_real_recusa_conjunto_json_acima_do_teto_com_error_code_download(
+    servidor_csv, monkeypatch, formato, modulo, constante, permitidas, dados, com_tamanho
+):
+    monkeypatch.setattr(modulo, constante, len(dados) - 1)
+    dataset = _dataset_no_servidor(servidor_csv, formato, permitidas, dados, com_tamanho)
+    run = ingest(dataset, _cliente_http_local())
+    assert run.state == IngestionRun.State.FAILED
+    assert run.error_code == IngestionRun.ErrorCode.DOWNLOAD
+    assert f"limite de {len(dados) - 1} bytes" in run.error_detail
+    assert run.rows_loaded == 0
+    assert RawRecord.objects.count() == 0
+
+
+@pytest.mark.parametrize("com_tamanho", [True, False], ids=["com_tamanho", "em_fluxo"])
+@pytest.mark.parametrize(("formato", "modulo", "constante", "permitidas", "dados"), FORMATOS_JSON)
+def test_cliente_real_aceita_conjunto_json_no_teto_exato(
+    servidor_csv, monkeypatch, formato, modulo, constante, permitidas, dados, com_tamanho
+):
+    monkeypatch.setattr(modulo, constante, len(dados))
+    dataset = _dataset_no_servidor(servidor_csv, formato, permitidas, dados, com_tamanho)
+    run = ingest(dataset, _cliente_http_local())
+    assert run.state == IngestionRun.State.SUCCEEDED
+    assert run.error_code == ""
+    assert run.rows_loaded == 1
+
+
+def _ckan_com_tamanho(tamanho):
+    """Pacote CKAN válido (`license_id` `cc-by`) com exatamente `tamanho` bytes."""
+
+    def corpo(notas):
+        resultado = {"license_id": "cc-by", "notes": notas}
+        return json.dumps({"success": True, "result": resultado}).encode()
+
+    dados = corpo("x" * (tamanho - len(corpo(""))))
+    assert len(dados) == tamanho
+    return dados
+
+
+@pytest.mark.parametrize("com_tamanho", [True, False], ids=["com_tamanho", "em_fluxo"])
+def test_cliente_real_recusa_ckan_acima_do_teto_com_error_code_download(servidor_csv, com_tamanho):
+    servidor_csv.corpo = _ckan_com_tamanho(MAX_BYTES + 1)
+    servidor_csv.com_tamanho = com_tamanho
+    porta = servidor_csv.server_address[1]
+    dataset = make_dataset(license_check_url=f"http://127.0.0.1:{porta}/pacote")
+    run = ingest(dataset, _cliente_http_local())
+    assert run.state == IngestionRun.State.FAILED
+    assert run.error_code == IngestionRun.ErrorCode.DOWNLOAD
+    assert f"limite de {MAX_BYTES} bytes" in run.error_detail
+    assert RawRecord.objects.count() == 0
+
+
+@pytest.mark.parametrize("com_tamanho", [True, False], ids=["com_tamanho", "em_fluxo"])
+def test_cliente_real_le_o_ckan_no_teto_exato(servidor_csv, tmp_path, com_tamanho):
+    servidor_csv.corpo = _ckan_com_tamanho(MAX_BYTES)
+    servidor_csv.com_tamanho = com_tamanho
+    url = f"http://127.0.0.1:{servidor_csv.server_address[1]}/pacote"
+    assert read_license_id(_cliente_http_local(), url, tmp_path) == "cc-by"

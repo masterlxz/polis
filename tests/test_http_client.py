@@ -517,13 +517,17 @@ class RespostaFalsa:
         return dados
 
 
-def cliente_com_resposta_falsa(clock, resposta, **kwargs):
+def cliente_com_resposta_falsa(clock, resposta, *, avanco_na_abertura=0.0, **kwargs):
+    """`resposta` pode ser uma lista (uma por abertura; a última se repete). Cada abertura
+    adianta o relógio em `avanco_na_abertura` s (conexão, TLS e cabeçalhos lentos)."""
+    respostas = list(resposta) if isinstance(resposta, list) else [resposta]
     cliente = make_client(clock, **kwargs)
     cliente.timeouts_pedidos = []
 
     def abrir(request, timeout):
         cliente.timeouts_pedidos.append(timeout)
-        return resposta
+        clock.now += avanco_na_abertura
+        return respostas.pop(0) if len(respostas) > 1 else respostas[0]
 
     cliente._opener.open = abrir
     return cliente
@@ -558,16 +562,18 @@ def test_prazo_vencido_nao_altera_o_arquivo_anterior_nem_deixa_part(server, cloc
     assert [p.name for p in tmp_path.iterdir()] == ["a.zip"]
 
 
-@pytest.mark.parametrize("bytes_", [60, 61], ids=["1800s_exatos", "1830s"])
-def test_prazo_padrao_e_de_1800_segundos_exatos(server, clock, tmp_path, bytes_):
+@pytest.mark.parametrize(
+    ("bytes_", "aceito"), [(60, True), (61, False)], ids=["1800s_exatos", "1830s"]
+)
+def test_prazo_padrao_e_de_1800_segundos_exatos(server, clock, tmp_path, bytes_, aceito):
     # Sem `total_timeout`: 60 bytes x 30 s = 1800 s passa (e o conteúdo sai íntegro);
     # 61 bytes x 30 s = 1830 s estoura.
     server.script = [gotejamento(clock, bytes_, 30.0)]
     destino = tmp_path / "a.zip"
-    if bytes_ == 60:
+    if aceito:
         resultado = make_client(clock).download(url(server), destino)
-        assert destino.read_bytes() == b"x" * 60
-        assert resultado.sha256 == hashlib.sha256(b"x" * 60).hexdigest()
+        assert destino.read_bytes() == b"x" * bytes_
+        assert resultado.sha256 == hashlib.sha256(b"x" * bytes_).hexdigest()
     else:
         with pytest.raises(DownloadError) as erro:
             make_client(clock).download(url(server), destino)
@@ -604,6 +610,40 @@ def test_a_leitura_que_devolve_o_fim_tambem_conta_no_prazo(clock, tmp_path, avan
             cliente.download(URL_FALSA, destino)
         assert "acima do prazo de 100 segundos" in str(erro.value)
         assert list(tmp_path.iterdir()) == []
+
+
+@pytest.mark.parametrize(
+    ("avanco_no_corpo", "aceito"), [(30.0, True), (50.0, False)], ids=["90s", "110s"]
+)
+def test_o_prazo_comeca_antes_da_abertura_e_conta_conexao_e_cabecalhos(
+    clock, tmp_path, avanco_no_corpo, aceito
+):
+    # A abertura (conexão, TLS, cabeçalhos) leva 60 s; o prazo é de 100 s. Corpo em +30 s soma
+    # 90 s (passa); em +50 s soma 110 s (estoura). Se `started` fosse lido depois de `_open`, os
+    # dois casos passariam.
+    resposta = RespostaFalsa(clock, [(avanco_no_corpo, b"x")])
+    cliente = cliente_com_resposta_falsa(
+        clock, resposta, avanco_na_abertura=60.0, total_timeout=100
+    )
+    destino = tmp_path / "a.zip"
+    if aceito:
+        assert cliente.download(URL_FALSA, destino).size_bytes == 1
+    else:
+        with pytest.raises(DownloadError) as erro:
+            cliente.download(URL_FALSA, destino)
+        assert "acima do prazo de 100 segundos" in str(erro.value)
+        assert list(tmp_path.iterdir()) == []
+
+
+def test_pausa_de_cortesia_antes_da_abertura_nao_conta_no_prazo(clock, tmp_path):
+    # Segunda chamada ao mesmo host espera 1000 s de pausa (o `sleep` falso adianta o relógio);
+    # o prazo é de 100 s e o corpo leva 50 s: passa, porque `started` vem depois da pausa.
+    respostas = [RespostaFalsa(clock), RespostaFalsa(clock, [(50.0, b"x")])]
+    cliente = cliente_com_resposta_falsa(clock, respostas, min_interval=1000.0, total_timeout=100)
+    cliente.download(URL_FALSA, tmp_path / "a.zip")
+    resultado = cliente.download(URL_FALSA, tmp_path / "b.zip")
+    assert clock.sleeps == [1000.0]
+    assert resultado.size_bytes == 1
 
 
 @pytest.mark.parametrize(

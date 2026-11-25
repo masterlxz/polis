@@ -505,6 +505,32 @@ def test_falha_inesperada_do_comando_nao_mexe_no_estado_gravado(dataset, monkeyp
     assert hora == antes
 
 
+def test_o_comando_limpa_so_o_conjunto_do_tse_e_nao_o_de_outra_fonte(dataset):
+    outra_fonte = Source.objects.create(
+        slug="camara",
+        name="Câmara",
+        institution="Câmara dos Deputados",
+        official_url="https://example.org/camara",
+        access_type=Source.AccessType.API,
+    )
+    outro = Dataset.objects.create(
+        source=outra_fonte,
+        slug="deputados",
+        name="Deputados",
+        url="https://example.org/deputados.json",
+        format=Dataset.Format.JSON,
+        allowed_columns=["id"],
+        last_normalization_error="Normalização recusada: dados de outra fonte.",
+    )
+    carga(dataset, [ana()])
+    recusa_antiga(dataset)
+
+    normalizar_com()
+
+    assert estado_da_normalizacao(dataset)[0] == ""
+    assert estado_da_normalizacao(outro)[0] == "Normalização recusada: dados de outra fonte."
+
+
 def test_depois_do_comando_o_aviso_de_coleta_falhada_nao_diz_que_as_retiradas_estao_paradas(
     dataset,
 ):

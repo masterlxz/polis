@@ -7,7 +7,7 @@ retirada da fonte (lápide, `test_retirement.py`).
 """
 
 import socket
-from datetime import datetime
+from datetime import datetime, timedelta
 from io import StringIO
 from zoneinfo import ZoneInfo
 
@@ -422,3 +422,107 @@ def test_normalize_latest_retenta_a_carga_que_recusou_quando_vem_uma_valida(data
     carga(dataset, [ana()])
 
     assert normalize_latest(dataset).created == 1
+
+
+# --- Estado da última normalização (painel e alerta) depois do comando à mão (Sessão 85) ---
+# `Dataset.last_normalization_error` só era escrito pelo agendador, depois de coleta bem-sucedida.
+# Um `normalize_tse` à mão que desse certo deixava a recusa antiga no painel e, com a coleta
+# falhando, o aviso seguia dizendo que as retiradas estavam paradas quando já tinham sido aplicadas.
+
+RECUSA_ANTIGA = "Normalização recusada: candidaturas sumiram do arquivo: 25 de 100. Nada gravado."
+
+
+def recusa_antiga(dataset):
+    """Deixa no conjunto a recusa que o agendador gravou antes; devolve a hora que ele gravou."""
+    antes = timezone.now() - timedelta(days=1)
+    Dataset.objects.filter(pk=dataset.pk).update(
+        last_normalization_error=RECUSA_ANTIGA, last_normalization_at=antes
+    )
+    return antes
+
+
+def estado_da_normalizacao(dataset):
+    dataset.refresh_from_db()
+    return dataset.last_normalization_error, dataset.last_normalization_at
+
+
+def normalizar_com(*argumentos):
+    call_command("normalize_tse", *argumentos, stdout=StringIO(), stderr=StringIO())
+
+
+@pytest.mark.parametrize("argumentos", [(), ("--aceitar-retiradas",)])
+def test_normalizar_com_sucesso_limpa_a_recusa_antiga_e_marca_a_hora(dataset, argumentos):
+    carga(dataset, [ana()])
+    antes = recusa_antiga(dataset)
+    comando_em = timezone.now()
+
+    normalizar_com(*argumentos)
+
+    erro, hora = estado_da_normalizacao(dataset)
+    assert erro == ""
+    assert hora is not None and hora > antes and hora >= comando_em
+
+
+def test_normalizar_com_sucesso_sem_erro_gravado_so_atualiza_a_hora(dataset):
+    carga(dataset, [ana()])
+    Dataset.objects.filter(pk=dataset.pk).update(last_normalization_at=None)
+
+    normalizar_com()
+
+    erro, hora = estado_da_normalizacao(dataset)
+    assert erro == ""
+    assert hora is not None
+
+
+def test_recusa_do_comando_nao_mexe_no_estado_gravado(dataset):
+    carga(dataset, [ana(SQ_CANDIDATO="VALOR-RUIM-XYZ")])
+    antes = recusa_antiga(dataset)
+
+    with pytest.raises(CommandError):
+        normalizar_com()
+
+    erro, hora = estado_da_normalizacao(dataset)
+    assert erro == RECUSA_ANTIGA
+    assert hora == antes
+
+
+def test_falha_inesperada_do_comando_nao_mexe_no_estado_gravado(dataset, monkeypatch):
+    carga(dataset, [ana()])
+    antes = recusa_antiga(dataset)
+    original = QuerySet.bulk_create
+
+    def falha(self, objs, *args, **kwargs):
+        if self.model is Candidacy:
+            raise RuntimeError(f"DETAIL: Failing row contains ({SEGREDO})")
+        return original(self, objs, *args, **kwargs)
+
+    monkeypatch.setattr(QuerySet, "bulk_create", falha)
+    with pytest.raises(CommandError, match="inesperada"):
+        normalizar_com()
+
+    erro, hora = estado_da_normalizacao(dataset)
+    assert erro == RECUSA_ANTIGA
+    assert hora == antes
+
+
+def test_depois_do_comando_o_aviso_de_coleta_falhada_nao_diz_que_as_retiradas_estao_paradas(
+    dataset,
+):
+    from apps.sources import alerts
+
+    Dataset.objects.filter(pk=dataset.pk).update(
+        enabled=True,
+        schedule_interval_hours=24,
+        license_basis=Dataset.LicenseBasis.OWNER_DECISION,
+        license_justification="Decisão do dono de teste.",
+    )
+    carga(dataset, [ana()])
+    carga_com_falha(dataset)  # a coleta de depois falhou: a situação é "Última coleta falhou"
+    recusa_antiga(dataset)
+    normalizar_com("--aceitar-retiradas")
+    textos = []
+
+    alerts.send_pending(timezone.now(), textos.append)
+
+    assert textos == ["ALERTA tse/consulta-cand-2026: Última coleta falhou (Falha de download)"]
+    assert alerts.RETIREMENTS_HELD_TEXT not in textos[0]

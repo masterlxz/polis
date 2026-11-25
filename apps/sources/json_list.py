@@ -92,7 +92,7 @@ def fetch_pages(
     page_file = destination.with_name(destination.name + ".pagina")
     items = {}
     for number in range(1, limit + 1):
-        client.download(_page_url(url, number), page_file)
+        client.download(_page_url(url, number), page_file, max_bytes=MAX_PAGE_BYTES)
         try:
             page = _load_items(page_file, MAX_PAGE_BYTES)
         finally:

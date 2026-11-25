@@ -42,7 +42,7 @@ Medição de 2026-11-24 (`fontes/camara.md`, Rodada 3): `votacoes-2026.csv` tem 
 - **Só 1,9% das votações têm voto nominal.** A página futura da votação sem lista mostra só os totais da fonte; os totais `votosSim` e `votosNao` divergem da contagem dos votos em **1 de 170** votações nominais (não verifiquei qual).
 - O `PlainCsvReader` usa métodos privados do `ZipCsvReader` (`_read_layout`, `_read_item`, `_open_text`) com um item de mentira; se o contrato deles mudar, `tests/test_plain_csv.py` falha. É o custo de não refatorar agora.
 - **Limites conhecidos, para tratar antes de habilitar os conjuntos ou quando doerem** (achados da auditoria, sem correção nesta fatia):
-  - **O download não tem o teto de 100 MB:** passar o limite por conjunto ao `PoliteClient.download` (hoje 2 GiB para todos) é a correção, e mexe no cliente HTTP.
+  - **O download não tinha o teto de 100 MB:** corrigido (Sessão 82). `PoliteClient.download` aceita `max_bytes` por chamada (só reduz o teto do cliente, de 2 GiB; nunca o alarga) e a ingestão passa `plain_csv.MAX_BYTES` ao formato `csv`; os demais formatos seguem com o teto do cliente.
   - **Arquivo só com cabeçalho** entra como carga bem-sucedida de 0 linhas (o leitor de ZIP faz igual). Não conta na retenção (`rows_loaded__gt=0`) nem é lido pela normalização, mas "0 linhas" talvez devesse falhar; é decisão do dono (a virada do ano pode legitimamente ter 0).
   - **`item_name` do `RawRecord` sai como `download.zip`** (o nome do arquivo temporário), enganoso para um CSV; nada o lê hoje.
   - **Nome de coluna acima de 100 caracteres e NUL em valor** caem em erro inesperado (`OTHER`), não em `SCHEMA`; existe igual no leitor de ZIP.

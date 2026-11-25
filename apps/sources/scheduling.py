@@ -36,6 +36,7 @@ from .normalization import NormalizationRefused
 RETRY_HOURS = 6
 ERROR_MAX_LENGTH = 300  # o tamanho de `Dataset.last_normalization_error`
 UNEXPECTED_ERROR_TEXT = "Falha inesperada na normalização (veja o log do agendador)."
+CLASS_NAME_MAX_LENGTH = 80  # corte do nome da classe da exceção no log
 ALLOWED_MINUTES = [minute for minute in range(1, 60) if minute % 5]
 SCHEDULABLE_STATUSES = (Source.Status.INTEGRATING, Source.Status.ACTIVE)
 
@@ -139,13 +140,16 @@ def _normalize(dataset, name, result, now):
     """Normaliza o bruto de `dataset` se ele tiver normalizador registrado.
 
     Recusa (falha fechada) mostra a mensagem, que é segura por contrato; qualquer outra exceção
-    vira uma linha genérica, porque a mensagem de um erro do banco cita valores da linha. O
-    resultado (inclusive o texto) é gravado no conjunto; o texto da exceção nunca é.
+    vira uma linha genérica, porque a mensagem de um erro do banco cita valores da linha: o log
+    leva só o nome da classe da exceção (`__name__`, cortado), nunca a mensagem, os argumentos,
+    `__context__` nem `__cause__`. O resultado (inclusive o texto) é gravado no conjunto; o texto
+    da exceção nunca é, nem o nome da classe.
     """
     path = settings.NORMALIZERS.get(name)
     if path is None:
         return
     failed = False
+    error_class = ""
     try:
         summary = import_string(path)(dataset)
     except NormalizationRefused as error:
@@ -153,10 +157,11 @@ def _normalize(dataset, name, result, now):
         result.normalization_failed += 1
         _record_normalization(dataset, now, str(error))
         return
-    except Exception:
+    except Exception as error:
         failed = True
+        error_class = type(error).__name__[:CLASS_NAME_MAX_LENGTH]  # só o nome: nunca a exceção
     if failed:
-        result.lines.append(f"{name}: normalização falhou de forma inesperada")
+        result.lines.append(f"{name}: normalização falhou de forma inesperada ({error_class})")
         result.normalization_failed += 1
         _record_normalization(dataset, now, UNEXPECTED_ERROR_TEXT)
         return

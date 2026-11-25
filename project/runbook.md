@@ -50,16 +50,25 @@ Para recuperar de um desastre **no banco em uso**: pare `web`, `agendador` e `ba
 Quando uma carga do TSE faz sumir mais que `max(20, 1%)` candidaturas, a normalização é recusada (`collect_due` sai com erro; o bruto fica; nada é apagado). Antes de liberar, **confira que o arquivo da fonte não está incompleto** (compare as contagens da última carga com a anterior no admin). Se a retirada é legítima: `dc run --rm web python manage.py normalize_tse --aceitar-retiradas`. **Apaga dado pessoal sem volta.**
 
 ## Carga do TSE recusada por linha inválida ou conflito (não é o disjuntor)
-**Como reconhecer:** o alerta "Normalização falhou" de `tse/consulta-cand-2026` termina com "Retiradas pedidas pela fonte ficam paradas até a normalização passar", e a coluna "última normalização" do admin (e o `collect_due`, no log do `agendador`) mostra "linhas inválidas" ou "dados conflitantes entre linhas do bruto". A mensagem do admin e do alerta é cortada em 300 caracteres; a completa sai de `dc run --rm web python manage.py normalize_tse` (sem rede; ao recusar não grava nem apaga nada).
+**Como reconhecer:** o alerta "Normalização falhou" de `tse/consulta-cand-2026` termina com "Enquanto isso, nenhuma retirada pedida pela fonte é efetivada." A frase sai em **três** casos, que se distinguem pela mensagem entre parênteses (a mesma da coluna "última normalização" do admin):
+- "linhas inválidas" ou "dados conflitantes entre linhas do bruto": **esta seção**.
+- "candidaturas sumiram do arquivo": o disjuntor (`RetirementsHeld`); siga a seção "Retiradas seguradas pelo disjuntor", acima.
+- "Falha inesperada na normalização": erro que não é recusa; a mensagem não diz mais nada, veja o log do `agendador` (`dc logs agendador`).
 
-**O que significa:** a normalização lê e valida a carga inteira (`_collect`) antes de gravar qualquer coisa (`_write`, que é quem aplica as retiradas). Uma linha inválida ou um conflito recusam tudo: nem candidatura nova nem retirada é efetivada, então o dado pessoal que a fonte pediu para retirar **continua publicado** até a carga passar. Enquanto o bruto do dia estiver nesse estado, o agendador retenta a cada coleta bem-sucedida do conjunto (1 vez por dia, também quando o arquivo veio igual) e o alerta repete a cada 24 h.
+A mensagem gravada é cortada em 300 caracteres; a completa sai de `dc run --rm web python manage.py normalize_tse` (sem rede; ao recusar não grava nem apaga nada).
+
+**Quando o aviso NÃO traz a frase:** se a última coleta também falhou, a situação é "Última coleta falhou" (ela vence "Normalização falhou", `freshness.py`) e o aviso mostra só o rótulo do erro da coleta. Se a recusa anterior não foi resolvida, as retiradas seguem paradas mesmo assim, e o texto não diz. Resolva a coleta e volte a esta seção quando o aviso mudar para "Normalização falhou".
+
+**O que significa:** a normalização lê e valida a carga inteira (`_collect`) antes de gravar qualquer coisa (`_write`, que é quem aplica as retiradas). Uma linha inválida ou um conflito recusam tudo: nem candidatura nova nem retirada é efetivada, então o dado pessoal que a fonte tenha pedido para retirar **continua publicado** até a carga passar. Enquanto o bruto do dia estiver nesse estado, o agendador retenta a cada coleta bem-sucedida do conjunto (1 vez por dia, também quando o arquivo veio igual) e o alerta repete a cada 24 h.
 
 **`--aceitar-retiradas` não destrava isto:** ele só liberta o disjuntor (`retirement.plan`), que roda depois da validação. `normalize_tse` à mão faz a mesma validação e recusa do mesmo jeito; não há atalho manual.
 
 **O que fazer:**
-1. Leia as colunas na mensagem (só nomes de coluna e contagens, nunca valores) e confira o arquivo da fonte no portal do TSE: formato mudou, coluna nova ou vazia, valor fora do esperado.
-2. Se o arquivo está errado, espere a fonte publicar um corrigido: a próxima coleta o baixa e normaliza sozinha (a normalização usa a carga mais recente com linhas). Para não esperar o dia, force a coleta (seção "Forçar uma coleta") ou, com o arquivo já baixado, rode `normalize_tse`.
-3. Se o arquivo está certo e o parser é que não o aceita (`apps/elections/tse.py`), a correção é um PR no parser; depois de implantado, rode `normalize_tse` para efetivar as retiradas paradas.
+1. Leia a mensagem (só nomes, tipos e contagens, nunca valores). Em "linhas inválidas" ela lista as **colunas** com a quantidade de linhas ruins (`colunas: NR_TURNO (3)`). Em "dados conflitantes" ela lista o **tipo do conflito** com a contagem (`eleições`, `pessoas`, `candidaturas`), sem coluna. Confira o arquivo da fonte no portal do TSE: formato mudou, coluna nova ou vazia, valor fora do esperado, cópias da mesma candidatura que divergem.
+2. Se o arquivo está errado, espere a fonte publicar um corrigido: a coleta que o baixa já o normaliza (`scheduling._handle` chama `_normalize` depois de coleta bem-sucedida), sem passo manual. Para não esperar o dia, force a coleta (seção "Forçar uma coleta"). `normalize_tse` não ajuda aqui: ele lê a mesma carga mais recente e recusa igual.
+3. Se o arquivo está certo e o parser é que não o aceita (`apps/elections/tse.py`), a correção é um PR no parser. Depois de implantado, `normalize_tse` à mão efetiva as retiradas paradas, com dois cuidados:
+   - `normalize_tse` **não limpa** a "última normalização" do admin (só `scheduling._record_normalization`, na coleta, escreve nela): o conjunto continua como "Normalização falhou" e o lembrete de 24 h continua saindo até a próxima coleta bem-sucedida. Para limpar na hora, force a coleta.
+   - As retiradas acumuladas podem passar do disjuntor `max(20, 1%)` e a carga ser recusada de novo, agora com "candidaturas sumiram do arquivo". Nesse caso siga a seção do disjuntor, conferindo o arquivo antes de `--aceitar-retiradas`.
 
 ## Alerta ativo (Sessão 76)
 O `collect_due` (rodado a cada minuto pelo `agendador`) avisa por webhook quando uma fonte **entra** em "Atrasado", "Última coleta falhou" ou "Normalização falhou", repete **1 vez por dia** enquanto continuar ruim e avisa a **recuperação**. Uma mensagem por volta, com todos os conjuntos que precisam de aviso.

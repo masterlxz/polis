@@ -16,7 +16,7 @@ perde, e o pior caso é avisar de novo na volta seguinte.
 A mensagem leva só `fonte/conjunto`, a situação e, quando há, o rótulo do código de erro da coleta
 ou a mensagem da recusa da normalização (segura por contrato: só colunas e contagens). Se o conjunto
 está em `settings.RETIREMENT_DATASETS` (a normalização dele efetiva retiradas pedidas pela fonte),
-o aviso de normalização falhou leva também uma frase fixa dizendo que as retiradas ficam paradas.
+o aviso de normalização falhou leva também uma frase fixa dizendo que nenhuma retirada é efetivada.
 Nunca a URL do conjunto nem a do webhook.
 """
 
@@ -37,7 +37,7 @@ RECOVERY = "recovery"
 REMINDER_AFTER = timedelta(hours=24)
 BAD_SITUATIONS = frozenset({Situation.LATE, Situation.FAILED, Situation.NORMALIZATION_FAILED})
 # Frase fixa, sem dado de linha. Carga recusada não efetiva nenhuma retirada (ADR 0026).
-RETIREMENTS_HELD_TEXT = "Retiradas pedidas pela fonte ficam paradas até a normalização passar."
+RETIREMENTS_HELD_TEXT = "Enquanto isso, nenhuma retirada pedida pela fonte é efetivada."
 
 
 @dataclass

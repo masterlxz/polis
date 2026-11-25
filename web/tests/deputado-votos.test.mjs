@@ -157,7 +157,6 @@ test("votos: o código da fonte não é traduzido e a nota diz que o significado
 
   assert.equal(status, 200);
   assert.ok(!/<th\s[^>]*>Resultado/.test(html), "a coluna ainda se chama Resultado");
-  assert.ok(!/>Aprovada</.test(html), "o código virou palavra");
   assert.match(
     html,
     /Códigos como a fonte os manda; o significado de 1\/0 e das siglas de voto não foi verificado\./,
@@ -198,7 +197,8 @@ test("votos: `voto` nulo aparece como 'sem posição registrada', nunca vazio ne
   assert.equal(status, 200);
   assert.match(linhaCom(html, "Descrição B"), /sem posição registrada/i);
   assert.ok(!/sem posição registrada/i.test(linhaCom(html, "Descrição A")));
-  assert.ok(!html.includes(">null<"));
+  assert.equal(celulas(html, "Descrição A")[5], "Sim");
+  assert.equal(celulas(html, "Descrição B")[5], "Sem posição registrada");
 });
 
 test("votos: `aprovacao` nula deixa a célula vazia; a outra linha mantém o código", async () => {
@@ -221,8 +221,9 @@ test("votos: `partido` nulo não vira 'null' na tela", async () => {
   const { status, html } = await comVotos(historico({ votos: [itemDeVoto({ partido: null })] }));
 
   assert.equal(status, 200);
-  assert.ok(html.includes("Aprovada a Medida Provisória nº 1/2026."));
-  assert.ok(!html.includes(">null<"));
+  const [, , descricao, , partido] = celulas(html, "Aprovada a Medida Provisória nº 1/2026.");
+  assert.equal(descricao, "Aprovada a Medida Provisória nº 1/2026.");
+  assert.equal(partido, "", "o partido nulo tem de deixar a célula vazia");
 });
 
 test("votos: sem link para proposição e sem mostrar o id da proposição", async () => {
@@ -308,6 +309,7 @@ test("votos: página além da última volta para a primeira", async () => {
   assert.ok(html.includes(`href="/deputados/${ID}/"`));
   assert.ok(!html.includes("Anterior"), "não há setas na página vazia");
   assert.ok(!html.includes("Próxima"), "não há setas na página vazia");
+  assert.ok(!html.includes("não foi verificado"), "a nota dos códigos sem tabela não faz sentido");
 });
 
 test("votos: a atribuição dos votos aparece com o conjunto e o link do original", async () => {

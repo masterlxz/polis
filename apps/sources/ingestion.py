@@ -36,6 +36,7 @@ from pathlib import Path
 from django.db import transaction
 from django.utils import timezone
 
+from . import plain_csv
 from .ckan import CkanError, read_license_id
 from .http_client import BlockedError, DownloadError
 from .json_list import JsonListError, JsonListReader, fetch_pages
@@ -112,6 +113,10 @@ def _execute(dataset, client, run, destination, batch_size, keep_loads):
             result = fetch_senate_list(client, dataset.url, destination)
         elif dataset.format == dataset.Format.JSON_SENADO_VOTACOES:
             result = fetch_senate_votings(client, dataset.url, destination)
+        elif dataset.format == dataset.Format.CSV:
+            # Mesmo teto do leitor (ADR 0031): o cliente recusa no Content-Length ou ao passar do
+            # teto durante o fluxo, sem gravar nada.
+            result = client.download(dataset.url, destination, max_bytes=plain_csv.MAX_BYTES)
         else:
             result = client.download(dataset.url, destination)
     except BlockedError as error:

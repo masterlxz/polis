@@ -11,12 +11,14 @@ Regras que este módulo aplica:
   host (a coleta daquele host para; nunca se tenta de novo com outra identidade);
 - qualquer outro erro HTTP ou de rede: `DownloadError`, sem nova tentativa;
 - download em fluxo para um arquivo temporário ao lado do destino, conferindo `Content-Length` e
-  `max_bytes`; só depois de íntegro é renomeado. Falha não deixa arquivo parcial nem altera um
-  arquivo anterior (ADR 0005, decisão 9: falha técnica nunca apaga).
+  `max_bytes` (o do cliente, que cada chamada pode só reduzir); só depois de íntegro é renomeado.
+  Falha não deixa arquivo parcial nem altera um arquivo anterior (ADR 0005, decisão 9: falha
+  técnica nunca apaga).
 
-Segurança dos erros: as mensagens citam só o host e o status, nunca a URL completa (a query pode
-ter token), o corpo da resposta nem o texto da exceção original. Os erros são levantados fora de
-qualquer `except`, então não carregam `__context__`.
+Segurança dos erros: as mensagens citam só o host e o status (e, quando o limite de bytes recusa,
+o número do limite), nunca a URL completa (a query pode ter token), o corpo da resposta nem o
+texto da exceção original. Os erros são levantados fora de qualquer `except`, então não carregam
+`__context__`.
 
 O módulo não importa Django nem toca no banco. Ligar o cliente ao `Dataset` e ao `IngestionRun`
 (e mapear os erros para `error_code`) é da camada que o usa.
@@ -105,7 +107,15 @@ class PoliteClient:
             opener.add_handler(handler)
         return opener
 
-    def download(self, url, destination):
+    def download(self, url, destination, *, max_bytes=None):
+        """Baixa `url` para `destination`.
+
+        `max_bytes` (opcional) é o limite desta chamada; o efetivo é o menor entre ele e o teto do
+        cliente, então a chamada só pode reduzir o teto, nunca alargá-lo. `None` usa o do cliente.
+        """
+        if max_bytes is not None and (type(max_bytes) is not int or max_bytes <= 0):
+            raise ValueError("max_bytes deve ser um inteiro positivo ou None.")
+        limit = self._max_bytes if max_bytes is None else min(max_bytes, self._max_bytes)
         try:
             parts = urlsplit(url)
             host = parts.hostname
@@ -124,7 +134,7 @@ class PoliteClient:
             self._pause(host)
             response, status, retry_after, network_failed = self._open(url)
             if response is not None:
-                return self._save(response, host, Path(destination))
+                return self._save(response, host, Path(destination), limit)
             if network_failed:
                 raise DownloadError(f"Falha de rede ao acessar {host}.")
             if status in BLOCKED_STATUSES:
@@ -177,13 +187,13 @@ class PoliteClient:
             return None
         return max(0.0, moment.timestamp() - self._wall_clock())
 
-    def _save(self, response, host, destination):
+    def _save(self, response, host, destination, limit):
         declared = _parse_length(response.headers.get("Content-Length"))
         etag = response.headers.get("ETag", "")
         last_modified = response.headers.get("Last-Modified", "")
-        if declared is not None and declared > self._max_bytes:
+        if declared is not None and declared > limit:
             response.close()
-            raise DownloadError(f"{host} anunciou arquivo acima do limite de bytes.")
+            raise DownloadError(f"{host} anunciou arquivo acima do limite de {limit} bytes.")
 
         digest = hashlib.sha256()
         received = 0
@@ -198,8 +208,8 @@ class PoliteClient:
                 with response, os.fdopen(handle, "wb") as file:
                     while chunk := response.read(CHUNK_SIZE):
                         received += len(chunk)
-                        if received > self._max_bytes:
-                            problem = "acima do limite de bytes"
+                        if received > limit:
+                            problem = f"acima do limite de {limit} bytes"
                             break
                         digest.update(chunk)
                         file.write(chunk)

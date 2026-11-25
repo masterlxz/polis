@@ -162,6 +162,18 @@ def _todas_as_chaves(valor):
             yield from _todas_as_chaves(filho)
 
 
+def _todos_os_valores(valor):
+    """Cada valor escalar do JSON, em qualquer profundidade (as chaves não entram)."""
+    if isinstance(valor, dict):
+        for filho in valor.values():
+            yield from _todos_os_valores(filho)
+    elif isinstance(valor, list):
+        for filho in valor:
+            yield from _todos_os_valores(filho)
+    else:
+        yield valor
+
+
 @pytest.fixture
 def historico(run, run_dos_votos):
     """Dois deputados da mesma legislatura que votaram nas mesmas duas votações."""
@@ -239,11 +251,13 @@ def test_nada_de_id_interno_totais_nem_dado_de_outro_deputado(client, historico)
 
     assert not set(_todas_as_chaves(corpo)) & internos
     assert "Beto Exemplo" not in str(corpo)
-    # Por valor, não por substring de `str(corpo)`: um id curto casaria com datas e outros ids.
+    # Por valor inteiro, não por substring de `str(corpo)`: um id curto casaria com datas e outros
+    # ids. Os itens não carregam o id do deputado, então a varredura é no corpo todo, em número e
+    # em texto.
     assert corpo["deputado"]["id_camara"] == DEPUTADO
-    valores_dos_itens = [valor for item in corpo["votos"] for valor in item.values()]
-    assert OUTRO not in valores_dos_itens
-    assert OUTRO not in corpo["deputado"].values()
+    valores = list(_todos_os_valores(corpo))
+    assert OUTRO not in valores
+    assert str(OUTRO) not in valores
 
 
 # --- Conteúdo ------------------------------------------------------------------------------------
@@ -480,7 +494,10 @@ def test_pagina_malformada_de_deputado_inexistente_da_400_e_nao_404(client, hist
     ele dá 404, então o 400 abaixo só pode vir da validação da página.
     """
     _ok(client, _url())  # controle: a rota existe para um deputado que existe
-    assert client.get(_url(58, 999)).status_code == 404  # controle: o par não tem perfil
+    # controle: o par não tem perfil, e o 404 vem da view (corpo dela), não da rota
+    sem_perfil = client.get(_url(58, 999))
+    assert sem_perfil.status_code == 404
+    assert sem_perfil.json() == {"erro": "não encontrado"}
 
     resposta = client.get(_url(58, 999), {"pagina": pagina})
 

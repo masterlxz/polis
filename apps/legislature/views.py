@@ -440,7 +440,7 @@ def deputy_votes(request, legislature, camara_id):
             },
             "votos": [_deputy_vote_item(v) for v in votes],
             "pagina": page,
-            "total_paginas": (total + VOTINGS_PER_PAGE - 1) // VOTINGS_PER_PAGE,
+            "total_paginas": total // VOTINGS_PER_PAGE + 1,
             "atribuicao": _attribution(newest_run) if newest_run else None,
         },
         json_dumps_params={"ensure_ascii": False},

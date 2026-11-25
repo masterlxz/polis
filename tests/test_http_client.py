@@ -32,6 +32,12 @@ class Resposta:
     declared_length: int | None = None
     chunked: bool = False
     delay: float = 0.0
+    # Gotejamento: manda o corpo 1 byte por vez e, antes de cada byte, adianta `drip_clock` em
+    # `drip_step` segundos (relógio falso, sem espera real). Simula um host que entrega 1 byte a
+    # cada `drip_step` s; o adiantamento vem ANTES da escrita para que o cliente, ao ler o byte
+    # `n`, já veja `n * drip_step` s passados (sem corrida entre as duas threads).
+    drip_clock: object = None
+    drip_step: float = 0.0
 
 
 class _Handler(BaseHTTPRequestHandler):
@@ -63,7 +69,12 @@ class _Handler(BaseHTTPRequestHandler):
                     tamanho = len(resposta.body)
                 self.send_header("Content-Length", str(tamanho))
                 self.end_headers()
-                self.wfile.write(resposta.body)
+                if resposta.drip_clock is not None:
+                    for i in range(len(resposta.body)):
+                        resposta.drip_clock.now += resposta.drip_step
+                        self.wfile.write(resposta.body[i : i + 1])
+                else:
+                    self.wfile.write(resposta.body)
                 if tamanho > len(resposta.body):
                     self.close_connection = True
         except BrokenPipeError, ConnectionResetError:
@@ -461,6 +472,271 @@ def test_limite_por_chamada_invalido_levanta_value_error_antes_de_abrir_rede(
         make_client(clock).download(url(server), tmp_path / "a.zip", max_bytes=invalido)
     assert server.requests == []
     assert list(tmp_path.iterdir()) == []
+
+
+# --- Prazo total por download (`total_timeout`; nota em "Consequências" do ADR 0008) ---
+# O `timeout` por operação de socket (30 s) não limita um host que manda 1 byte a cada 29 s: cada
+# `recv` volta antes de estourar. Estes testes usam o gotejamento de `Resposta` (relógio falso
+# adiantado pelo servidor) e conferem que o relógio injetado do cliente corta o download. Os que
+# precisam contar as leituras ou isolar a leitura final usam uma resposta falsa injetada em
+# `_opener.open` (`RespostaFalsa`), sem rede.
+
+TIMEOUT_POR_OPERACAO = 30.0
+PASSO_LENTO = 29.0  # menor que o timeout por operação: nenhuma leitura estoura sozinha
+
+
+def gotejamento(clock, bytes_, passo=PASSO_LENTO):
+    return Resposta(body=b"x" * bytes_, drip_clock=clock, drip_step=passo)
+
+
+class RespostaFalsa:
+    """Resposta que o cliente lê só por `read1`; cada passo é (segundos a adiantar, bytes)."""
+
+    def __init__(self, clock, passos=()):
+        self.headers = {}
+        self.chamadas_read1 = 0
+        self._clock = clock
+        self._passos = iter(passos)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        self.close()
+
+    def close(self):
+        pass
+
+    def read(self, *args):
+        raise AssertionError("o cliente deve ler com read1: read encadeia leituras de socket")
+
+    def read1(self, tamanho=-1):
+        self.chamadas_read1 += 1
+        avanco, dados = next(self._passos, (0.0, b""))
+        self._clock.now += avanco
+        return dados
+
+
+def cliente_com_resposta_falsa(clock, resposta, *, avanco_na_abertura=0.0, **kwargs):
+    """`resposta` pode ser uma lista (uma por abertura; a última se repete). Cada abertura
+    adianta o relógio em `avanco_na_abertura` s (conexão, TLS e cabeçalhos lentos)."""
+    respostas = list(resposta) if isinstance(resposta, list) else [resposta]
+    cliente = make_client(clock, **kwargs)
+    cliente.timeouts_pedidos = []
+
+    def abrir(request, timeout):
+        cliente.timeouts_pedidos.append(timeout)
+        clock.now += avanco_na_abertura
+        return respostas.pop(0) if len(respostas) > 1 else respostas[0]
+
+    cliente._opener.open = abrir
+    return cliente
+
+
+URL_FALSA = "http://127.0.0.1:9/a.zip"
+
+
+def test_gotejamento_abaixo_do_timeout_por_operacao_e_cortado_pelo_prazo_total(
+    server, clock, tmp_path
+):
+    assert PASSO_LENTO < TIMEOUT_POR_OPERACAO
+    server.script = [gotejamento(clock, 20)]  # 20 bytes x 29 s = 580 s, prazo de 100 s
+    cliente = make_client(clock, timeout=TIMEOUT_POR_OPERACAO, total_timeout=100)
+    with pytest.raises(DownloadError) as erro:
+        cliente.download(url(server, "/a.zip?token=segredo"), tmp_path / "a.zip")
+    texto = str(erro.value)
+    assert texto == "Download de 127.0.0.1 acima do prazo de 100 segundos."
+    assert "segredo" not in texto
+    assert erro.value.__context__ is None
+    assert len(server.requests) == 1
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_prazo_vencido_nao_altera_o_arquivo_anterior_nem_deixa_part(server, clock, tmp_path):
+    destino = tmp_path / "a.zip"
+    destino.write_bytes(b"versao antiga")
+    server.script = [gotejamento(clock, 20)]
+    with pytest.raises(DownloadError):
+        make_client(clock, total_timeout=100).download(url(server), destino)
+    assert destino.read_bytes() == b"versao antiga"
+    assert [p.name for p in tmp_path.iterdir()] == ["a.zip"]
+
+
+@pytest.mark.parametrize(
+    ("bytes_", "aceito"), [(60, True), (61, False)], ids=["1800s_exatos", "1830s"]
+)
+def test_prazo_padrao_e_de_1800_segundos_exatos(server, clock, tmp_path, bytes_, aceito):
+    # Sem `total_timeout`: 60 bytes x 30 s = 1800 s passa (e o conteúdo sai íntegro);
+    # 61 bytes x 30 s = 1830 s estoura.
+    server.script = [gotejamento(clock, bytes_, 30.0)]
+    destino = tmp_path / "a.zip"
+    if aceito:
+        resultado = make_client(clock).download(url(server), destino)
+        assert destino.read_bytes() == b"x" * bytes_
+        assert resultado.sha256 == hashlib.sha256(b"x" * bytes_).hexdigest()
+    else:
+        with pytest.raises(DownloadError) as erro:
+            make_client(clock).download(url(server), destino)
+        assert "acima do prazo de 1800 segundos" in str(erro.value)
+        assert list(tmp_path.iterdir()) == []
+
+
+def test_le_a_resposta_por_read1_e_corta_na_primeira_checagem_depois_do_prazo(clock, tmp_path):
+    # Cada read1 devolve 1 byte e custa 29 s; prazo de 100 s: 29, 58, 87 passam e a 4a (116 s)
+    # corta. Com `read` (mutação) o fake levanta AssertionError; sem checar a cada volta, leria
+    # os 1000 passos do fim.
+    resposta = RespostaFalsa(clock, [(29.0, b"x")] * 1000)
+    cliente = cliente_com_resposta_falsa(clock, resposta, total_timeout=100)
+    with pytest.raises(DownloadError) as erro:
+        cliente.download(URL_FALSA, tmp_path / "a.zip")
+    assert "acima do prazo de 100 segundos" in str(erro.value)
+    assert resposta.chamadas_read1 == 4
+    assert list(tmp_path.iterdir()) == []
+
+
+@pytest.mark.parametrize(
+    ("avanco_no_fim", "aceito"), [(100.0, True), (101.0, False)], ids=["no_prazo", "estoura_no_eof"]
+)
+def test_a_leitura_que_devolve_o_fim_tambem_conta_no_prazo(clock, tmp_path, avanco_no_fim, aceito):
+    # Os dados chegam no relógio inicial; só a leitura que devolve b"" avança o relógio. Um
+    # download completo cuja leitura final passa do prazo falha (intencional).
+    resposta = RespostaFalsa(clock, [(0.0, b"abc"), (avanco_no_fim, b"")])
+    cliente = cliente_com_resposta_falsa(clock, resposta, total_timeout=100)
+    destino = tmp_path / "a.zip"
+    if aceito:
+        assert cliente.download(URL_FALSA, destino).size_bytes == 3
+    else:
+        with pytest.raises(DownloadError) as erro:
+            cliente.download(URL_FALSA, destino)
+        assert "acima do prazo de 100 segundos" in str(erro.value)
+        assert list(tmp_path.iterdir()) == []
+
+
+@pytest.mark.parametrize(
+    ("avanco_no_corpo", "aceito"), [(30.0, True), (50.0, False)], ids=["90s", "110s"]
+)
+def test_o_prazo_comeca_antes_da_abertura_e_conta_conexao_e_cabecalhos(
+    clock, tmp_path, avanco_no_corpo, aceito
+):
+    # A abertura (conexão, TLS, cabeçalhos) leva 60 s; o prazo é de 100 s. Corpo em +30 s soma
+    # 90 s (passa); em +50 s soma 110 s (estoura). Se `started` fosse lido depois de `_open`, os
+    # dois casos passariam.
+    resposta = RespostaFalsa(clock, [(avanco_no_corpo, b"x")])
+    cliente = cliente_com_resposta_falsa(
+        clock, resposta, avanco_na_abertura=60.0, total_timeout=100
+    )
+    destino = tmp_path / "a.zip"
+    if aceito:
+        assert cliente.download(URL_FALSA, destino).size_bytes == 1
+    else:
+        with pytest.raises(DownloadError) as erro:
+            cliente.download(URL_FALSA, destino)
+        assert "acima do prazo de 100 segundos" in str(erro.value)
+        assert list(tmp_path.iterdir()) == []
+
+
+def test_pausa_de_cortesia_antes_da_abertura_nao_conta_no_prazo(clock, tmp_path):
+    # Segunda chamada ao mesmo host espera 1000 s de pausa (o `sleep` falso adianta o relógio);
+    # o prazo é de 100 s e o corpo leva 50 s: passa, porque `started` vem depois da pausa.
+    respostas = [RespostaFalsa(clock), RespostaFalsa(clock, [(50.0, b"x")])]
+    cliente = cliente_com_resposta_falsa(clock, respostas, min_interval=1000.0, total_timeout=100)
+    cliente.download(URL_FALSA, tmp_path / "a.zip")
+    resultado = cliente.download(URL_FALSA, tmp_path / "b.zip")
+    assert clock.sleeps == [1000.0]
+    assert resultado.size_bytes == 1
+
+
+@pytest.mark.parametrize(
+    ("timeout", "total_timeout", "esperado"),
+    [
+        (30, 0.2, 0.2),
+        (30, 5, 5),
+        (30, 1800, 30),
+        (30, float("inf"), 30),
+        (0.5, 100, 0.5),
+    ],
+    ids=["prazo_menor", "prazo_inteiro_menor", "prazo_maior", "prazo_infinito", "timeout_menor"],
+)
+def test_timeout_da_abertura_e_o_menor_entre_o_por_operacao_e_o_prazo_total(
+    clock, tmp_path, timeout, total_timeout, esperado
+):
+    cliente = cliente_com_resposta_falsa(
+        clock, RespostaFalsa(clock), timeout=timeout, total_timeout=total_timeout
+    )
+    cliente.download(URL_FALSA, tmp_path / "a.zip")
+    assert cliente.timeouts_pedidos == [esperado]
+
+
+def test_prazo_infinito_desliga_o_prazo(clock, tmp_path):
+    resposta = RespostaFalsa(clock, [(1e9, b"x")] * 3)
+    cliente = cliente_com_resposta_falsa(clock, resposta, total_timeout=float("inf"))
+    assert cliente.download(URL_FALSA, tmp_path / "a.zip").size_bytes == 3
+
+
+@pytest.mark.parametrize(
+    ("total_timeout", "texto"), [(1_000_000, "1000000"), (0.5, "0.5"), (1800.0, "1800")]
+)
+def test_mensagem_do_prazo_nao_usa_notacao_cientifica(clock, tmp_path, total_timeout, texto):
+    resposta = RespostaFalsa(clock, [(2_000_000.0, b"x")])
+    cliente = cliente_com_resposta_falsa(clock, resposta, total_timeout=total_timeout)
+    with pytest.raises(DownloadError) as erro:
+        cliente.download(URL_FALSA, tmp_path / "a.zip")
+    assert str(erro.value) == f"Download de 127.0.0.1 acima do prazo de {texto} segundos."
+
+
+@pytest.mark.parametrize(
+    ("passo", "aceito"), [(25.0, True), (26.0, False)], ids=["no_prazo_exato", "um_pouco_acima"]
+)
+def test_prazo_exato_passa_e_acima_dele_falha(server, clock, tmp_path, passo, aceito):
+    # 4 bytes x 25 s = 100 s (= prazo, aceito); 4 bytes x 26 s = 104 s (> prazo, recusado).
+    server.script = [gotejamento(clock, 4, passo)]
+    cliente = make_client(clock, total_timeout=100)
+    if aceito:
+        assert cliente.download(url(server), tmp_path / "a.zip").size_bytes == 4
+    else:
+        with pytest.raises(DownloadError):
+            cliente.download(url(server), tmp_path / "a.zip")
+        assert list(tmp_path.iterdir()) == []
+
+
+def test_espera_de_429_nao_conta_no_prazo_do_download(server, clock, tmp_path):
+    # Retry-After de 90 s + download de 100 s: soma 190 s, mas o prazo (100 s) só vale para o
+    # download da resposta que deu certo.
+    server.script = [
+        Resposta(status=429, headers={"Retry-After": "90"}, body=b""),
+        gotejamento(clock, 4, 25.0),
+    ]
+    resultado = make_client(clock, total_timeout=100).download(url(server), tmp_path / "a.zip")
+    assert clock.sleeps == [90.0]
+    assert resultado.size_bytes == 4
+
+
+def test_cada_download_tem_o_proprio_prazo(server, clock, tmp_path):
+    server.script = [gotejamento(clock, 4, 25.0)]
+    cliente = make_client(clock, total_timeout=100)
+    cliente.download(url(server), tmp_path / "a.zip")
+    cliente.download(url(server), tmp_path / "b.zip")  # 200 s no relógio, 100 s por download
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["a.zip", "b.zip"]
+
+
+@pytest.mark.parametrize("invalido", [0, -1, 0.0, -0.5, True, False, "10", None, float("nan")])
+def test_prazo_total_invalido_levanta_value_error_no_construtor(clock, invalido):
+    with pytest.raises(ValueError):
+        make_client(clock, total_timeout=invalido)
+
+
+@pytest.mark.parametrize("valido", [5, 0.5, 1800.0, float("inf")])
+def test_prazo_total_valido_e_aceito(clock, valido):
+    make_client(clock, total_timeout=valido)
+
+
+@pytest.mark.parametrize(
+    "invalido", [None, 0, -1, 0.0, True, False, "30", float("nan"), float("inf")]
+)
+def test_timeout_por_operacao_invalido_levanta_value_error_no_construtor(clock, invalido):
+    # Antes, `timeout=None` chegava ao `min` de `_open` como TypeError cru.
+    with pytest.raises(ValueError):
+        make_client(clock, timeout=invalido)
 
 
 # --- Segurança dos erros (mesma regra do leitor de ZIP) ---

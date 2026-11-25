@@ -24,16 +24,19 @@ from .models import CamaraVote, CamaraVoting
 from .parsing import INT32, RowError, _int, _text
 
 _VOTING_ID = re.compile(r"[0-9]{1,10}-[0-9]{1,10}")
+_VOTING_ID_MAX = CamaraVoting._meta.get_field("camara_voting_id").max_length
 _DATE = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}")
 _COUNT = re.compile(r"[0-9]{1,10}")
-_LINE_BREAK = re.compile(r"\r\n|\r|\n")
+# Quebras de linha: CRLF, CR, LF e os separadores de linha e de parágrafo do Unicode (U+2028 e
+# U+2029), que não são caracteres de controle e passariam pelo `_text`.
+_LINE_BREAK = re.compile("\r\n|[\r\n  ]")
 _DESCRIPTION_MAX = 5000
 _APPROVALS = ("", "0", "1")
 
 
 def _voting_id(values, column):
     value = values.get(column)
-    if type(value) is not str or not _VOTING_ID.fullmatch(value):
+    if type(value) is not str or not _VOTING_ID.fullmatch(value) or len(value) > _VOTING_ID_MAX:
         raise RowError(column)
     return value
 

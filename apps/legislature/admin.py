@@ -72,4 +72,6 @@ class CamaraVoteAdmin(DeputyAdmin):
 
     list_display = ["camara_id", "legislature_id", "party_acronym", "vote", "voting"]
     list_filter = ["vote", "party_acronym"]
+    list_select_related = ["voting"]
+    search_fields = ["voting__camara_voting_id"]
     raw_id_fields = ["ingestion_run", "voting"]

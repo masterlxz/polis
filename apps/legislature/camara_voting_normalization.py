@@ -13,9 +13,12 @@ conjuntos (dois arquivos), cada um com a sua carga, e a normalização lê a mai
 
 A corrida entre as duas coletas: o agendador coleta cada conjunto em hora sorteada e normaliza
 depois de cada coleta, então o arquivo de votos pode chegar antes do de votações. Voto sem votação
-só é recusa quando a carga de votações é tão nova quanto a de votos (a votação deveria estar lá);
-se a de votos é mais nova, `normalize_latest` devolve `None` e espera a coleta de votações.
-Nesse caso o painel das fontes mostra a normalização como feita, sem erro.
+só é recusa quando a carga de votações é tão nova quanto a de votos ou mais (a votação deveria
+estar lá); se a de votos é mais nova por até 48 h, `normalize_latest` devolve `None` e espera a
+coleta de votações. Nesse caso o painel das fontes mostra a normalização como feita, sem erro.
+Passadas as 48 h (votações paradas, conjunto desabilitado, votação que não vem), vira recusa.
+Compara o início das duas execuções que gravaram linhas, ou seja, a última vez que cada arquivo
+MUDOU: "arquivo igual" não cria execução com linhas.
 
 O código dos senadores e das votações do Senado foi copiado, não generalizado (como o ADR 0022 já
 fez): a duplicação é candidata a refatoração depois. Duas normalizações simultâneas continuam sem
@@ -24,6 +27,7 @@ trava.
 
 from collections import Counter
 from dataclasses import dataclass
+from datetime import timedelta
 
 from django.db import transaction
 
@@ -39,6 +43,13 @@ VOTINGS_SLUG = "votacoes-2026"
 VOTES_SLUG = "votos-2026"
 BATCH_SIZE = 1000
 READ_CHUNK = 2000
+# A espera por votações acaba depois de 48 h (dois ciclos de coleta): passado isso, voto sem
+# votação é anomalia e aparece como recusa.
+MAX_WAIT = timedelta(hours=48)
+# Teto de linhas por carga, medido contra o real (9.153 votações e 57.855 votos em 2026; até
+# ~175 mil votos em 2025): a normalização guarda tudo em memória.
+MAX_VOTINGS = 50_000
+MAX_VOTES = 500_000
 VOTING_UPDATABLE = [
     "voted_on",
     "organ_acronym",
@@ -70,6 +81,14 @@ class ConflictError(NormalizationRefused):
     def __init__(self, votings, votes):
         super().__init__(
             "Normalização recusada: dados conflitantes entre linhas do bruto "
+            f"(votações: {votings}, votos: {votes}). Nada foi gravado."
+        )
+
+
+class RunTooLargeError(NormalizationRefused):
+    def __init__(self, votings, votes):
+        super().__init__(
+            "Normalização recusada: carga acima do limite de linhas "
             f"(votações: {votings}, votos: {votes}). Nada foi gravado."
         )
 
@@ -115,6 +134,8 @@ def latest_run(dataset):
 
 
 def normalize(votings_run, votes_run):
+    if votings_run.rows_loaded > MAX_VOTINGS or votes_run.rows_loaded > MAX_VOTES:
+        raise RunTooLargeError(votings_run.rows_loaded, votes_run.rows_loaded)
     rows_read, votings, votes = _collect(votings_run, votes_run)
     return _write(votings_run, votes_run, rows_read, votings, votes)
 
@@ -125,7 +146,7 @@ def normalize_latest(dataset):
     `dataset` não decide nada: a normalização usa a carga mais recente de cada conjunto. Devolve
     `None` se falta uma das cargas, se as duas já foram normalizadas (alguma votação aponta para a
     de votações e algum voto para a de votos) ou se a carga de votos é mais nova que a de votações
-    e há voto sem votação (espera a coleta de votações).
+    por até 48 h e há voto sem votação (espera a coleta de votações).
     """
     votings_dataset, votes_dataset = find_datasets()
     if votings_dataset is None or votes_dataset is None:
@@ -142,7 +163,7 @@ def normalize_latest(dataset):
     try:
         return normalize(votings_run, votes_run)
     except MissingVotingError:
-        if votes_run.started_at > votings_run.started_at:
+        if timedelta(0) < votes_run.started_at - votings_run.started_at <= MAX_WAIT:
             return None
         raise
 

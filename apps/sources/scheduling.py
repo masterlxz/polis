@@ -160,7 +160,7 @@ def _normalize(dataset, name, result, now):
         return
     except Exception as error:
         failed = True
-        class_name = type(error).__name__  # só o nome: nunca a exceção
+        class_name = str(error)  # MUTAÇÃO DO COORDENADOR: vaza a mensagem
         error_class = (class_name if class_name.isidentifier() else "?")[:CLASS_NAME_MAX_LENGTH]
     if failed:
         result.lines.append(f"{name}: normalização falhou de forma inesperada ({error_class})")

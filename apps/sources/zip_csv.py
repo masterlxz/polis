@@ -62,7 +62,9 @@ MAX_DOWNLOAD_BYTES = 256 * 1024**2
 # zip bomb: o download já é limitado acima, mas um ZIP pequeno pode declarar muito mais). Medido
 # em 2026-11-25 (índice do ZIP, sem baixá-lo): candidatos de 2024, 78,7 MB comprimidos e 513 MB
 # descomprimidos (razão 6,5); de 2026, 3,3 MB e 23,7 MB (razão 7,2). 2 GiB é ~4x o maior medido e
-# cobre o que o teto de download aceita (256 MiB x razão observada = ~1,7 a 1,9 GiB).
+# cobre o que o teto de download aceita enquanto a razão ficar abaixo de 8 (256 MiB x 6,5 a 7,2 =
+# ~1,6 a 1,8 GiB; 256 MiB x 8 = 2 GiB). Só dois pontos de razão foram medidos: se o TSE mudar a
+# compressão, a coleta falha com `error_code=schema` (o rótulo da recusa deste leitor).
 MAX_UNCOMPRESSED_BYTES = 2 * 1024**3
 
 _FOREIGN_ERRORS = (

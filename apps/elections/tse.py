@@ -24,7 +24,9 @@ from .models import Candidacy, Election, Person
 SOURCE_TIMEZONE = ZoneInfo("America/Sao_Paulo")
 MARKERS = frozenset({"#NULO", "#NULO#", "#NE", "#NE#", "-1", "-3", "-4", "NÃO DIVULGÁVEL", ""})
 COALITION_COMPOSITION_MAX = 2000
-INT16, INT32, INT64 = 2**15 - 1, 2**31 - 1, 2**63 - 1
+INT16, INT32 = 2**15 - 1, 2**31 - 1
+# Maior SQ_CANDIDATO: 12 dígitos, o `[1-9][0-9]{0,11}` da rota do perfil (`urls.py`).
+SQ_MAX = 10**12 - 1
 
 _DIGITS = re.compile(r"[0-9]{1,18}")
 _DATE = re.compile(r"([0-9]{2})/([0-9]{2})/([0-9]{4})")
@@ -133,9 +135,8 @@ def parse_row(values):
     }
     person = {
         "cycle_year": year,
-        # Mínimo 1: a rota do perfil (`urls.py`) só casa SQ de 1 em diante; um 0 não teria página.
-        # O teto 12 (rota) x 18 (`_DIGITS`) é descasamento conhecido, para outra tarefa.
-        "tse_candidate_id": _required_int(values, "SQ_CANDIDATO", INT64, minimum=1),
+        # Faixa 1..SQ_MAX: a rota do perfil (`urls.py`) só casa SQ nela; fora dela não teria página.
+        "tse_candidate_id": _required_int(values, "SQ_CANDIDATO", SQ_MAX, minimum=1),
         "public_name": _required_text(values, "NM_URNA_CANDIDATO", _limit(Person, "public_name")),
         "social_name": _optional_text(values, "NM_SOCIAL_CANDIDATO", _limit(Person, "social_name")),
     }

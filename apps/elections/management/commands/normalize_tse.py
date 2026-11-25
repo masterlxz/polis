@@ -54,7 +54,7 @@ class Command(BaseCommand):
         # `scheduling._record_normalization`, para não desfazer uma edição feita ao mesmo tempo
         # no admin.
         Dataset.objects.filter(pk=dataset.pk).update(
-            last_normalization_at=timezone.now(), last_normalization_error=""
+            last_normalization_at=timezone.now()  # MUTAÇÃO DO COORDENADOR: não limpa o erro
         )
         self.stdout.write(
             f"Execução {run.pk}: linhas lidas {result.rows_read}, "

@@ -398,3 +398,64 @@ def camara_voting_detail(request, voting_id):
         },
         json_dumps_params={"ensure_ascii": False},
     )
+
+
+@require_safe
+def deputy_votes(request, legislature, camara_id):
+    """Histórico de votos de um deputado da Câmara, mais recente primeiro, 50 por página.
+
+    O inverso de `camara_voting_detail`: cada item é uma votação com o voto dele. Mesmas regras de
+    página do Senado (ADR 0030, decisão 4) e a mesma ordem da lista da Câmara (ADR 0032). O voto
+    não tem chave para `Deputy` (ADR 0031): o histórico é o das linhas com o par (legislatura, id
+    da Câmara), e deputado sem `Deputy` para o par dá 404, como o perfil, mesmo que tenha votado.
+    `voto` vazio sai `null` e `partido` é o do momento do voto. A atribuição é a da coleta de
+    VOTOS mais recente entre os itens da página (o conjunto de votos, não o de votações).
+    """
+    page_text = request.GET.get("pagina", "1")
+    if not _PAGE_PATTERN.fullmatch(page_text):
+        return JsonResponse(
+            {"erro": "página inválida"}, status=400, json_dumps_params={"ensure_ascii": False}
+        )
+    page = int(page_text)
+
+    deputy = Deputy.objects.filter(legislature_id=legislature, camara_id=camara_id).first()
+    if deputy is None:
+        return JsonResponse({"erro": "não encontrado"}, status=404)
+
+    votes_of_deputy = CamaraVote.objects.filter(legislature_id=legislature, camara_id=camara_id)
+    total = votes_of_deputy.count()
+    start = (page - 1) * VOTINGS_PER_PAGE
+    votes = list(
+        votes_of_deputy.select_related("voting", "ingestion_run__dataset__source").order_by(
+            "-voting__voted_on", "-voting__camara_voting_id"
+        )[start : start + VOTINGS_PER_PAGE]
+    )
+    newest_run = max((v.ingestion_run for v in votes), key=lambda r: r.started_at, default=None)
+    return JsonResponse(
+        {
+            "deputado": {
+                "legislatura": deputy.legislature_id,
+                "id_camara": deputy.camara_id,
+                "nome": deputy.name,
+            },
+            "votos": [_deputy_vote_item(v) for v in votes],
+            "pagina": page,
+            "total_paginas": (total + VOTINGS_PER_PAGE - 1) // VOTINGS_PER_PAGE,
+            "atribuicao": _attribution(newest_run) if newest_run else None,
+        },
+        json_dumps_params={"ensure_ascii": False},
+    )
+
+
+def _deputy_vote_item(vote):
+    voting = vote.voting
+    return {
+        "id": voting.camara_voting_id,
+        "data": voting.voted_on.isoformat(),
+        "orgao": voting.organ_acronym,
+        "descricao": voting.description,
+        "aprovacao": _or_none(voting.approval),
+        "id_proposicao": voting.proposition_id,
+        "partido": _or_none(vote.party_acronym),
+        "voto": _or_none(vote.vote),
+    }

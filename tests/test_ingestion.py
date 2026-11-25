@@ -15,7 +15,7 @@ from pathlib import Path
 import pytest
 from django.core.management import CommandError, call_command
 
-from apps.sources import json_list, json_senado, json_senado_votacoes, plain_csv
+from apps.sources import json_list, json_senado, json_senado_votacoes, plain_csv, zip_csv
 from apps.sources.ckan import MAX_BYTES, read_license_id
 from apps.sources.http_client import BlockedError, DownloadError, DownloadResult, PoliteClient
 from apps.sources.ingestion import IngestionError, ingest
@@ -643,9 +643,10 @@ def test_csv_simples_com_linha_de_largura_errada_falha_com_malformed_row():
 
 
 # --- Teto de bytes do download por formato (ADR 0031, "limites conhecidos") ---
-# O formato `csv` passa `plain_csv.MAX_BYTES` (100 MB) ao `download`; só o `zip_csv` não passa
-# limite (`None`: vale o teto do cliente); os formatos JSON e o CKAN passam o teto do próprio
-# leitor (testados mais abaixo). Para não alocar 100 MB, os testes trocam `plain_csv.MAX_BYTES`
+# O formato `csv` passa `plain_csv.MAX_BYTES` (100 MB) ao `download`; o `zip_csv` passa
+# `zip_csv.MAX_DOWNLOAD_BYTES` (256 MiB, Sessão 89: antes não passava limite e valia o do cliente,
+# 2 GiB); os formatos JSON e o CKAN passam o teto do próprio leitor (testados mais abaixo). Para
+# não alocar 100 MB, os testes trocam `plain_csv.MAX_BYTES`
 # por um valor pequeno: a ingestão o lê na hora da chamada, e o leitor não é afetado, porque o
 # padrão do `PlainCsvReader` foi fixado na definição da classe.
 
@@ -679,13 +680,41 @@ def test_conjunto_csv_com_arquivo_exatamente_no_teto_e_aceito(monkeypatch):
     assert run.rows_loaded == len(LINHAS_CSV)
 
 
-def test_conjunto_zip_csv_do_mesmo_tamanho_nao_e_recusado_nem_recebe_limite(monkeypatch):
-    # Discrimina o ramo: o mesmo teto que recusaria um conjunto `csv` não alcança o `zip_csv`.
+def test_conjunto_zip_csv_nao_e_alcancado_pelo_teto_do_csv_e_recebe_o_proprio(monkeypatch):
+    # Discrimina o ramo: o mesmo teto que recusaria um conjunto `csv` não alcança o `zip_csv`,
+    # que tem o seu (o do cliente, de 2 GiB, deixou de valer para ele: Sessão 89).
     dados = zip_ok("1;ANA", "2;BIA")
     monkeypatch.setattr(plain_csv, "MAX_BYTES", len(dados) - 1)
     cliente = FakeClient(dados)
     run = ingest(make_dataset(), cliente)
-    assert cliente.max_bytes_usados == [None]
+    assert cliente.max_bytes_usados == [zip_csv.MAX_DOWNLOAD_BYTES]
+    assert run.state == IngestionRun.State.SUCCEEDED
+    assert run.rows_loaded == 2
+
+
+def test_o_teto_do_zip_e_de_256_mib():
+    # Decisão do dono (2026-11-25): ~4x o maior ZIP de candidatos medido (64,7 MB, 2024; o de
+    # 2026 tem 3,3 MB), em `project/fontes/tse.md`; 8x menor que o teto do cliente (2 GiB).
+    assert zip_csv.MAX_DOWNLOAD_BYTES == 256 * 1024**2
+    assert zip_csv.MAX_DOWNLOAD_BYTES > 64_700_000
+
+
+def test_conjunto_zip_csv_recusa_download_acima_do_teto_e_nao_grava_nada(monkeypatch):
+    dados = zip_ok("1;ANA", "2;BIA")
+    monkeypatch.setattr(zip_csv, "MAX_DOWNLOAD_BYTES", len(dados) - 1)
+    cliente = FakeClient(dados)
+    run = ingest(make_dataset(), cliente)
+    assert cliente.max_bytes_usados == [len(dados) - 1]
+    assert run.state == IngestionRun.State.FAILED
+    assert run.error_code == IngestionRun.ErrorCode.DOWNLOAD
+    assert run.rows_loaded == 0
+    assert RawRecord.objects.count() == 0
+
+
+def test_conjunto_zip_csv_com_arquivo_exatamente_no_teto_e_aceito(monkeypatch):
+    dados = zip_ok("1;ANA", "2;BIA")
+    monkeypatch.setattr(zip_csv, "MAX_DOWNLOAD_BYTES", len(dados))
+    run = ingest(make_dataset(), FakeClient(dados))
     assert run.state == IngestionRun.State.SUCCEEDED
     assert run.rows_loaded == 2
 

@@ -25,7 +25,7 @@ As votações da Câmara estão modeladas e normalizadas (ADR 0031: `CamaraVotin
 - **`nome` sempre, com um texto de reserva para quem não tem perfil:** descartada; inventaria um nome. `null` com `tem_perfil: false` é verdadeiro.
 - **Casar o deputado só pelo id da Câmara:** descartada; o id se repete entre legislaturas (a chave de `Deputy` é o par).
 - **Uma consulta por voto, ou `JOIN` por FK:** descartadas; N+1, e o ADR 0031 decidiu não ter FK (quem votou e saiu da lista pode não estar em `Deputy`).
-- **Histórico de votos por deputado (`/deputados/<legislatura>-<id>/votos/`):** fica para depois, como a emenda 7 do ADR 0030 fez no Senado, depois da página.
+- **Histórico de votos por deputado (`/deputados/<legislatura>-<id>/votos/`):** ficou para depois da página e foi feito na **emenda 1** (abaixo), como a emenda 7 do ADR 0030 fez no Senado.
 - **Paginar os votos do detalhe:** descartada por ora; a votação medida com 466 votos (ADR 0031) dá a ordem de grandeza (centenas). Se aparecer uma votação com milhares, a decisão volta.
 
 ## Consequências
@@ -40,3 +40,18 @@ As votações da Câmara estão modeladas e normalizadas (ADR 0031: `CamaraVotin
   - o plano das consultas não foi medido: o `EXISTS` deveria usar o índice do `unique (voting, camara_id)` (a coluna da frente é `voting`), e a consulta de `Deputy` com `IN` nas duas colunas usa o `unique (legislature_id, camara_id)` no melhor caso; só um `EXPLAIN` com carga real confirma;
   - o uso real pela página (fatia seguinte);
   - nada vai a público antes do P-16 (licença da fonte sem declaração, ADR 0031).
+
+## Emenda 1 (2026-11-25): histórico de votos por deputado
+Espelho de `senator_votes` (ADR 0030, emenda 7), PRs #192 (API) e #194 (página do deputado).
+1. **Rota:** `GET /internal/v1/deputados/<legislatura>-<id>/votos/?pagina=N`, 50 por página, da votação mais recente para a mais antiga (`-voted_on`, `-camara_voting_id`, a mesma ordem da lista; o desempate é do banco para texto).
+2. **Corpo:** `deputado` (`legislatura`, `id_camara`, `nome`), `votos` (por item: `id`, `data`, `orgao`, `descricao`, `aprovacao`, `id_proposicao`, `partido`, `voto`), `pagina`, `total_paginas`, `atribuicao`. `partido` é o do momento do voto; `voto` e `aprovacao` vazios saem `null`. Resposta montada campo a campo.
+3. **404 sem `Deputy`:** quem não tem perfil para o par (legislatura, id) dá 404 mesmo que haja votos; a junção continua por par e sem FK (ADR 0031).
+4. **Página inválida dá 400 antes do 404 do deputado.** É a ordem do `senator_votes`, herdada, **não uma decisão do dono**; o teste a fixa (`test_pagina_malformada_de_deputado_inexistente_da_400_e_nao_404`). Se o dono quiser a ordem contrária, o teste e a view mudam juntos.
+5. **Índice novo:** `CamaraVote(legislature_id, camara_id)` (migration `legislature/0006`). A unique `(voting, camara_id)` começa por `voting` e não serve à busca por deputado. `CREATE INDEX` comum bloqueia escrita na tabela enquanto cria; rodar o `migrate` com o agendador parado, ou aceitar a espera.
+6. **Uma só `atribuicao`:** a da coleta de votos mais recente entre os itens da página (`null` numa página vazia). Os campos da votação (`CamaraVoting`) e o `nome` (`Deputy`) vêm de outros conjuntos e não são citados. **Decisão do dono aberta:** uma atribuição basta, ou o histórico deve devolver as três como o detalhe devolve duas (ADR 0008, decisão 3)?
+7. **Página do deputado:** tabela com Data, Órgão, Descrição, "Aprovação (código da fonte)", Partido e Voto; `voto` nulo aparece como "Sem posição registrada"; o código de `aprovacao` e as siglas saem **como vêm**, com nota de que o significado não foi verificado (ADR 0031). Qualquer falha de `/votos/` derruba o perfil inteiro (como no senador); degradar só a seção é decisão aberta, assim como o tratamento de caracteres bidirecionais em `descricao`.
+
+**Consequências e pontos para o P-16:**
+- Esta é a **primeira rota que reúne o histórico de posições de uma pessoa, com o nome** (o detalhe da votação mostra uma votação por vez); o risco de perfilamento é maior. Continua interna (`/internal/v1/`, o Caddy responde 404 a `/internal/*`), e nada vai a público antes do P-16.
+- Hoje não há retirada de deputado da Câmara (ADR 0026, decisão 1: ele "nunca apaga"). **Se um dia a retirada passar a apagar `Deputy`, ela tem de apagar também os `CamaraVote` pelo par (legislatura, id)**; sem isso o detalhe da votação (já existente) continua mostrando o id e o voto dele. É a pergunta do ADR 0031 ("Pergunta para o P-16") e segue aberta.
+- **Não validado:** o `CREATE INDEX` e o `EXPLAIN` com dado real (a tabela deve estar vazia: nenhuma votação foi coletada); a página contra a API real e no navegador; a collation do PostgreSQL de produção para a ordem do desempate.

@@ -118,7 +118,8 @@ def _execute(dataset, client, run, destination, batch_size, keep_loads):
             # teto durante o fluxo, sem gravar nada.
             result = client.download(dataset.url, destination, max_bytes=plain_csv.MAX_BYTES)
         else:
-            # `zip_csv` (o TSE): teto do próprio ZIP, bem abaixo do 2 GiB do cliente.
+            # Demais formatos (hoje só `zip_csv`, o TSE): teto do próprio ZIP, bem abaixo do
+            # 2 GiB do cliente.
             result = client.download(dataset.url, destination, max_bytes=zip_csv.MAX_DOWNLOAD_BYTES)
     except BlockedError as error:
         return _detail(error), IngestionRun.ErrorCode.BLOCKED

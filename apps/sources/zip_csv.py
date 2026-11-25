@@ -53,6 +53,8 @@ _ZIP_ENCRYPTED_FLAG = 0x1
 # ingestão o passa ao cliente HTTP, que recusa pelo `Content-Length` ou ao passar dele durante o
 # fluxo, sem gravar nada. Decisão do dono (2026-11-25): 256 MiB, ~4x o maior ZIP de candidatos
 # medido (64,7 MB, 2024; o de 2026 tem 3,3 MB; `project/fontes/tse.md`), 8x menor que o do cliente.
+# Vale para QUALQUER dataset `zip_csv`: habilitar um ZIP maior (votação por município e zona, 421 MB
+# em 2026; prestação de contas, 1,36 GB em 2024) exige um teto por conjunto ou nova decisão.
 MAX_DOWNLOAD_BYTES = 256 * 1024**2
 
 _FOREIGN_ERRORS = (

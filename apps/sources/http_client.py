@@ -238,7 +238,7 @@ class PoliteClient:
                         # `read1`: no máximo uma leitura de socket por volta. `read(CHUNK_SIZE)`
                         # só volta com 1 MiB ou no fim e encadearia leituras: um host de 1 byte a
                         # cada 29 s nunca estouraria o `timeout` nem devolveria o controle aqui.
-                        chunk = response.read1(CHUNK_SIZE)
+                        chunk = response.read(CHUNK_SIZE)  # MUTAÇÃO DO COORDENADOR
                         if self._clock() - started > self._total_timeout:
                             # `.15g`: sem notação científica (`:g` daria "1e+06" para 1_000_000).
                             problem = f"acima do prazo de {self._total_timeout:.15g} segundos"

@@ -15,8 +15,8 @@ from pathlib import Path
 import pytest
 from django.core.management import CommandError, call_command
 
-from apps.sources import ckan, json_list, json_senado, json_senado_votacoes, plain_csv
-from apps.sources.ckan import read_license_id
+from apps.sources import json_list, json_senado, json_senado_votacoes, plain_csv
+from apps.sources.ckan import MAX_BYTES, read_license_id
 from apps.sources.http_client import BlockedError, DownloadError, DownloadResult, PoliteClient
 from apps.sources.ingestion import IngestionError, ingest
 from apps.sources.management.commands import ingest_dataset
@@ -643,8 +643,9 @@ def test_csv_simples_com_linha_de_largura_errada_falha_com_malformed_row():
 
 
 # --- Teto de bytes do download por formato (ADR 0031, "limites conhecidos") ---
-# O formato `csv` passa `plain_csv.MAX_BYTES` (100 MB) ao `download`; os demais não passam limite
-# (`None`: vale o teto do cliente). Para não alocar 100 MB, os testes trocam `plain_csv.MAX_BYTES`
+# O formato `csv` passa `plain_csv.MAX_BYTES` (100 MB) ao `download`; só o `zip_csv` não passa
+# limite (`None`: vale o teto do cliente); os formatos JSON e o CKAN passam o teto do próprio
+# leitor (testados mais abaixo). Para não alocar 100 MB, os testes trocam `plain_csv.MAX_BYTES`
 # por um valor pequeno: a ingestão o lê na hora da chamada, e o leitor não é afetado, porque o
 # padrão do `PlainCsvReader` foi fixado na definição da classe.
 
@@ -866,20 +867,20 @@ def _ckan_com_tamanho(tamanho):
 
 @pytest.mark.parametrize("com_tamanho", [True, False], ids=["com_tamanho", "em_fluxo"])
 def test_cliente_real_recusa_ckan_acima_do_teto_com_error_code_download(servidor_csv, com_tamanho):
-    servidor_csv.corpo = _ckan_com_tamanho(ckan.MAX_BYTES + 1)
+    servidor_csv.corpo = _ckan_com_tamanho(MAX_BYTES + 1)
     servidor_csv.com_tamanho = com_tamanho
     porta = servidor_csv.server_address[1]
     dataset = make_dataset(license_check_url=f"http://127.0.0.1:{porta}/pacote")
     run = ingest(dataset, _cliente_http_local())
     assert run.state == IngestionRun.State.FAILED
     assert run.error_code == IngestionRun.ErrorCode.DOWNLOAD
-    assert f"limite de {ckan.MAX_BYTES} bytes" in run.error_detail
+    assert f"limite de {MAX_BYTES} bytes" in run.error_detail
     assert RawRecord.objects.count() == 0
 
 
 @pytest.mark.parametrize("com_tamanho", [True, False], ids=["com_tamanho", "em_fluxo"])
 def test_cliente_real_le_o_ckan_no_teto_exato(servidor_csv, tmp_path, com_tamanho):
-    servidor_csv.corpo = _ckan_com_tamanho(ckan.MAX_BYTES)
+    servidor_csv.corpo = _ckan_com_tamanho(MAX_BYTES)
     servidor_csv.com_tamanho = com_tamanho
     url = f"http://127.0.0.1:{servidor_csv.server_address[1]}/pacote"
     assert read_license_id(_cliente_http_local(), url, tmp_path) == "cc-by"

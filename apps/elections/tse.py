@@ -25,7 +25,8 @@ SOURCE_TIMEZONE = ZoneInfo("America/Sao_Paulo")
 MARKERS = frozenset({"#NULO", "#NULO#", "#NE", "#NE#", "-1", "-3", "-4", "NÃO DIVULGÁVEL", ""})
 COALITION_COMPOSITION_MAX = 2000
 INT16, INT32 = 2**15 - 1, 2**31 - 1
-# Maior SQ_CANDIDATO: 12 dígitos, o `[1-9][0-9]{0,11}` da rota do perfil (`urls.py`).
+# Teto da rota do perfil (`urls.py`, `[1-9][0-9]{0,11}`). Medido: 12 dígitos no ciclo 2026,
+# 42.034 linhas (project/fontes/tse.md, Sessão 39); outros ciclos não medidos.
 SQ_MAX = 10**12 - 1
 
 _DIGITS = re.compile(r"[0-9]{1,18}")

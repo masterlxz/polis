@@ -259,9 +259,12 @@ def test_sq_candidato_acima_de_12_digitos_e_recusado_porque_a_rota_do_perfil_nao
 @pytest.mark.parametrize("padrao", ["9", "1"])
 def test_o_teto_do_sq_no_parser_e_o_mesmo_da_rota_do_perfil(tse, digitos, padrao):
     # Liga as duas pontas: para todo tamanho de 1 a 19 dígitos, o parser aceita o SQ se e só se
-    # a rota `pessoas/<ciclo>-<sq>/` o casa. "9"*n é o maior valor de n dígitos; "1" + "0"*(n-1),
-    # o menor. `resolve()` direto, sem client nem banco.
-    sq = "9" * digitos if padrao == "9" else "1" + "0" * (digitos - 1)
+    # o padrão da rota `pessoas/<ciclo>-<sq>/` o casa. "9"*n é o maior valor de n dígitos;
+    # "1" + "0"*(n-1) é o menor positivo de n dígitos (para n=1 o 0 é recusado à parte, no teste
+    # do SQ 0, e o menor positivo é "1"). `resolve()` direto, sem client nem banco: prova só que
+    # o padrão casa, não que a página responde 200. O `assert aceito == (digitos <= 12)` fixa o
+    # 12 de propósito: quem alargar rota e parser juntos tem de editar este teste.
+    sq ="9" * digitos if padrao == "9" else "1" + "0" * (digitos - 1)
     try:
         tse.parse_row(linha(SQ_CANDIDATO=sq))
         aceito = True
@@ -297,6 +300,8 @@ def test_o_teto_do_sq_nao_muda_o_teto_das_outras_colunas_numericas(tse, coluna, 
 
 @pytest.mark.parametrize("sq", ["1" + "0" * 18, str(2**63 - 1), str(2**63)])
 def test_sq_candidato_de_19_digitos_segue_recusado(tse, sq):
+    # Hoje há duas barreiras para estes valores, e o teste não distingue qual atua: o `_DIGITS`
+    # (1 a 18 dígitos, checado primeiro em `_integer`) e o `SQ_MAX`. Basta uma delas para passar.
     with pytest.raises(tse.RowError) as erro:
         tse.parse_row(linha(SQ_CANDIDATO=sq))
     assert erro.value.column == "SQ_CANDIDATO"

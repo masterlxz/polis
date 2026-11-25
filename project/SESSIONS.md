@@ -2,6 +2,14 @@
 
 Mais recente no topo.
 
+### 2026-11-25 — Sessão 86 (`help_text` de `last_normalization_at`; sessão individual)
+
+- **Pedido**: item (a) do P-21, que o dono escolheu ("vamos de 1") depois de confirmar a migração (AGENTS §4). Sem plan mode: tarefa mecânica, uma string e uma `AlterField`.
+- **Feito (1 PR, em rascunho até o dono mesclar)**: **#165** `ajuda-ultima-normalizacao`: o `help_text` de `Dataset.last_normalization_at` passa a dizer "Escrito pelo agendador depois de cada coleta e pelo normalize_tse quando ele dá certo; vazio se nunca normalizou." (o texto antigo ficou falso com o #160; o campo é somente leitura no admin). Migração `0012_ajuda_da_ultima_normalizacao` escrita à mão (`AlterField`, só estado: sem coluna, índice nem dado). O rótulo ("última normalização tentada em") ficou: o agendador grava tentativas.
+- **Provas (CI, PR de controle; fechado e com a branch apagada)**: #164 (só o modelo, sem a migração, `657df5d`, run 45652978993): **4 falham de 1.629**, todos de migração pendente (`test_nao_ha_migracao_pendente` nos 3 arquivos de modelo e `test_sem_migracao_pendente` em `test_configuracao.py`). Cabeça verde `7cf7cee` (run 45653065963, status e `headSha` conferidos): **1.629 passam**.
+- **Não verificado**: o `sqlmigrate` da 0012 (nada de Django na VM; só o CI confere que ela bate com o modelo); sem revisor adversarial nem mutação (diff de uma string e uma `AlterField`; o controle prova que o CI pega migração faltando); `ruff` não rodou na VM; nada é público (P-16).
+- **Fica**: o item (b) do P-21 (os 4 comandos `normalize_*` da legislatura); o "Fica" da Sessão 85.
+
 ### 2026-11-25 — Sessão 85 (`normalize_tse` limpa a recusa antiga da última normalização; sessão individual)
 
 - **Pedido**: fechar o falso positivo da Sessão 84 (achado I1 do #150), com a skill `/equipe` aberta e, depois da leitura do código, **sessão individual** por decisão do dono: a tarefa é uma só, em série, e dividir geraria conflito no `runbook.md`. Plan mode; plano aprovado; `git commit -s` autorizado. Decisão do dono: **só o `normalize_tse`** (os 4 comandos `normalize_*` da Câmara e do Senado ficam como pendência).

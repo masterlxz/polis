@@ -1,9 +1,8 @@
 from django.core.management.base import BaseCommand, CommandError
-from django.utils import timezone
 
 from apps.elections import normalization
-from apps.sources.models import Dataset
 from apps.sources.normalization import NormalizationRefused as SharedRefused
+from apps.sources.normalization import record_success
 
 
 class Command(BaseCommand):
@@ -49,15 +48,11 @@ class Command(BaseCommand):
 
         # Só no sucesso: a carga mais recente foi normalizada, então a recusa que o agendador
         # gravou antes deixou de valer (senão o painel e o aviso de coleta falhada seguem dizendo
-        # que as retiradas estão paradas). Recusa e falha inesperada não gravam nada aqui: quem
-        # registra esses resultados é o agendador. `update()` troca só estas duas colunas, como
-        # `scheduling._record_normalization`, para não desfazer uma edição feita ao mesmo tempo
-        # no admin. Limite conhecido: se o agendador coletar e recusar uma carga mais nova enquanto
-        # este comando ainda normaliza a anterior (janela de segundos, coleta 1 vez por dia), este
-        # `update()` zera a recusa dela; a próxima passada do agendador a grava de novo.
-        Dataset.objects.filter(pk=dataset.pk).update(
-            last_normalization_at=timezone.now(), last_normalization_error=""
-        )
+        # que as retiradas estão paradas). Limite conhecido: se o agendador coletar e recusar uma
+        # carga mais nova enquanto este comando ainda normaliza a anterior (janela de segundos,
+        # coleta 1 vez por dia), isto zera a recusa dela; a próxima passada do agendador a grava
+        # de novo.
+        record_success(dataset)
         self.stdout.write(
             f"Execução {run.pk}: linhas lidas {result.rows_read}, "
             f"candidaturas únicas {result.unique}, criadas {result.created}, "

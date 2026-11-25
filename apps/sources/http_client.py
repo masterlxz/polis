@@ -33,9 +33,15 @@ Regras que este módulo aplica:
     pela conexão ao ficar pronta); a leitura bloqueada acorda e o erro vira o do prazo. Vale para
     tudo depois que a conexão (e o TLS) fica pronta; a thread nasce antes da abertura e, se vencer
     antes, o socket é cortado ao ser registrado;
-  - NÃO coberto: DNS, conexão TCP e aperto de mão TLS só têm o `timeout` por operação (o socket
-    recebe `min(timeout, total_timeout)`), porque o socket TLS só existe depois do aperto de mão.
-    Um host que goteja o aperto de mão ainda ganha até algumas operações de `timeout`.
+  - abertura (DNS, conexão TCP, aperto de mão TLS e cabeçalhos): o `opener.open` roda numa thread
+    de trabalho (`_Handoff`, nome `polis-abertura`) e a principal espera no máximo `total_timeout`
+    em tempo real. Estourou: o watchdog marca o prazo, corta o socket se já existir, e a thread é
+    ABANDONADA (o `getaddrinfo` não tem timeout nem cancelamento; ela só termina quando o
+    resolvedor do SO desistir, dezenas de segundos). Se ela terminar depois com uma resposta, é
+    ela quem a fecha. Custo: uma thread a mais por download. O aperto de mão TLS, sozinho, já
+    era limitado pelo `timeout` do socket como prazo ÚNICO do handshake inteiro (CPython; o teste
+    de CI o confirma), então o ganho real desta thread é o DNS e a conexão TCP com vários
+    endereços (N x `timeout`), que antes só tinham o teto do resolvedor do SO.
 
 Segurança dos erros: as mensagens citam só o host e o status (e, quando o limite de bytes recusa,
 o número do limite), nunca a URL completa (a query pode ter token), o corpo da resposta nem o
@@ -46,8 +52,14 @@ O módulo não importa Django nem toca no banco. Ligar o cliente ao `Dataset` e 
 (e mapear os erros para `error_code`) é da camada que o usa.
 
 Atenção para quem consome:
-- O cliente NÃO é seguro entre threads: o watchdog da tentativa em curso fica na instância
-  (`_watchdog`). Use uma instância por thread.
+- Use uma instância por thread: as pausas por host e o bloqueio de host (`_last_request`,
+  `_blocked_hosts`) não têm trava. O watchdog é por tentativa e viaja na requisição
+  (`request.watchdog`), então uma thread de abertura abandonada que acorda durante o `download`
+  seguinte registra o socket no watchdog velho (já vencido, que o corta antes do envio), nunca
+  no novo. Threads abandonadas se acumulam enquanto o resolvedor demora (cada uma ainda tenta os
+  endereços depois de acordar, mas o socket é cortado ao ser registrado).
+- Uma exceção inesperada na thread de abertura (não `OSError`, `HTTPException` ou `ValueError`)
+  é relançada na thread principal; se a thread já foi abandonada, ela se perde.
 - O bloqueio de host vale só para a instância; a persistência (`blocked` no `IngestionRun`) é de
   quem chama.
 - Não há proxy do ambiente nem verificação de IP privado: a URL vem do cadastro do `Dataset`.
@@ -75,6 +87,7 @@ BLOCKED_STATUSES = frozenset({401, 403, 451})
 BACKOFF_STATUSES = frozenset({429, 503})
 CHUNK_SIZE = 1024 * 1024
 WATCHDOG_THREAD_NAME = "polis-prazo-total"
+OPEN_THREAD_NAME = "polis-abertura"
 
 
 class _Watchdog:
@@ -93,7 +106,7 @@ class _Watchdog:
         self._sock = None
         self._timer = None
         if seconds != math.inf:
-            self._timer = threading.Timer(min(seconds, threading.TIMEOUT_MAX), self._fire)
+            self._timer = threading.Timer(min(seconds, threading.TIMEOUT_MAX), self.expire)
             self._timer.name = WATCHDOG_THREAD_NAME
             self._timer.daemon = True
             self._timer.start()
@@ -106,7 +119,8 @@ class _Watchdog:
         if expired:
             self._cut(sock)
 
-    def _fire(self):
+    def expire(self):
+        """O prazo venceu: marca e corta o socket, se a conexão já existir."""
         with self._lock:
             self.expired = True
             sock = self._sock
@@ -124,6 +138,61 @@ class _Watchdog:
         if self._timer is not None:
             self._timer.cancel()
             self._timer.join()
+
+
+class _Handoff:
+    """Entrega o resultado de uma thread de trabalho à principal, que pode desistir de esperar.
+
+    `getaddrinfo` (DNS) é uma chamada de C bloqueante, sem timeout e sem como cancelar de fora:
+    só dá para parar de esperar por ela. A principal chama `wait`; se o prazo estoura, a thread é
+    marcada como abandonada e, se ela terminar depois com uma resposta, é ela quem a fecha (senão
+    a conexão vazaria). A decisão "terminou a tempo" ou "foi abandonada" é tomada sob o mesmo lock.
+    """
+
+    def __init__(self):
+        self._lock = threading.Lock()
+        self._done = threading.Event()
+        self._abandoned = False
+        self._result = None
+        self._error = None
+
+    def run(self, function, *args):
+        try:
+            result = function(*args)
+        except Exception as error:  # a principal relança: um erro inesperado não some
+            with self._lock:
+                self._error = error
+                self._done.set()
+            return
+        with self._lock:
+            self._result = result
+            abandoned = self._abandoned
+            self._done.set()
+        if abandoned and result[0] is not None:
+            result[0].close()
+
+    def wait(self, timeout):
+        """True se a thread terminou a tempo; False se estourou (e agora está abandonada).
+
+        Uma interrupção da principal (Ctrl-C) durante a espera também abandona a thread, para ela
+        fechar a resposta que trouxer depois.
+        """
+        try:
+            self._done.wait(timeout)
+        except BaseException:
+            with self._lock:
+                self._abandoned = True
+            raise
+        with self._lock:
+            if self._done.is_set():
+                return True
+            self._abandoned = True
+            return False
+
+    def result(self):
+        if self._error is not None:
+            raise self._error
+        return self._result
 
 
 class _WatchedConnectionMixin:
@@ -146,24 +215,25 @@ class _WatchedHTTPSConnection(_WatchedConnectionMixin, http.client.HTTPSConnecti
     pass
 
 
-class _WatchedHTTPHandler(urllib.request.HTTPHandler):
-    def __init__(self, on_connect):
-        super().__init__()
-        self._connection = functools.partial(_WatchedHTTPConnection, on_connect=on_connect)
+def _watched(connection_class, request):
+    """A conexão avisa o watchdog DESTA requisição (`request.watchdog`), não um da instância.
 
+    Uma thread de abertura abandonada pode acordar durante o `download` seguinte; se o registro
+    fosse feito num watchdog da instância, ela registraria o socket velho no watchdog novo.
+    """
+    return functools.partial(connection_class, on_connect=request.watchdog.register)
+
+
+class _WatchedHTTPHandler(urllib.request.HTTPHandler):
     def http_open(self, req):
-        return self.do_open(self._connection, req)
+        return self.do_open(_watched(_WatchedHTTPConnection, req), req)
 
 
 class _WatchedHTTPSHandler(urllib.request.HTTPSHandler):
-    def __init__(self, on_connect):
-        # Sem `context=`: o contexto é o padrão do urllib (o de `http.client`, com ALPN http/1.1 e
-        # verificação de certificado e de nome), que `https_open` original também usa.
-        super().__init__()
-        self._connection = functools.partial(_WatchedHTTPSConnection, on_connect=on_connect)
-
     def https_open(self, req):
-        return self.do_open(self._connection, req, context=self._context)
+        # `context` é o padrão do urllib (o de `http.client`, com ALPN http/1.1 e verificação de
+        # certificado e de nome), o mesmo que o `https_open` original usa.
+        return self.do_open(_watched(_WatchedHTTPSConnection, req), req, context=self._context)
 
 
 class DownloadError(Exception):
@@ -218,18 +288,15 @@ class PoliteClient:
         self._wall_clock = wall_clock
         self._last_request = {}
         self._blocked_hosts = set()
-        self._watchdog = None
         self._opener = self._build_opener()
 
-    def _register_socket(self, sock):
-        self._watchdog.register(sock)
-
-    def _build_opener(self):
+    @staticmethod
+    def _build_opener():
         # Sem HTTPRedirectHandler (3xx vira erro), sem ProxyHandler, sem File/FTP.
         opener = urllib.request.OpenerDirector()
         for handler in (
-            _WatchedHTTPHandler(self._register_socket),
-            _WatchedHTTPSHandler(self._register_socket),
+            _WatchedHTTPHandler(),
+            _WatchedHTTPSHandler(),
             urllib.request.HTTPDefaultErrorHandler(),
             urllib.request.HTTPErrorProcessor(),
         ):
@@ -262,9 +329,9 @@ class PoliteClient:
         for attempt in range(1, self._max_attempts + 1):
             self._pause(host)
             started = self._clock()
-            watchdog = self._watchdog = _Watchdog(self._total_timeout)
+            watchdog = _Watchdog(self._total_timeout)
             try:
-                response, status, retry_after, network_failed = self._open(url)
+                response, status, retry_after, network_failed = self._open(url, watchdog)
                 if response is not None:
                     return self._save(response, host, Path(destination), limit, started, watchdog)
             finally:
@@ -290,9 +357,38 @@ class PoliteClient:
                 self._sleep(wait)
         self._last_request[host] = self._clock()
 
-    def _open(self, url):
-        """Devolve (resposta, status, Retry-After, falha de rede); nunca levanta."""
+    def _open(self, url, watchdog):
+        """Abre `url` numa thread e espera no máximo o prazo total (DNS, TCP, TLS e cabeçalhos).
+
+        Estourou: o watchdog marca o prazo (e corta o socket, se já existir) e a thread é
+        abandonada; `download` converte isso na mensagem do prazo.
+        """
+        handoff = _Handoff()
+        worker = threading.Thread(
+            target=handoff.run,
+            args=(self._open_blocking, url, watchdog),
+            name=OPEN_THREAD_NAME,
+            daemon=True,
+        )
+        try:
+            worker.start()
+        except RuntimeError:  # "can't start new thread": falta de recurso é falha de rede
+            return None, None, None, True
+        total = None if self._total_timeout == math.inf else self._total_timeout
+        if not handoff.wait(None if total is None else min(total, threading.TIMEOUT_MAX)):
+            watchdog.expire()
+            return None, None, None, True
+        return handoff.result()
+
+    @staticmethod
+    def _new_request(url, watchdog):
         request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})  # noqa: S310
+        request.watchdog = watchdog  # lido por `_watched`: o registro do socket é desta tentativa
+        return request
+
+    def _open_blocking(self, url, watchdog):
+        """Devolve (resposta, status, Retry-After, falha de rede); só levanta o inesperado."""
+        request = self._new_request(url, watchdog)
         response = status = retry_after = None
         network_failed = False
         try:

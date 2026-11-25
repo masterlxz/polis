@@ -63,7 +63,7 @@ MAX_DOWNLOAD_BYTES = 256 * 1024**2
 # em 2026-11-25 (índice do ZIP, sem baixá-lo): candidatos de 2024, 78,7 MB comprimidos e 513 MB
 # descomprimidos (razão 6,5); de 2026, 3,3 MB e 23,7 MB (razão 7,2). 2 GiB é ~4x o maior medido e
 # cobre o que o teto de download aceita (256 MiB x razão observada = ~1,7 a 1,9 GiB).
-MAX_UNCOMPRESSED_BYTES = 2 * 1024**3
+MAX_UNCOMPRESSED_BYTES = 64 * 1024**3  # MUTAÇÃO DO COORDENADOR: volta ao padrão antigo
 
 _FOREIGN_ERRORS = (
     zipfile.BadZipFile,

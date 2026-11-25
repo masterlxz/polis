@@ -965,9 +965,10 @@ def test_normalizacao_que_espera_num_conjunto_sem_resultado_nao_grava_concluida(
     )
     dataset = make_dataset()
 
-    coletar(agendador)
+    resultado = coletar(agendador)
 
     dataset.refresh_from_db()
+    assert LINHA_DE_ESPERA in resultado.lines  # o normalizador foi chamado e esperou
     assert dataset.last_normalization_error == ""
     assert dataset.last_normalization_at is None
 
@@ -983,6 +984,7 @@ def test_a_linha_de_espera_nao_cita_a_mensagem_da_excecao(
 
     resultado = coletar(agendador)
 
+    assert LINHA_DE_ESPERA in resultado.lines
     assert segredo not in " ".join(resultado.lines)
 
 

@@ -23,9 +23,12 @@ Regras que este módulo aplica:
     socket por volta, em vez de `read`, que encadeia leituras) e o prazo é conferido depois de cada
     leitura, inclusive a que devolve o fim. O corte vem na primeira checagem depois do prazo, então
     pode vir até um `timeout` por operação depois dele. Um download completo cuja leitura final
-    passa do prazo falha (intencional);
+    passa do prazo falha (intencional). Com `Content-Length`, o `read1` que completa o corpo já
+    fecha a conexão e o seguinte devolve `b""` sem I/O, então um "fim lento" só ocorre em
+    resposta chunked ou sem `Content-Length`;
   - conexão, TLS e cabeçalhos: só são conferidos depois da primeira leitura do corpo; antes disso
-    vale só o `timeout` por operação;
+    vale só o `timeout` por operação (o socket recebe `min(timeout, total_timeout)`, então com
+    `total_timeout < timeout` essa fase é limitada ao `total_timeout` por operação);
   - resposta `chunked`: a linha do tamanho de cada pedaço, as extensões e os trailers são lidos
     pelo `http.client` com `readline` (até 64 KiB) e `_safe_read`, possivelmente em mais de uma
     leitura de socket dentro de uma única chamada de `read1`. Nesses trechos, e na fase de
@@ -240,7 +243,7 @@ class PoliteClient:
                         # cada 29 s nunca estouraria o `timeout` nem devolveria o controle aqui.
                         chunk = response.read1(CHUNK_SIZE)
                         if self._clock() - started > self._total_timeout:
-                            # `.15g`: sem notação científica (`:g` daria "1e+06" para 1_000_000).
+                            # `.15g`: sem notação científica até 1e15 (`:g` daria "1e+06").
                             problem = f"acima do prazo de {self._total_timeout:.15g} segundos"
                             break
                         if not chunk:

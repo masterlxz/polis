@@ -332,6 +332,33 @@ def test_falha_inesperada_na_gravacao_desfaz_tudo_e_nao_vaza_o_detalhe(dataset, 
     assert contagens() == (0, 0, 0)
 
 
+def test_falha_inesperada_mostra_so_a_classe_da_excecao(dataset, monkeypatch):
+    carga(dataset, [ana()])
+
+    def falha(self, objs, *args, **kwargs):
+        raise RuntimeError(f"DETAIL: Failing row contains ({SEGREDO})")
+
+    monkeypatch.setattr(QuerySet, "bulk_create", falha)
+    with pytest.raises(CommandError) as erro:
+        normalizar()
+    assert str(erro.value) == (
+        "A normalização falhou de forma inesperada (RuntimeError); nada foi gravado."
+    )
+
+
+def test_classe_com_nome_que_nao_e_identificador_vira_interrogacao(dataset, monkeypatch):
+    carga(dataset, [ana()])
+    forjada = type("Falsa\nforjada: tudo certo", (Exception,), {})
+
+    def falha(self, objs, *args, **kwargs):
+        raise forjada(SEGREDO)
+
+    monkeypatch.setattr(QuerySet, "bulk_create", falha)
+    with pytest.raises(CommandError) as erro:
+        normalizar()
+    assert str(erro.value) == "A normalização falhou de forma inesperada (?); nada foi gravado."
+
+
 # --- Saída e rede ---
 
 

@@ -182,3 +182,38 @@ def test_falha_inesperada_do_comando_nao_mexe_no_estado_gravado(comando, cenario
     assert SEGREDO not in str(erro.value)
     for conjunto in c.normalizados:
         assert estado(conjunto) == (RECUSA_ANTIGA, c.antes)
+
+
+@pytest.mark.parametrize("comando", COMANDOS)
+def test_falha_inesperada_do_comando_mostra_so_a_classe_da_excecao(comando, cenario, monkeypatch):
+    modulo = import_module(COMANDOS[comando][0])
+
+    def falha(*_runs):
+        raise RuntimeError(f"DETAIL: Failing row contains ({SEGREDO})")
+
+    monkeypatch.setattr(modulo, "normalize", falha)
+    cenario(comando)
+
+    with pytest.raises(CommandError) as erro:
+        rodar(comando)
+
+    assert str(erro.value) == (
+        "A normalização falhou de forma inesperada (RuntimeError); nada foi gravado."
+    )
+
+
+@pytest.mark.parametrize("comando", COMANDOS)
+def test_classe_com_nome_que_nao_e_identificador_vira_interrogacao(comando, cenario, monkeypatch):
+    modulo = import_module(COMANDOS[comando][0])
+    forjada = type("Falsa\nforjada: tudo certo", (Exception,), {})
+
+    def falha(*_runs):
+        raise forjada(SEGREDO)
+
+    monkeypatch.setattr(modulo, "normalize", falha)
+    cenario(comando)
+
+    with pytest.raises(CommandError) as erro:
+        rodar(comando)
+
+    assert str(erro.value) == "A normalização falhou de forma inesperada (?); nada foi gravado."

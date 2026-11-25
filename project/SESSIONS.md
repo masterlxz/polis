@@ -2,6 +2,14 @@
 
 Mais recente no topo.
 
+### 2026-11-25 — Sessão 92 (os comandos `normalize_*` mostram a classe do erro inesperado; sessão individual)
+
+- **Pedido**: o item "os 5 comandos `normalize_*` dizem 'falhou de forma inesperada' sem a classe" do "Fica" das Sessões 90 e 91. Conferido no código antes de recomendar: só o agendador (`scheduling.py`) mostrava a classe. Receita mecânica, sem plan mode; `git commit -s`.
+- **Feito (1 PR, em rascunho até o dono mesclar)**: **#186** `normalize-mostra-a-classe-do-erro`. O nome da classe (só `__name__`, cortado em 80, `?` se não for identificador) passou de `scheduling.py` para `unexpected_error_class` em `apps/sources/normalization.py`, e o agendador e os 5 comandos (`normalize_tse`, `normalize_camara`, `normalize_camara_votacoes`, `normalize_senado`, `normalize_senado_votacoes`) usam o mesmo. Mensagem do comando: "A normalização falhou de forma inesperada (RuntimeError); nada foi gravado." Nunca a mensagem da exceção nem encadeamento (`from None`, `__context__` continua `None`). `CLASS_NAME_MAX_LENGTH` mudou de módulo (ninguém mais o importava).
+- **Provas (CI)**: controle só-de-teste `016b711` (#186): **10 falham** (2 por comando, por diferença de mensagem), 1.666 antigos passam. Cabeça de código `3b875d5`: **1.676 passam**, 5 workflows verdes. Mutações (PRs descartáveis fechados, branches apagadas): #187 (sem a checagem `isidentifier`, `51e76d6`): **7 falham** (os 5 novos de `?` e 2 do agendador); #188 (o helper usa `str(error)`, `8bb3cfc`): **15 falham** (os 5 novos de classe e 10 do agendador). Em todas, falha de asserção (nenhum erro de compilação ou de lint).
+- **Não verificado**: `ruff format --check` e `ruff check` não rodaram na VM (o CI é o juiz); o texto novo não foi visto num erro real de produção (só com exceções forjadas nos testes).
+- **Fica**: o do "Fica" da Sessão 91, sem este item: na coleta real, olhar se algum download termina com "acima do prazo"; coletar a Câmara de verdade e a página das votações; teto por conjunto do TSE; rótulo `schema` do teto descomprimido (decisão: código novo ou `download`); `error_class = ""` do #148; histórico de votos por deputado; P-16 sobre `CamaraVote`; `ANO_ELEICAO`.
+
 ### 2026-11-25 — Sessão 91 (P-20: watchdog do prazo total do download; sessão individual)
 
 - **Pedido**: "vamos de P-20". O P-20 já estava em **Resolvidas** no `PENDING.md` (decisão da Sessão 84: ficar com `read1`, watchdog adiado "para decidir com medição"); eu o apresentei na abertura como pendência em aberto, sem checar a seção da tabela. O dono quis fazê-lo mesmo assim, antes da medição da coleta real.

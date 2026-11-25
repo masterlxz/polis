@@ -1,7 +1,7 @@
 from django.core.management.base import BaseCommand, CommandError
 
 from apps.legislature import normalization
-from apps.sources.normalization import record_success
+from apps.sources.normalization import record_success, unexpected_error_class
 
 
 class Command(BaseCommand):
@@ -25,13 +25,14 @@ class Command(BaseCommand):
             result = normalization.normalize(run)
         except normalization.NormalizationRefused as error:
             raise CommandError(str(error)) from None
-        except Exception:
+        except Exception as error:
             # A mensagem de um erro do banco cita valores da linha: não é repassada nem
-            # encadeada (mesmo cuidado de apps/sources/ingestion.py).
+            # encadeada (mesmo cuidado de apps/sources/ingestion.py); só o nome da classe.
             failed = True
+            error_class = unexpected_error_class(error)
         if failed:
             raise CommandError(
-                "A normalização falhou de forma inesperada; nada foi gravado."
+                f"A normalização falhou de forma inesperada ({error_class}); nada foi gravado."
             ) from None
 
         record_success(dataset)  # só no sucesso: limpa a recusa que o agendador gravou antes

@@ -31,12 +31,11 @@ from django.utils.module_loading import import_string
 
 from .ingestion import IngestionError, ingest
 from .models import Dataset, IngestionRun, Source
-from .normalization import NormalizationRefused, NormalizationWaiting
+from .normalization import NormalizationRefused, NormalizationWaiting, unexpected_error_class
 
 RETRY_HOURS = 6
 ERROR_MAX_LENGTH = 300  # o tamanho de `Dataset.last_normalization_error`
 UNEXPECTED_ERROR_TEXT = "Falha inesperada na normalização (veja o log do agendador)."
-CLASS_NAME_MAX_LENGTH = 80  # corte do nome da classe da exceção no log
 ALLOWED_MINUTES = [minute for minute in range(1, 60) if minute % 5]
 SCHEDULABLE_STATUSES = (Source.Status.INTEGRATING, Source.Status.ACTIVE)
 
@@ -166,8 +165,7 @@ def _normalize(dataset, name, result, now):
         return
     except Exception as error:
         failed = True
-        class_name = type(error).__name__  # só o nome: nunca a exceção
-        error_class = (class_name if class_name.isidentifier() else "?")[:CLASS_NAME_MAX_LENGTH]
+        error_class = unexpected_error_class(error)  # só o nome: nunca a exceção
     if failed:
         result.lines.append(f"{name}: normalização falhou de forma inesperada ({error_class})")
         result.normalization_failed += 1

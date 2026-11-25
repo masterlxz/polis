@@ -114,7 +114,8 @@ def _execute(dataset, client, run, destination, batch_size, keep_loads):
         elif dataset.format == dataset.Format.JSON_SENADO_VOTACOES:
             result = fetch_senate_votings(client, dataset.url, destination)
         elif dataset.format == dataset.Format.CSV:
-            # Mesmo teto do leitor (ADR 0031): recusa antes de baixar até o teto do cliente (2 GiB).
+            # Mesmo teto do leitor (ADR 0031): o cliente recusa no Content-Length ou ao passar do
+            # teto durante o fluxo, sem gravar nada.
             result = client.download(dataset.url, destination, max_bytes=plain_csv.MAX_BYTES)
         else:
             result = client.download(dataset.url, destination)

@@ -15,9 +15,10 @@ Regras que este módulo aplica:
   Falha não deixa arquivo parcial nem altera um arquivo anterior (ADR 0005, decisão 9: falha
   técnica nunca apaga).
 
-Segurança dos erros: as mensagens citam só o host e o status, nunca a URL completa (a query pode
-ter token), o corpo da resposta nem o texto da exceção original. Os erros são levantados fora de
-qualquer `except`, então não carregam `__context__`.
+Segurança dos erros: as mensagens citam só o host e o status (e, quando o limite de bytes recusa,
+o número do limite), nunca a URL completa (a query pode ter token), o corpo da resposta nem o
+texto da exceção original. Os erros são levantados fora de qualquer `except`, então não carregam
+`__context__`.
 
 O módulo não importa Django nem toca no banco. Ligar o cliente ao `Dataset` e ao `IngestionRun`
 (e mapear os erros para `error_code`) é da camada que o usa.
@@ -192,7 +193,7 @@ class PoliteClient:
         last_modified = response.headers.get("Last-Modified", "")
         if declared is not None and declared > limit:
             response.close()
-            raise DownloadError(f"{host} anunciou arquivo acima do limite de bytes.")
+            raise DownloadError(f"{host} anunciou arquivo acima do limite de {limit} bytes.")
 
         digest = hashlib.sha256()
         received = 0
@@ -208,7 +209,7 @@ class PoliteClient:
                     while chunk := response.read(CHUNK_SIZE):
                         received += len(chunk)
                         if received > limit:
-                            problem = "acima do limite de bytes"
+                            problem = f"acima do limite de {limit} bytes"
                             break
                         digest.update(chunk)
                         file.write(chunk)

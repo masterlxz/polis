@@ -10,8 +10,9 @@ O que muda para os arquivos anuais da Câmara (medidos em 2026-11-24):
 - `allow_multiline_records` existe porque `votacoes` tem registros em mais de uma linha física, e
   `max_record_lines` (padrão 100; o maior registro real ocupa 13) limita o quanto um registro
   aceito pode juntar, porque o `csv.reader` junta linhas enquanto houver aspas abertas;
-- `max_bytes` (padrão 100 MB; o maior arquivo real foi 58 MB) recusa a carga antes de ler. Ele
-  protege o parse, não o download: o cliente HTTP aceita até 2 GiB antes de o leitor ver o arquivo;
+- `max_bytes` (padrão 100 MB; o maior arquivo real foi 58 MB) recusa a carga antes de ler. A
+  ingestão passa o mesmo valor ao `download` do cliente HTTP, que recusa antes: este teto é a
+  segunda barreira, para o arquivo que chegar ao leitor por outro caminho;
 - só arquivo regular: diretório, FIFO e dispositivo são recusados.
 
 Erro de sistema (`OSError`: arquivo sumiu, disco, permissão) não é "CSV inválido" e sobe como no

@@ -162,7 +162,7 @@ class _Handoff:
             self._result = result
             abandoned = self._abandoned
             self._done.set()
-        if abandoned and result[0] is not None:
+        if abandoned and result[0] is None:
             result[0].close()
 
     def wait(self, timeout):

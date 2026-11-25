@@ -40,6 +40,7 @@ SQ = 1_000_000_001
 # (nome do caso, URL normal que devolve 200 com os registros de `registros`)
 ROTAS = [
     ("deputado", f"/internal/v1/deputados/{LEGISLATURA}-{ID_CAMARA}/"),
+    ("votos-do-deputado", f"/internal/v1/deputados/{LEGISLATURA}-{ID_CAMARA}/votos/"),
     ("senador", f"/internal/v1/senadores/{CODIGO_SENADOR}/"),
     ("votos-do-senador", f"/internal/v1/senadores/{CODIGO_SENADOR}/votos/"),
     ("votacao-do-senado", f"/internal/v1/senado/votacoes/{CODIGO_VOTACAO}/"),

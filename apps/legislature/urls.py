@@ -14,7 +14,7 @@ urlpatterns = [
         name="deputy-profile",
     ),
     re_path(
-        r"^deputados/(?P<legislature>[1-9][0-9]{0,8})-(?P<camara_id>[1-9][0-9]{0,8})/votos/$",
+        r"^deputados/(?P<legislature>[1-9][0-9]{0,7})-(?P<camara_id>[1-9][0-9]{0,8})/votos/$",
         views.deputy_votes,
         name="deputy-votes",
     ),

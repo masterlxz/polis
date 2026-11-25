@@ -11,6 +11,7 @@ from zoneinfo import ZoneInfo
 
 import pytest
 from django.core.exceptions import ValidationError
+from django.urls import Resolver404, resolve
 
 from apps.elections.models import Candidacy, Election, Person
 from apps.sources.catalog import DATASETS
@@ -226,14 +227,72 @@ def test_sq_candidato_zero_e_recusado_porque_a_rota_do_perfil_nao_o_casa(tse, sq
     assert erro.value.column == "SQ_CANDIDATO"
 
 
-@pytest.mark.parametrize("sq", ["1", "250001234567", "9" * 18])
-def test_sq_candidato_positivo_hoje_aceito_ate_18_digitos(tse, sq):
-    # CARACTERIZAÇÃO do estado atual, não contrato desejado: o teto efetivo é o de `_DIGITS`
-    # (18 dígitos), menor que o INT64 (19). Há descasamento conhecido com a rota do perfil
-    # (`[1-9][0-9]{0,11}`, 12 dígitos): um SQ de 13 a 18 dígitos passa aqui e não teria página.
-    # Fica para outra tarefa; o caso "9" * 18 não é um valor que se queira garantir.
+@pytest.mark.parametrize(
+    "sq",
+    # O teto 999999999999 (12 dígitos) é o do padrão `[1-9][0-9]{0,11}` da rota `pessoas/`
+    # (apps/elections/urls.py). "250001234567" e "100000000000" não são o SQ da fixture.
+    ["1", "9", "250001234567", "100000000000", "999999999999"],
+)
+def test_sq_candidato_de_1_a_12_digitos_e_aceito(tse, sq):
     resultado = tse.parse_row(linha(SQ_CANDIDATO=sq))
     assert resultado.person["tse_candidate_id"] == int(sq)
+
+
+@pytest.mark.parametrize(
+    "sq",
+    [
+        "1000000000000",  # 10**12: o primeiro valor acima do teto, 13 dígitos
+        "9999999999999",
+        "1" + "0" * 17,  # 18 dígitos: o teto antigo, de `_DIGITS`
+        "9" * 18,
+    ],
+)
+def test_sq_candidato_acima_de_12_digitos_e_recusado_porque_a_rota_do_perfil_nao_o_casa(tse, sq):
+    # Um SQ de 13 a 18 dígitos viraria uma pessoa sem página (a rota só casa até 12). A recusa
+    # é a mesma de qualquer linha inválida: RowError com o nome da coluna.
+    with pytest.raises(tse.RowError) as erro:
+        tse.parse_row(linha(SQ_CANDIDATO=sq))
+    assert erro.value.column == "SQ_CANDIDATO"
+
+
+@pytest.mark.parametrize("digitos", range(1, 20))
+@pytest.mark.parametrize("padrao", ["9", "1"])
+def test_o_teto_do_sq_no_parser_e_o_mesmo_da_rota_do_perfil(tse, digitos, padrao):
+    # Liga as duas pontas: para todo tamanho de 1 a 19 dígitos, o parser aceita o SQ se e só se
+    # a rota `pessoas/<ciclo>-<sq>/` o casa. "9"*n é o maior valor de n dígitos; "1" + "0"*(n-1),
+    # o menor. `resolve()` direto, sem client nem banco.
+    sq = "9" * digitos if padrao == "9" else "1" + "0" * (digitos - 1)
+    try:
+        tse.parse_row(linha(SQ_CANDIDATO=sq))
+        aceito = True
+    except tse.RowError:
+        aceito = False
+    try:
+        resolve(f"/internal/v1/pessoas/2026-{sq}/")
+        roteado = True
+    except Resolver404:
+        roteado = False
+    assert aceito == roteado, f"{digitos} dígitos: parser={aceito}, rota={roteado}"
+    assert aceito == (digitos <= 12)
+
+
+@pytest.mark.parametrize(
+    ("coluna", "parte", "campo", "teto"),
+    [
+        ("NR_CANDIDATO", "candidacy", "ballot_number", 2**31 - 1),
+        ("CD_ELEICAO", "election", "tse_code", 2**31 - 1),
+        ("NR_PARTIDO", "candidacy", "party_number", 2**15 - 1),
+    ],
+)
+def test_o_teto_do_sq_nao_muda_o_teto_das_outras_colunas_numericas(tse, coluna, parte, campo, teto):
+    # Guarda de regressão (passa antes e depois): cada coluna segue com o seu teto; o valor no
+    # teto passa e chega ao campo, um a mais não. Pega quem trocasse o teto de todas as colunas
+    # em vez de só o do SQ_CANDIDATO.
+    resultado = tse.parse_row(linha(**{coluna: str(teto)}))
+    assert getattr(resultado, parte)[campo] == teto
+    with pytest.raises(tse.RowError) as erro:
+        tse.parse_row(linha(**{coluna: str(teto + 1)}))
+    assert erro.value.column == coluna
 
 
 @pytest.mark.parametrize("sq", ["1" + "0" * 18, str(2**63 - 1), str(2**63)])

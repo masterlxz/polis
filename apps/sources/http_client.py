@@ -366,7 +366,7 @@ class PoliteClient:
                 # O watchdog desligou o socket: o fim da leitura (limpo ou com erro) é do prazo.
                 # Vale também para o download que terminou no mesmo instante, como a regra do
                 # relógio (a leitura final que passa do prazo falha).
-                problem = "prazo"
+                problem = "interrompido"
             if problem is None and declared is not None and received != declared:
                 problem = "cortado"
             if problem is None:

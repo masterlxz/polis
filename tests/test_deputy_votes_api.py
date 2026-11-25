@@ -239,7 +239,11 @@ def test_nada_de_id_interno_totais_nem_dado_de_outro_deputado(client, historico)
 
     assert not set(_todas_as_chaves(corpo)) & internos
     assert "Beto Exemplo" not in str(corpo)
-    assert str(OUTRO) not in str(corpo)
+    # Por valor, não por substring de `str(corpo)`: um id curto casaria com datas e outros ids.
+    assert corpo["deputado"]["id_camara"] == DEPUTADO
+    valores_dos_itens = [valor for item in corpo["votos"] for valor in item.values()]
+    assert OUTRO not in valores_dos_itens
+    assert OUTRO not in corpo["deputado"].values()
 
 
 # --- Conteúdo ------------------------------------------------------------------------------------
@@ -465,6 +469,43 @@ def test_pagina_malformada_da_400(client, historico, pagina):
     assert resposta.json() == {"erro": "página inválida"}
 
 
+@pytest.mark.parametrize("pagina", ["abc", "0"])
+def test_pagina_malformada_de_deputado_inexistente_da_400_e_nao_404(client, historico, pagina):
+    """Fixa a ordem "página inválida (400) antes de procurar o deputado (404)".
+
+    Essa ordem é HERDADA de `senator_votes`; não foi decisão do dono, e mudá-la (procurar o
+    `Deputy` antes de validar a página) é decisão aberta: se for tomada, este teste muda junto.
+    Hoje a ordem está em `deputy_votes`: o `_PAGE_PATTERN.fullmatch` vem antes do
+    `Deputy.objects.filter`. O par 58-999 não tem `Deputy`; o controle mostra que, sem `pagina`,
+    ele dá 404, então o 400 abaixo só pode vir da validação da página.
+    """
+    _ok(client, _url())  # controle: a rota existe para um deputado que existe
+    assert client.get(_url(58, 999)).status_code == 404  # controle: o par não tem perfil
+
+    resposta = client.get(_url(58, 999), {"pagina": pagina})
+
+    assert resposta.status_code == 400
+    assert resposta.json() == {"erro": "página inválida"}
+
+
+@pytest.mark.parametrize(
+    "legislatura, camara_id", [(999999999, DEPUTADO), (LEGISLATURA, 999999999)]
+)
+def test_id_de_9_digitos_e_valido_e_chega_ao_banco(client, run, legislatura, camara_id):
+    # 9 dígitos é o maior que a rota aceita (`{0,8}` depois do primeiro): cabe no int32 do parser.
+    _deputado(run, camara_id, legislatura=legislatura, name="Deputado de 9 dígitos")
+    _voto(_votacao(run, "5-1"), camara_id, "Sim", legislatura=legislatura)
+
+    corpo = _ok(client, _url(legislatura, camara_id))
+
+    assert corpo["deputado"] == {
+        "legislatura": legislatura,
+        "id_camara": camara_id,
+        "nome": "Deputado de 9 dígitos",
+    }
+    assert [(i["id"], i["voto"]) for i in corpo["votos"]] == [("5-1", "Sim")]
+
+
 @pytest.mark.parametrize("pagina", ["1", "2", "9999"])
 def test_pagina_na_forma_canonica_segue_valida(client, historico, pagina):
     corpo = _ok(client, f"{_url()}?pagina={pagina}")
@@ -496,6 +537,42 @@ def test_pagina_de_50_em_50(client, run):
     assert primeira["votos"][0]["id"] == "1-51"  # o mais recente
     assert [i["id"] for i in segunda["votos"]] == ["1-1"]  # o mais antigo
     assert (segunda["pagina"], segunda["total_paginas"]) == (2, 2)
+
+
+def _votar_em(run, quantidade):
+    """`quantidade` votações, uma por dia, com o voto do `DEPUTADO` em cada uma."""
+    for numero in range(1, quantidade + 1):
+        dia = date(2025, 1, 1) + timedelta(days=numero)
+        _voto(_votacao(run, f"2-{numero}", voted_on=dia), DEPUTADO, "Sim")
+
+
+def test_exatamente_50_votos_cabem_em_1_pagina(client, run):
+    # Borda da conta de `total_paginas`: 50 votos são 1 página, não 2 (`total // 50 + 1` erraria).
+    _deputado(run)
+    _votar_em(run, 50)
+
+    primeira = _ok(client, _url())
+    alem = _ok(client, f"{_url()}?pagina=2")
+
+    assert (primeira["pagina"], primeira["total_paginas"]) == (1, 1)
+    assert len(primeira["votos"]) == 50
+    assert alem["votos"] == []
+    assert (alem["pagina"], alem["total_paginas"]) == (2, 1)
+    assert alem["atribuicao"] is None
+
+
+def test_exatamente_100_votos_sao_2_paginas(client, run):
+    # Borda de múltiplo exato: 100 votos são 2 páginas, não 3 (`total // 50 + 1` erraria).
+    _deputado(run)
+    _votar_em(run, 100)
+
+    segunda = _ok(client, f"{_url()}?pagina=2")
+    terceira = _ok(client, f"{_url()}?pagina=3")
+
+    assert (segunda["pagina"], segunda["total_paginas"]) == (2, 2)
+    assert len(segunda["votos"]) == 50
+    assert terceira["votos"] == []
+    assert terceira["total_paginas"] == 2
 
 
 def test_pagina_alem_da_ultima_devolve_lista_vazia(client, historico):

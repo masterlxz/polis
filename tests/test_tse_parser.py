@@ -264,7 +264,7 @@ def test_o_teto_do_sq_no_parser_e_o_mesmo_da_rota_do_perfil(tse, digitos, padrao
     # do SQ 0, e o menor positivo é "1"). `resolve()` direto, sem client nem banco: prova só que
     # o padrão casa, não que a página responde 200. O `assert aceito == (digitos <= 12)` fixa o
     # 12 de propósito: quem alargar rota e parser juntos tem de editar este teste.
-    sq ="9" * digitos if padrao == "9" else "1" + "0" * (digitos - 1)
+    sq = "9" * digitos if padrao == "9" else "1" + "0" * (digitos - 1)
     try:
         tse.parse_row(linha(SQ_CANDIDATO=sq))
         aceito = True

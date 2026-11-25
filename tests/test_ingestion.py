@@ -6,14 +6,17 @@ O cliente é falso: escreve um ZIP pequeno no destino ou levanta o erro combinad
 import hashlib
 import io
 import json
+import threading
 import zipfile
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from io import StringIO
 from pathlib import Path
 
 import pytest
 from django.core.management import CommandError, call_command
 
-from apps.sources.http_client import BlockedError, DownloadError, DownloadResult
+from apps.sources import plain_csv
+from apps.sources.http_client import BlockedError, DownloadError, DownloadResult, PoliteClient
 from apps.sources.ingestion import IngestionError, ingest
 from apps.sources.management.commands import ingest_dataset
 from apps.sources.models import Dataset, IngestionRun, RawRecord, Source
@@ -636,3 +639,120 @@ def test_csv_simples_com_linha_de_largura_errada_falha_com_malformed_row():
     assert run.error_code == IngestionRun.ErrorCode.MALFORMED_ROW
     assert run.rows_loaded == 0
     assert RawRecord.objects.count() == 0
+
+
+# --- Teto de bytes do download por formato (ADR 0031, "limites conhecidos") ---
+# O formato `csv` passa `plain_csv.MAX_BYTES` (100 MB) ao `download`; os demais não passam limite
+# (`None`: vale o teto do cliente). Para não alocar 100 MB, os testes trocam `plain_csv.MAX_BYTES`
+# por um valor pequeno: a ingestão o lê na hora da chamada, e o leitor não é afetado, porque o
+# padrão do `PlainCsvReader` foi fixado na definição da classe.
+
+LINHAS_CSV = ("2641546-7;Sim;204379;X", "2641546-7;Não;160976;Y")
+
+
+def test_conjunto_csv_passa_o_teto_do_leitor_ao_download():
+    cliente = FakeClient(csv_ok(*LINHAS_CSV))
+    run = ingest(dataset_csv(), cliente)
+    assert run.state == IngestionRun.State.SUCCEEDED
+    assert cliente.max_bytes_usados == [plain_csv.MAX_BYTES]
+
+
+def test_conjunto_csv_recusa_download_acima_do_teto_e_nao_grava_nada(monkeypatch):
+    dados = csv_ok(*LINHAS_CSV)
+    monkeypatch.setattr(plain_csv, "MAX_BYTES", len(dados) - 1)
+    cliente = FakeClient(dados)
+    run = ingest(dataset_csv(), cliente)
+    assert cliente.max_bytes_usados == [len(dados) - 1]
+    assert run.state == IngestionRun.State.FAILED
+    assert run.error_code == IngestionRun.ErrorCode.DOWNLOAD
+    assert run.rows_loaded == 0
+    assert RawRecord.objects.count() == 0
+
+
+def test_conjunto_csv_com_arquivo_exatamente_no_teto_e_aceito(monkeypatch):
+    dados = csv_ok(*LINHAS_CSV)
+    monkeypatch.setattr(plain_csv, "MAX_BYTES", len(dados))
+    run = ingest(dataset_csv(), FakeClient(dados))
+    assert run.state == IngestionRun.State.SUCCEEDED
+    assert run.rows_loaded == len(LINHAS_CSV)
+
+
+def test_conjunto_zip_csv_do_mesmo_tamanho_nao_e_recusado_nem_recebe_limite(monkeypatch):
+    # Discrimina o ramo: o mesmo teto que recusaria um conjunto `csv` não alcança o `zip_csv`.
+    dados = zip_ok("1;ANA", "2;BIA")
+    monkeypatch.setattr(plain_csv, "MAX_BYTES", len(dados) - 1)
+    cliente = FakeClient(dados)
+    run = ingest(make_dataset(), cliente)
+    assert cliente.max_bytes_usados == [None]
+    assert run.state == IngestionRun.State.SUCCEEDED
+    assert run.rows_loaded == 2
+
+
+# Com o `PoliteClient` real, contra um servidor HTTP local: junta o ramo da ingestão ao limite do
+# cliente (os testes acima só provam o que a ingestão passa; o limite em si é testado em
+# `test_http_client.py`).
+
+
+class _CsvHandler(BaseHTTPRequestHandler):
+    def log_message(self, *args):
+        pass
+
+    def do_GET(self):
+        self.send_response(200)
+        if self.server.com_tamanho:
+            self.send_header("Content-Length", str(len(self.server.corpo)))
+        self.end_headers()
+        try:
+            self.wfile.write(self.server.corpo)
+        except BrokenPipeError, ConnectionResetError:
+            pass
+
+
+@pytest.fixture
+def servidor_csv():
+    srv = ThreadingHTTPServer(("127.0.0.1", 0), _CsvHandler)
+    srv.corpo = b""
+    srv.com_tamanho = True
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    yield srv
+    srv.shutdown()
+    srv.server_close()
+
+
+def _dataset_csv_no_servidor(srv, dados, com_tamanho):
+    srv.corpo = dados
+    srv.com_tamanho = com_tamanho
+    dataset = dataset_csv()
+    dataset.url = f"http://127.0.0.1:{srv.server_address[1]}/votos-2026.csv"
+    dataset.save(update_fields=["url"])
+    return dataset
+
+
+def _cliente_http_local():
+    return PoliteClient(allowed_schemes=("http",))
+
+
+@pytest.mark.parametrize("com_tamanho", [True, False], ids=["com_tamanho", "em_fluxo"])
+def test_cliente_real_recusa_conjunto_csv_acima_do_teto_com_error_code_download(
+    servidor_csv, monkeypatch, com_tamanho
+):
+    dados = csv_ok(*LINHAS_CSV)
+    monkeypatch.setattr(plain_csv, "MAX_BYTES", len(dados) - 1)
+    dataset = _dataset_csv_no_servidor(servidor_csv, dados, com_tamanho)
+    run = ingest(dataset, _cliente_http_local())
+    assert run.state == IngestionRun.State.FAILED
+    assert run.error_code == IngestionRun.ErrorCode.DOWNLOAD
+    assert f"limite de {len(dados) - 1} bytes" in run.error_detail
+    assert run.rows_loaded == 0
+    assert RawRecord.objects.count() == 0
+
+
+@pytest.mark.parametrize("com_tamanho", [True, False], ids=["com_tamanho", "em_fluxo"])
+def test_cliente_real_aceita_conjunto_csv_no_teto_exato(servidor_csv, monkeypatch, com_tamanho):
+    dados = csv_ok(*LINHAS_CSV)
+    monkeypatch.setattr(plain_csv, "MAX_BYTES", len(dados))
+    dataset = _dataset_csv_no_servidor(servidor_csv, dados, com_tamanho)
+    run = ingest(dataset, _cliente_http_local())
+    assert run.state == IngestionRun.State.SUCCEEDED
+    assert run.rows_loaded == len(LINHAS_CSV)
+    assert run.size_bytes == len(dados)

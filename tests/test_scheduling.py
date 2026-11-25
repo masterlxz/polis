@@ -928,7 +928,7 @@ def test_conjunto_sem_normalizador_nao_mexe_no_resultado_da_normalizacao(
 # `NormalizationWaiting` não é sucesso (não limpa a recusa de antes) nem recusa (não grava erro
 # novo): o resultado gravado fica como está, e a linha do log diz que aguarda.
 
-LINHA_DE_ESPERA = "camara/deputados: normalização aguardando a coleta de votações"
+LINHA_DE_ESPERA = "camara/deputados: normalização aguardando outra coleta"
 
 
 def test_normalizacao_que_espera_nao_mexe_na_recusa_nem_na_hora_gravadas(

@@ -5,7 +5,10 @@ Cada app normaliza o bruto de um conjunto na sua própria tabela (`apps/election
 ou um resumo com `rows_read`, `created` e `existing`. Quando recusa por dado inválido ou
 conflitante (falha fechada, nada gravado), levanta uma subclasse de `NormalizationRefused`,
 cuja mensagem é segura por contrato: só nomes de coluna e contagens, nunca valores de linha.
-Qualquer outra exceção é inesperada e o chamador não deve repetir a mensagem dela.
+Quando só falta outra coleta (a Câmara-votações recebe o arquivo de votos antes do de votações),
+levanta `NormalizationWaiting`: nem sucesso nem recusa, e o agendador deixa como está o
+resultado gravado no conjunto. Qualquer outra exceção é inesperada e o chamador não deve repetir
+a mensagem dela.
 
 Os comandos `normalize_*` (à mão) chamam `record_success` quando a normalização dá certo; o
 agendador grava o resultado dele em `scheduling._record_normalization`.
@@ -18,6 +21,15 @@ from .models import Dataset
 
 class NormalizationRefused(Exception):
     """A normalização parou antes de gravar. A mensagem é segura: sem valores de linha."""
+
+
+class NormalizationWaiting(Exception):
+    """A normalização espera outra coleta: não gravou nada, e não é recusa nem sucesso.
+
+    Não é subclasse de `NormalizationRefused` de propósito: recusa vira erro gravado no conjunto,
+    e a espera não deve gravar nada. O agendador a trata à parte; quem não a conhece a vê como
+    erro inesperado (falha alto), o que é melhor do que tratá-la como "nada a fazer".
+    """
 
 
 def record_success(*datasets):

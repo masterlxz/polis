@@ -14,9 +14,10 @@ conjuntos (dois arquivos), cada um com a sua carga, e a normalização lê a mai
 A corrida entre as duas coletas: o agendador coleta cada conjunto em hora sorteada e normaliza
 depois de cada coleta, então o arquivo de votos pode chegar antes do de votações. Voto sem votação
 só é recusa quando a carga de votações é tão nova quanto a de votos ou mais (a votação deveria
-estar lá); se a de votos é mais nova por até 48 h, `normalize_latest` devolve `None` e espera a
-coleta de votações. Nesse caso o painel das fontes mostra a normalização como feita, sem erro.
-Passadas as 48 h (votações paradas, conjunto desabilitado, votação que não vem), vira recusa.
+estar lá); se a de votos é mais nova por até 48 h, `normalize_latest` levanta `NormalizationWaiting`
+e espera a coleta de votações. Nesse caso o agendador não grava sucesso nem erro: o resultado da
+última normalização fica como estava no painel das fontes. Passadas as 48 h (votações paradas,
+conjunto desabilitado, votação que não vem), vira recusa.
 Compara o início das duas execuções que gravaram linhas, ou seja, a última vez que cada arquivo
 MUDOU: "arquivo igual" não cria execução com linhas.
 
@@ -33,6 +34,7 @@ from django.db import transaction
 
 from apps.sources.models import Dataset, IngestionRun, RawRecord
 from apps.sources.normalization import NormalizationRefused as SharedRefused
+from apps.sources.normalization import NormalizationWaiting
 
 from .camara_voting_parsing import parse_vote, parse_voting
 from .models import CamaraVote, CamaraVoting
@@ -144,9 +146,10 @@ def normalize_latest(dataset):
     """O passo que o agendador encadeia, depois da coleta de QUALQUER dos dois conjuntos.
 
     `dataset` não decide nada: a normalização usa a carga mais recente de cada conjunto. Devolve
-    `None` se falta uma das cargas, se as duas já foram normalizadas (alguma votação aponta para a
-    de votações e algum voto para a de votos) ou se a carga de votos é mais nova que a de votações
-    por até 48 h e há voto sem votação (espera a coleta de votações).
+    `None` se falta uma das cargas ou se as duas já foram normalizadas (alguma votação aponta para
+    a de votações e algum voto para a de votos). Levanta `NormalizationWaiting` se a carga de votos
+    é mais nova que a de votações por até 48 h e há voto sem votação (espera a coleta de votações):
+    `None` quer dizer "em dia", e a espera não está em dia.
     """
     votings_dataset, votes_dataset = find_datasets()
     if votings_dataset is None or votes_dataset is None:
@@ -164,7 +167,7 @@ def normalize_latest(dataset):
         return normalize(votings_run, votes_run)
     except MissingVotingError:
         if timedelta(0) < votes_run.started_at - votings_run.started_at <= MAX_WAIT:
-            return None
+            raise NormalizationWaiting from None
         raise
 
 

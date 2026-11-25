@@ -203,3 +203,19 @@ def test_prazo_estourado_nao_e_retentado(gotejador, tmp_path):
     servidor._servir = contar
     baixar_e_medir(servidor, tmp_path / "a.zip")
     assert len(pedidos) == 1
+
+
+# Se o prazo vence antes de a conexão ficar pronta, o socket é cortado ao ser registrado.
+def test_prazo_vencido_antes_da_conexao_corta_o_socket_ao_registrar():
+    watchdog = http_client._Watchdog(0.01)
+    try:
+        assert watchdog._timer is not None
+        watchdog._timer.join(5)
+        assert watchdog.expired
+        lado_do_cliente, lado_do_servidor = socket.socketpair()
+        with lado_do_cliente, lado_do_servidor:
+            lado_do_cliente.settimeout(5)
+            watchdog.register(lado_do_cliente)
+            assert lado_do_cliente.recv(1) == b""
+    finally:
+        watchdog.stop()

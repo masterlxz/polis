@@ -41,7 +41,7 @@ class Command(BaseCommand):
 
         # Só no sucesso: a normalização leu os dois conjuntos, então os dois deixam de ter a
         # recusa que o agendador gravou antes (ele grava no conjunto cuja coleta disparou o passo).
-        record_success(votings_dataset, votes_dataset)
+        record_success(votings_dataset)  # MUTAÇÃO DO COORDENADOR: só um dos dois conjuntos
         self.stdout.write(
             f"Execuções {votings_run.pk} e {votes_run.pk}: linhas lidas {result.rows_read}, "
             f"votos únicos {result.unique}, criadas {result.created}, "

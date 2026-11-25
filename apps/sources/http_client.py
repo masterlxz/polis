@@ -14,11 +14,24 @@ Regras que este módulo aplica:
   `max_bytes` (o do cliente, que cada chamada pode só reduzir); só depois de íntegro é renomeado.
   Falha não deixa arquivo parcial nem altera um arquivo anterior (ADR 0005, decisão 9: falha
   técnica nunca apaga);
-- prazo total por download (`total_timeout`, padrão 1800 s), medido com o `clock` injetado a partir
-  de cada abertura de resposta (as pausas de cortesia e a espera de 429 e 503 não contam) até o
-  último byte. O `timeout` por operação de socket não basta: um host que manda 1 byte a cada 29 s
-  nunca o estoura. O prazo é conferido a cada leitura (`read1`), então um download pode passar do
-  prazo por até uma leitura (no pior caso, um `timeout` por operação) antes de ser cortado.
+- prazo total por download (`total_timeout`, padrão 1800 s; `inf` o desliga). O `timeout` por
+  operação de socket não basta: um host que manda 1 byte a cada 29 s nunca o estoura. O prazo é
+  medido com o `clock` injetado e começa a contar ANTES da abertura da resposta (conexão, TLS e
+  cabeçalhos entram na conta); as pausas de cortesia e a espera de 429 e 503 não contam (cada
+  tentativa recomeça). O que o prazo cobre e o que NÃO cobre:
+  - corpo com `Content-Length` (ou sem enquadramento): o corpo é lido por `read1` (uma leitura de
+    socket por volta, em vez de `read`, que encadeia leituras) e o prazo é conferido depois de cada
+    leitura, inclusive a que devolve o fim. O corte vem na primeira checagem depois do prazo, então
+    pode vir até um `timeout` por operação depois dele. Um download completo cuja leitura final
+    passa do prazo falha (intencional);
+  - conexão, TLS e cabeçalhos: só são conferidos depois da primeira leitura do corpo; antes disso
+    vale só o `timeout` por operação;
+  - resposta `chunked`: a linha do tamanho de cada pedaço, as extensões e os trailers são lidos
+    pelo `http.client` com `readline` (até 64 KiB) e `_safe_read`, possivelmente em mais de uma
+    leitura de socket dentro de uma única chamada de `read1`. Nesses trechos, e na fase de
+    cabeçalhos, o prazo NÃO limita: um host que goteja 1 byte a cada ~29 s ali ainda prende a
+    coleta, sem teto prático além dos limites do `http.client`. Lacuna conhecida e pendente (o
+    conserto seria um watchdog com thread; decisão do dono: não agora).
 
 Segurança dos erros: as mensagens citam só o host e o status (e, quando o limite de bytes recusa,
 o número do limite), nunca a URL completa (a query pode ter token), o corpo da resposta nem o
@@ -36,6 +49,7 @@ Atenção para quem consome:
 
 import hashlib
 import http.client
+import math
 import os
 import tempfile
 import time
@@ -86,6 +100,10 @@ class PoliteClient:
         clock=time.monotonic,
         wall_clock=time.time,
     ):
+        # `timeout` vai ao socket (finito) e `min(timeout, total_timeout)` precisa de números:
+        # validar aqui mantém `_open` sem levantar. `total_timeout=inf` desliga o prazo.
+        if type(timeout) not in (int, float) or not 0 < timeout < math.inf:
+            raise ValueError("timeout deve ser um número positivo e finito (segundos).")
         if type(total_timeout) not in (int, float) or not total_timeout > 0:
             raise ValueError("total_timeout deve ser um número positivo (segundos).")
         self._min_interval = min_interval
@@ -222,7 +240,8 @@ class PoliteClient:
                         # cada 29 s nunca estouraria o `timeout` nem devolveria o controle aqui.
                         chunk = response.read1(CHUNK_SIZE)
                         if self._clock() - started > self._total_timeout:
-                            problem = f"acima do prazo de {self._total_timeout:g} segundos"
+                            # `.15g`: sem notação científica (`:g` daria "1e+06" para 1_000_000).
+                            problem = f"acima do prazo de {self._total_timeout:.15g} segundos"
                             break
                         if not chunk:
                             break

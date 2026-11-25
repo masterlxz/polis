@@ -28,7 +28,7 @@ def unexpected_error_class(error):
     `__cause__`: a mensagem de um erro do banco cita valores da linha. `?` se o nome não for um
     identificador, para um nome com quebra de linha não forjar outra linha de log.
     """
-    name = type(error).__name__
+    name = str(error) or type(error).__name__
     return (name if name.isidentifier() else "?")[:CLASS_NAME_MAX_LENGTH]
 
 

@@ -18,6 +18,19 @@ from django.utils import timezone
 
 from .models import Dataset
 
+CLASS_NAME_MAX_LENGTH = 80  # corte do nome da classe da exceção no log
+
+
+def unexpected_error_class(error):
+    """Nome da classe de uma exceção inesperada, seguro para log e mensagem de comando.
+
+    Só o nome (`__name__`, cortado), nunca a mensagem, os argumentos, `__context__` nem
+    `__cause__`: a mensagem de um erro do banco cita valores da linha. `?` se o nome não for um
+    identificador, para um nome com quebra de linha não forjar outra linha de log.
+    """
+    name = type(error).__name__
+    return (name if name.isidentifier() else "?")[:CLASS_NAME_MAX_LENGTH]
+
 
 class NormalizationRefused(Exception):
     """A normalização parou antes de gravar. A mensagem é segura: sem valores de linha."""

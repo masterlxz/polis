@@ -36,7 +36,7 @@ from pathlib import Path
 from django.db import transaction
 from django.utils import timezone
 
-from . import plain_csv
+from . import plain_csv, zip_csv
 from .ckan import CkanError, read_license_id
 from .http_client import BlockedError, DownloadError
 from .json_list import JsonListError, JsonListReader, fetch_pages
@@ -118,7 +118,8 @@ def _execute(dataset, client, run, destination, batch_size, keep_loads):
             # teto durante o fluxo, sem gravar nada.
             result = client.download(dataset.url, destination, max_bytes=plain_csv.MAX_BYTES)
         else:
-            result = client.download(dataset.url, destination)
+            # `zip_csv` (o TSE): teto do próprio ZIP, bem abaixo do 2 GiB do cliente.
+            result = client.download(dataset.url, destination, max_bytes=zip_csv.MAX_DOWNLOAD_BYTES)
     except BlockedError as error:
         return _detail(error), IngestionRun.ErrorCode.BLOCKED
     except DownloadError as error:

@@ -187,3 +187,76 @@ class SenateVote(models.Model):
 
     def __str__(self):
         return f"{self.name}: {self.vote_code}"
+
+
+class CamaraVoting(models.Model):
+    """Votação da Câmara, dos arquivos anuais em massa (ADR 0031).
+
+    A chave é o id da votação em TEXTO (`2641546-7`); a tabela só acumula. Os totais vêm da fonte e
+    não são calculados: só 1,9% das votações têm voto nominal, as outras só têm os totais. Só a
+    data fica no modelo: os horários da fonte não dizem o fuso e ficam na camada bruta. `approval`
+    e `proposition_id` ficam como vêm (`aprovacao` é `1`, `0` ou vazio, de significado não
+    verificado; a proposição é `0` quando a fonte não indica nenhuma).
+    """
+
+    camara_voting_id = models.CharField("id da votação na Câmara", max_length=20)
+    voted_on = models.DateField("data da votação")
+    organ_acronym = models.CharField("sigla do órgão", max_length=20)
+    approval = models.CharField("aprovação", max_length=1, blank=True)
+    total_yes = models.PositiveIntegerField("votos sim")
+    total_no = models.PositiveIntegerField("votos não")
+    total_other = models.PositiveIntegerField("outros votos")
+    description = models.TextField("descrição", blank=True)
+    proposition_id = models.PositiveIntegerField("id da proposição")
+    ingestion_run = models.ForeignKey(
+        IngestionRun,
+        on_delete=models.PROTECT,
+        related_name="camara_votings",
+        verbose_name="última execução de coleta que a viu",
+    )
+
+    class Meta:
+        verbose_name = "votação da Câmara"
+        verbose_name_plural = "votações da Câmara"
+        constraints = [
+            models.UniqueConstraint(fields=["camara_voting_id"], name="camara_voting_unique_id"),
+        ]
+
+    def __str__(self):
+        return f"{self.camara_voting_id} ({self.voted_on})"
+
+
+class CamaraVote(models.Model):
+    """Voto de um deputado numa votação da Câmara (ADR 0031).
+
+    Sem chave para `Deputy`: guarda o id, a legislatura e o partido do momento do voto, e a junção
+    é por (legislatura, id) na leitura, como no Senado (ADR 0029). Nome, uri, UF e foto do deputado
+    nunca entram (ADR 0005). `vote` vem da fonte sem mapeamento e pode ser vazio: a votação
+    `2645346-18` tem 466 votos sem posição registrada, e vazio é "sem posição", nunca um voto.
+    """
+
+    voting = models.ForeignKey(
+        CamaraVoting, on_delete=models.PROTECT, related_name="votes", verbose_name="votação"
+    )
+    camara_id = models.PositiveIntegerField("id do deputado na Câmara")
+    legislature_id = models.PositiveIntegerField("legislatura")
+    party_acronym = models.CharField("sigla do partido", max_length=20, blank=True)
+    vote = models.CharField("voto", max_length=40, blank=True)
+    ingestion_run = models.ForeignKey(
+        IngestionRun,
+        on_delete=models.PROTECT,
+        related_name="camara_votes",
+        verbose_name="última execução de coleta que o viu",
+    )
+
+    class Meta:
+        verbose_name = "voto na Câmara"
+        verbose_name_plural = "votos na Câmara"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["voting", "camara_id"], name="camara_vote_unique_per_voting"
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.camara_id}: {self.vote or 'sem posição'}"

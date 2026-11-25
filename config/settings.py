@@ -95,6 +95,10 @@ OTP_TOTP_ISSUER = "polis"
 NORMALIZERS = {
     "tse/consulta-cand-2026": "apps.elections.normalization.normalize_latest",
     "camara/deputados": "apps.legislature.normalization.normalize_latest",
+    # Os dois conjuntos de votações da Câmara têm uma normalização só, que lê a carga mais
+    # recente de cada um (ADR 0031).
+    "camara/votacoes-2026": "apps.legislature.camara_voting_normalization.normalize_latest",
+    "camara/votos-2026": "apps.legislature.camara_voting_normalization.normalize_latest",
     "senado/senadores": "apps.legislature.senate_normalization.normalize_latest",
     "senado/votacoes": "apps.legislature.senate_voting_normalization.normalize_latest",
 }

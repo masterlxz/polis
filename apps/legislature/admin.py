@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Deputy, SenateVote, SenateVoting, Senator
+from .models import CamaraVote, CamaraVoting, Deputy, SenateVote, SenateVoting, Senator
 
 
 @admin.register(Deputy)
@@ -54,4 +54,22 @@ class SenateVoteAdmin(DeputyAdmin):
     list_display = ["name", "party_acronym", "state", "vote_code", "voting"]
     list_filter = ["vote_code", "state", "party_acronym"]
     search_fields = ["name"]
+    raw_id_fields = ["ingestion_run", "voting"]
+
+
+@admin.register(CamaraVoting)
+class CamaraVotingAdmin(DeputyAdmin):
+    """Idem: só leitura (ADR 0031)."""
+
+    list_display = ["camara_voting_id", "voted_on", "organ_acronym", "approval", "proposition_id"]
+    list_filter = ["organ_acronym", "approval"]
+    search_fields = ["camara_voting_id", "description"]
+
+
+@admin.register(CamaraVote)
+class CamaraVoteAdmin(DeputyAdmin):
+    """Idem: só leitura (ADR 0031). Sem nome do deputado: o voto guarda só o id (ADR 0005)."""
+
+    list_display = ["camara_id", "legislature_id", "party_acronym", "vote", "voting"]
+    list_filter = ["vote", "party_acronym"]
     raw_id_fields = ["ingestion_run", "voting"]

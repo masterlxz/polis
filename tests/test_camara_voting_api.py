@@ -27,6 +27,8 @@ SEM_VOTOS = "2641546-8"
 LEGISLATURA = 57
 COLETADO_EM = datetime(2026, 11, 24, 9, 0, tzinfo=UTC)
 URL_ORIGEM = "https://example.org/arquivos/votacoes/csv/votacoes-2026.csv"
+URL_ORIGEM_DOS_VOTOS = "https://example.org/arquivos/votacoesVotos/csv/votacoesVotos-2026.csv"
+COLETADO_EM_DOS_VOTOS = datetime(2026, 11, 24, 15, 30, tzinfo=UTC)
 
 CHAVES_LISTA = {"votacoes", "pagina", "total_paginas", "atribuicao"}
 CHAVES_ITEM_DA_LISTA = {
@@ -39,7 +41,7 @@ CHAVES_ITEM_DA_LISTA = {
     "id_proposicao",
     "tem_votos_nominais",
 }
-CHAVES_DETALHE = {"votacao", "votos", "contagem_por_voto", "atribuicao"}
+CHAVES_DETALHE = {"votacao", "votos", "contagem_por_voto", "atribuicao", "atribuicao_dos_votos"}
 CHAVES_VOTACAO = CHAVES_ITEM_DA_LISTA - {"tem_votos_nominais"}
 CHAVES_TOTAIS = {"sim", "nao", "outros"}
 CHAVES_VOTO = {"legislatura", "id_camara", "partido", "voto", "tem_perfil", "nome"}
@@ -47,7 +49,12 @@ CHAVES_CONTAGEM = {"voto", "quantidade"}
 CHAVES_ATRIBUICAO = {"fonte", "conjunto", "coletado_em", "url_origem", "licenca"}
 
 
-def _criar_run(started_at=COLETADO_EM):
+def _criar_run(
+    started_at=COLETADO_EM,
+    slug="votacoes-2026",
+    nome="Votações da Câmara em 2026",
+    url=URL_ORIGEM,
+):
     source, _ = Source.objects.get_or_create(
         slug="camara",
         defaults={
@@ -59,10 +66,10 @@ def _criar_run(started_at=COLETADO_EM):
     )
     dataset, _ = Dataset.objects.get_or_create(
         source=source,
-        slug="votacoes-2026",
+        slug=slug,
         defaults={
-            "name": "Votações da Câmara em 2026",
-            "url": URL_ORIGEM,
+            "name": nome,
+            "url": url,
             "format": Dataset.Format.CSV,
             "license_basis": Dataset.LicenseBasis.OWNER_DECISION,
             "license_justification": "Decisão do dono de teste.",
@@ -70,6 +77,16 @@ def _criar_run(started_at=COLETADO_EM):
     )
     return IngestionRun.objects.create(
         dataset=dataset, source_url=dataset.url, started_at=started_at
+    )
+
+
+def _criar_run_dos_votos(started_at=COLETADO_EM_DOS_VOTOS):
+    """Execução do conjunto de votos (`camara/votos-2026`), outro `Dataset` que o das votações."""
+    return _criar_run(
+        started_at,
+        slug="votos-2026",
+        nome="Votos da Câmara em 2026",
+        url=URL_ORIGEM_DOS_VOTOS,
     )
 
 
@@ -168,6 +185,7 @@ def test_detalhe_so_com_as_chaves_das_listas_explicitas(client, nominal):
     assert all(set(item) == CHAVES_VOTO for item in corpo["votos"])
     assert all(set(item) == CHAVES_CONTAGEM for item in corpo["contagem_por_voto"])
     assert set(corpo["atribuicao"]) == CHAVES_ATRIBUICAO
+    assert set(corpo["atribuicao_dos_votos"]) == CHAVES_ATRIBUICAO
 
 
 def test_votacao_com_os_campos_da_fonte(client, nominal):
@@ -182,7 +200,7 @@ def test_votacao_com_os_campos_da_fonte(client, nominal):
     }
 
 
-def test_aprovacao_vazia_sai_null_e_zero_sai_como_vem(client, run):
+def test_aprovacao_vazia_sai_null_e_zeros_saem_como_vem(client, run):
     _votacao(run, "10-1", approval="")
     _votacao(run, "10-2", approval="0", total_yes=0, total_no=0, total_other=0, proposition_id=0)
 
@@ -191,7 +209,8 @@ def test_aprovacao_vazia_sai_null_e_zero_sai_como_vem(client, run):
 
     assert vazia["aprovacao"] is None
     assert zero["aprovacao"] == "0"
-    # zero é valor, não ausência: totais e proposição `0` saem como vêm (ADR 0031)
+    # 0/0/0 numa votação sem voto nominal NÃO é uma contagem (a fonte não informou; ADR 0031) e o
+    # `0` da proposição é "sem proposição": a API não interpreta, devolve como vêm (ADR 0032)
     assert zero["totais_da_fonte"] == {"sim": 0, "nao": 0, "outros": 0}
     assert zero["id_proposicao"] == 0
 
@@ -282,12 +301,12 @@ def test_votacao_sem_votos_nominais_devolve_votos_vazio(client, sem_votos):
 def test_nada_de_id_interno_nem_execucao_no_detalhe(client, nominal):
     corpo = _detalhe(client, NOMINAL)
     # `atribuicao.licenca.id` é o id da licença (contrato de todas as APIs), não id interno; por
-    # isso a busca é fora da atribuição.
-    chaves = set(_todas_as_chaves({k: v for k, v in corpo.items() if k != "atribuicao"}))
-    texto = client.get(f"{LISTA}{NOMINAL}/").content.decode()
+    # isso a busca é fora das atribuições.
+    resto = {k: v for k, v in corpo.items() if not k.startswith("atribuicao")}
+    chaves = set(_todas_as_chaves(resto))
 
     assert not chaves & {"pk", "voting", "voting_id", "ingestion_run", "uri", "foto", "uf"}
-    assert f'"id": {nominal.pk},' not in texto
+    assert set(corpo["votacao"]) == CHAVES_VOTACAO  # o conjunto exato de chaves, sem `pk`
 
 
 def test_atribuicao_do_detalhe_traz_fonte_conjunto_data_origem_e_licenca_nula(client, nominal):
@@ -300,20 +319,59 @@ def test_atribuicao_do_detalhe_traz_fonte_conjunto_data_origem_e_licenca_nula(cl
     assert atribuicao["licenca"] == {"id": None, "url": None}
 
 
+def test_votos_citam_o_conjunto_de_votos_e_nao_o_das_votacoes(client, run):
+    # Os votos foram vistos por uma coleta de OUTRO conjunto (`camara/votos-2026`): a atribuição dos
+    # votos tem de ser a dele, e a da votação continua sendo a do conjunto de votações.
+    votos_run = _criar_run_dos_votos()
+    votacao = _votacao(run, NOMINAL)
+    _voto(votacao, 1, "Sim", ingestion_run=votos_run)
+    _voto(votacao, 2, "Não", ingestion_run=votos_run)
+
+    corpo = _detalhe(client, NOMINAL)
+
+    assert corpo["atribuicao"]["conjunto"] == "Votações da Câmara em 2026"
+    assert corpo["atribuicao"]["url_origem"] == URL_ORIGEM
+    assert datetime.fromisoformat(corpo["atribuicao"]["coletado_em"]) == COLETADO_EM
+    dos_votos = corpo["atribuicao_dos_votos"]
+    assert dos_votos["fonte"] == "Câmara dos Deputados: Dados Abertos"
+    assert dos_votos["conjunto"] == "Votos da Câmara em 2026"
+    assert dos_votos["url_origem"] == URL_ORIGEM_DOS_VOTOS
+    assert datetime.fromisoformat(dos_votos["coletado_em"]) == COLETADO_EM_DOS_VOTOS
+    assert dos_votos["licenca"] == {"id": None, "url": None}
+
+
+def test_atribuicao_dos_votos_e_a_da_coleta_mais_recente_entre_eles(client, run):
+    antiga = _criar_run_dos_votos(datetime(2026, 11, 20, 9, 0, tzinfo=UTC))
+    nova = _criar_run_dos_votos(datetime(2026, 11, 25, 9, 0, tzinfo=UTC))
+    votacao = _votacao(run, NOMINAL)
+    _voto(votacao, 1, "Sim", ingestion_run=nova)
+    _voto(votacao, 2, "Não", ingestion_run=antiga)
+    _voto(votacao, 3, "Sim", ingestion_run=antiga)
+
+    dos_votos = _detalhe(client, NOMINAL)["atribuicao_dos_votos"]
+
+    assert datetime.fromisoformat(dos_votos["coletado_em"]) == nova.started_at
+
+
+def test_sem_votos_a_atribuicao_dos_votos_e_null(client, sem_votos):
+    corpo = _detalhe(client, SEM_VOTOS)
+
+    assert corpo["atribuicao_dos_votos"] is None
+    assert corpo["atribuicao"]["conjunto"] == "Votações da Câmara em 2026"
+
+
 def test_votacao_inexistente_da_404(client, nominal):
     _detalhe(client, NOMINAL)  # controle
 
     # o formato é válido e não coincide com a fixture: o 404 vem da view, depois da consulta
-    assert client.get(f"{LISTA}999-1/").status_code == 404
-    assert client.get(f"{LISTA}2641546-70/").status_code == 404
+    for codigo in ("999-1", "2641546-70", "01-2", "0-1", "0999-1"):
+        assert client.get(f"{LISTA}{codigo}/").status_code == 404, codigo
 
 
 @pytest.mark.parametrize(
     "codigo",
     [
         "abc",
-        "01-2",  # zero à esquerda: o parser o aceitaria, a rota não (ADR 0032)
-        "0-1",
         "2641546",
         "2641546-",
         "-7",
@@ -323,7 +381,6 @@ def test_votacao_inexistente_da_404(client, nominal):
         "2641546_7",
         "2641546-7%0A",  # `\n` no fim do id
         "2641546-7%20",
-        "0999-1",  # não casa com a fixture: o 404 vem da rota, não da ausência do registro
         "1234567890-1234567890",  # 21 caracteres: o varchar(20) do banco é o limite
         "12345678901-1",  # 11 dígitos antes do hífen: o parser aceita até 10
         "1-12345678901",  # 11 dígitos depois do hífen
@@ -360,15 +417,27 @@ def test_quebra_de_linha_depois_da_barra_final_da_404_sem_consultar_o_banco(
     "codigo",
     [
         "1234567890-123456789",  # 20 caracteres, o máximo do varchar(20)
+        "123456789-1234567890",  # 20 caracteres, com 10 dígitos depois do hífen
         "1-0",
         "2641546-07",  # zero à esquerda depois do hífen: o parser o aceita
+        "01-2",  # zero à esquerda antes do hífen: o parser também o aceita e grava
+        "0-1",
     ],
 )
-def test_id_no_limite_do_formato_resolve(client, run, codigo):
+def test_id_no_formato_do_parser_resolve(client, run, codigo):
     assert len(codigo) <= 20
     _votacao(run, codigo)
 
     assert _detalhe(client, codigo)["votacao"]["id"] == codigo
+
+
+def test_id_com_zero_a_esquerda_e_o_id_sem_zero_sao_registros_distintos(client, run):
+    # O id é texto: `01-2` e `1-2` não são o mesmo registro, e cada URL devolve o seu.
+    _votacao(run, "01-2", description="Com zero.")
+    _votacao(run, "1-2", description="Sem zero.")
+
+    assert _detalhe(client, "01-2")["votacao"]["descricao"] == "Com zero."
+    assert _detalhe(client, "1-2")["votacao"]["descricao"] == "Sem zero."
 
 
 def test_o_detalhe_custa_tres_consultas_mesmo_com_muitos_votos(

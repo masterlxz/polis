@@ -17,10 +17,11 @@ não a do fim do mandato.
 import re
 from collections import Counter
 
+from django.db.models import Exists, OuterRef
 from django.http import JsonResponse
 from django.views.decorators.http import require_safe
 
-from .models import Deputy, SenateVote, SenateVoting, Senator
+from .models import CamaraVote, CamaraVoting, Deputy, SenateVote, SenateVoting, Senator
 
 VOTINGS_PER_PAGE = 50
 # Só a forma canônica, de 1 a 9999: sem zero à esquerda (nem `0`) e só dígitos ASCII (`\d`
@@ -262,3 +263,126 @@ def _senator_vote_item(vote):
     }
     item["participacao" if voting.secret else "voto"] = vote.vote_code
     return item
+
+
+def _camara_voting_fields(voting):
+    """Campos da votação da Câmara que a lista e o detalhe têm em comum (ADR 0032)."""
+    return {
+        "id": voting.camara_voting_id,
+        "data": voting.voted_on.isoformat(),
+        "orgao": voting.organ_acronym,
+        "aprovacao": _or_none(voting.approval),
+        "totais_da_fonte": {
+            "sim": voting.total_yes,
+            "nao": voting.total_no,
+            "outros": voting.total_other,
+        },
+        "descricao": voting.description,
+        "id_proposicao": voting.proposition_id,
+    }
+
+
+@require_safe
+def camara_voting_list(request):
+    """Votações da Câmara, mais recente primeiro, 50 por página (ADR 0032).
+
+    Mesmas regras de página do Senado (ADR 0030, decisão 4). `tem_votos_nominais` vem de um
+    `EXISTS` na própria consulta da página: só 1,9% das votações têm voto nominal (ADR 0031), e as
+    outras só têm os totais da fonte. A ordem é determinística: o id da votação é único (mas é
+    ordenado como texto, não como número).
+    """
+    page_text = request.GET.get("pagina", "1")
+    if not _PAGE_PATTERN.fullmatch(page_text):
+        return JsonResponse(
+            {"erro": "página inválida"}, status=400, json_dumps_params={"ensure_ascii": False}
+        )
+    page = int(page_text)
+
+    total = CamaraVoting.objects.count()
+    start = (page - 1) * VOTINGS_PER_PAGE
+    votings = list(
+        CamaraVoting.objects.select_related("ingestion_run__dataset__source")
+        .annotate(has_votes=Exists(CamaraVote.objects.filter(voting=OuterRef("pk"))))
+        .order_by("-voted_on", "-camara_voting_id")[start : start + VOTINGS_PER_PAGE]
+    )
+    newest_run = max((v.ingestion_run for v in votings), key=lambda r: r.started_at, default=None)
+    return JsonResponse(
+        {
+            "votacoes": [
+                {**_camara_voting_fields(v), "tem_votos_nominais": v.has_votes} for v in votings
+            ],
+            "pagina": page,
+            "total_paginas": (total + VOTINGS_PER_PAGE - 1) // VOTINGS_PER_PAGE,
+            "atribuicao": _attribution(newest_run) if newest_run else None,
+        },
+        json_dumps_params={"ensure_ascii": False},
+    )
+
+
+def _deputy_names_by_pair(pairs):
+    """Nome do `Deputy` de cada par (legislatura, id da Câmara) de `pairs` que tem perfil.
+
+    Uma consulta só para todos os pares: filtra pelas legislaturas e pelos ids (o produto cartesiano
+    pode trazer pares que ninguém votou) e confere o par em Python. Só o par inteiro casa: o mesmo
+    id da Câmara em outra legislatura é outro deputado.
+    """
+    if not pairs:
+        return {}
+    rows = Deputy.objects.filter(
+        legislature_id__in={legislature for legislature, _ in pairs},
+        camara_id__in={camara_id for _, camara_id in pairs},
+    ).values_list("legislature_id", "camara_id", "name")
+    return {
+        (legislature, camara_id): name
+        for legislature, camara_id, name in rows
+        if (legislature, camara_id) in pairs
+    }
+
+
+def _vote_count_order(item):
+    vote, quantity = item
+    return (-quantity, vote is None, vote or "")
+
+
+@require_safe
+def camara_voting_detail(request, voting_id):
+    """Uma votação da Câmara com os votos nominais, se houver (ADR 0031 e 0032).
+
+    `voto` vazio é "sem posição registrada": sai `null`, nunca string vazia nem chave ausente.
+    `nome` só sai para quem tem `Deputy` (junção por legislatura e id na leitura; o voto não guarda
+    nome, ADR 0005). `contagem_por_voto` é calculada pelo polis a partir dos itens, separada de
+    `totais_da_fonte`, que ficam como a fonte os mandou.
+    """
+    voting = (
+        CamaraVoting.objects.select_related("ingestion_run__dataset__source")
+        .filter(camara_voting_id=voting_id)
+        .first()
+    )
+    if voting is None:
+        return JsonResponse({"erro": "não encontrado"}, status=404)
+
+    votes = list(voting.votes.order_by("legislature_id", "camara_id"))
+    names = _deputy_names_by_pair({(v.legislature_id, v.camara_id) for v in votes})
+    counts = Counter(_or_none(v.vote) for v in votes)
+    return JsonResponse(
+        {
+            "votacao": _camara_voting_fields(voting),
+            "votos": [
+                {
+                    "legislatura": v.legislature_id,
+                    "id_camara": v.camara_id,
+                    "partido": _or_none(v.party_acronym),
+                    "voto": _or_none(v.vote),
+                    "tem_perfil": (v.legislature_id, v.camara_id) in names,
+                    "nome": names.get((v.legislature_id, v.camara_id)),
+                }
+                for v in votes
+            ],
+            "contagem_por_voto": [
+                {"voto": vote, "quantidade": quantity}
+                for vote, quantity in sorted(counts.items(), key=_vote_count_order)
+            ],
+            "atribuicao": _attribution(voting.ingestion_run),
+        },
+        json_dumps_params={"ensure_ascii": False},
+    )

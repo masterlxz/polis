@@ -31,10 +31,11 @@ PREENCHIMENTO = b"a" * 80
 class Gotejador:
     """Servidor TCP cru: lê o pedido e escreve `imediato` de uma vez e `lento` 1 byte por vez."""
 
-    def __init__(self, imediato, lento, contexto_tls=None):
+    def __init__(self, imediato, lento, contexto_tls=None, ler_pedido=True):
         self.imediato = imediato
         self.lento = lento
         self.contexto_tls = contexto_tls
+        self.ler_pedido = ler_pedido  # False: fala primeiro (o servidor TLS que goteja o aperto)
         self.encerrar = threading.Event()
         self.escutando = socket.socket()
         self.escutando.bind(("127.0.0.1", 0))
@@ -56,7 +57,7 @@ class Gotejador:
                 if self.contexto_tls is not None:
                     conexao = self.contexto_tls.wrap_socket(conexao, server_side=True)
                 pedido = b""
-                while b"\r\n\r\n" not in pedido:
+                while self.ler_pedido and b"\r\n\r\n" not in pedido:
                     dados = conexao.recv(4096)
                     if not dados:
                         return
@@ -84,8 +85,8 @@ class Gotejador:
 def gotejador():
     criados = []
 
-    def criar(imediato, lento, contexto_tls=None):
-        servidor = Gotejador(imediato, lento, contexto_tls)
+    def criar(imediato, lento, contexto_tls=None, ler_pedido=True):
+        servidor = Gotejador(imediato, lento, contexto_tls, ler_pedido)
         criados.append(servidor)
         return servidor
 
@@ -271,3 +272,106 @@ def test_tls_download_normal_passa(gotejador, tls, tmp_path):
     resultado = cliente().download(servidor.url, tmp_path / "a.zip")
     assert (tmp_path / "a.zip").read_bytes() == b"abcd"
     assert resultado.size_bytes == 4
+    assert esperar_sem_threads_de_abertura()
+
+
+# --- A abertura (DNS, TCP, aperto de mão TLS) também respeita o prazo total ---
+
+
+def threads_de_abertura():
+    return [t for t in threading.enumerate() if t.name == http_client.OPEN_THREAD_NAME]
+
+
+def esperar_sem_threads_de_abertura(segundos=2.0):
+    fim = time.monotonic() + segundos
+    while threads_de_abertura() and time.monotonic() < fim:
+        time.sleep(0.01)
+    return not threads_de_abertura()
+
+
+class RespostaQueFecha:
+    def __init__(self):
+        self.fechada = False
+
+    def close(self):
+        self.fechada = True
+
+
+# Se o servidor TLS goteja o aperto de mão (começa um registro de 16 KiB e entrega 1 byte por
+# vez), o cliente corta no prazo. O `socket` TLS ainda nem foi registrado no watchdog.
+def test_aperto_de_mao_tls_gotejado_e_cortado_pelo_prazo(gotejador, tmp_path):
+    servidor = gotejador(b"\x16\x03\x03\x40\x00", b"\x00" * 60, ler_pedido=False)
+    inicio = time.monotonic()
+    with pytest.raises(DownloadError) as erro:
+        cliente().download(f"https://localhost:{servidor.porta}/arquivo.zip", tmp_path / "a.zip")
+    assert str(erro.value) == "Download de localhost acima do prazo de 0.3 segundos."
+    assert time.monotonic() - inicio < LIMITE_DE_ESPERA
+    assert list(tmp_path.iterdir()) == []
+
+
+# Se o resolvedor de nomes trava (getaddrinfo não tem timeout), o cliente corta no prazo e a
+# thread abandonada termina quando o resolvedor volta.
+def test_resolvedor_travado_e_cortado_pelo_prazo(tmp_path, monkeypatch):
+    liberar = threading.Event()
+
+    def getaddrinfo_travado(*args, **kwargs):
+        liberar.wait(5)
+        raise socket.gaierror("nome não resolvido")
+
+    monkeypatch.setattr(socket, "getaddrinfo", getaddrinfo_travado)
+    inicio = time.monotonic()
+    try:
+        with pytest.raises(DownloadError) as erro:
+            cliente().download("http://trava.invalid/arquivo.zip", tmp_path / "a.zip")
+        demorou = time.monotonic() - inicio
+        assert str(erro.value) == "Download de trava.invalid acima do prazo de 0.3 segundos."
+        assert demorou < LIMITE_DE_ESPERA
+        assert list(tmp_path.iterdir()) == []
+    finally:
+        liberar.set()
+    assert esperar_sem_threads_de_abertura()
+
+
+# Se a thread abandonada termina depois com uma resposta, a resposta é fechada (sem vazar).
+def test_resposta_que_chega_depois_do_abandono_e_fechada():
+    handoff = http_client._Handoff()
+    assert handoff.wait(0.01) is False  # ninguém rodou: o prazo estourou e a thread é abandonada
+    resposta = RespostaQueFecha()
+    handoff.run(lambda _url: (resposta, None, None, False), "u")
+    assert resposta.fechada
+
+
+# Se a thread terminou antes do estouro, a resposta fica para a thread principal (aberta).
+def test_resposta_que_chega_a_tempo_nao_e_fechada():
+    handoff = http_client._Handoff()
+    resposta = RespostaQueFecha()
+    handoff.run(lambda _url: (resposta, 200, None, False), "u")
+    assert handoff.wait(0.01) is True
+    assert handoff.result() == (resposta, 200, None, False)
+    assert not resposta.fechada
+
+
+# Se a abertura lança uma exceção inesperada na thread, ela chega à thread principal.
+def test_excecao_inesperada_na_abertura_chega_a_thread_principal(tmp_path):
+    def abrir(request, timeout):
+        raise KeyError("falha de teste")
+
+    c = cliente()
+    c._opener.open = abrir
+    with pytest.raises(KeyError):
+        c.download("http://127.0.0.1:9/a.zip", tmp_path / "a.zip")
+    assert esperar_sem_threads_de_abertura()
+
+
+# Se o prazo é infinito, a thread principal espera a abertura sem limite de tempo.
+def test_prazo_infinito_espera_a_abertura_sem_limite():
+    handoff = http_client._Handoff()
+    threading.Timer(0.2, handoff.run, args=(lambda _url: (None, 200, None, False), "u")).start()
+    assert handoff.wait(None) is True
+
+
+# Se o host responde normal, não sobra thread de abertura (http).
+def test_download_normal_http_nao_deixa_thread_de_abertura(gotejador, tmp_path):
+    servidor = gotejador(HEADERS + b"abcd", b"")
+    cliente().download(servidor.url, tmp_path / "a.zip")
+    assert esperar_sem_threads_de_abertura()

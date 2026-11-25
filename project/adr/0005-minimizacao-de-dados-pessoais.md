@@ -42,6 +42,9 @@ Depois de medir os endpoints de senadores e os votos individuais (`fontes/senado
 - **Valores de voto:** o Senado usa `Sim`, `Não`, `AP`, `LS`, `P-NRV`, `NCom` e `Presidente (art. 51 RISF)`; a Câmara, pelo menos `Sim`, `Não` e `Artigo 17`. O significado das siglas ainda não foi verificado; o conector deve guardar o valor original e mapeá-lo para um conjunto próprio só depois de verificado.
 - **Senadores:** `DataNascimento`, `UfNaturalidade` e `NomeCompletoParlamentar` ficam como internos (decisões 2, 7 e 8). Endereço, e-mail e telefones parecem institucionais (n=1) e não são necessários, então ficam fora.
 
+### Emenda de leitura (2026-11-25, ADR 0031)
+Na linha da Câmara, **entram** `deputado_idLegislatura` nos votos (metade da chave de `Deputy`, com `deputado_id`; não é dado pessoal) e os totais `votosSim`, `votosNao` e `votosOutros` nas votações (contagens). Nada que já estava fora passa a entrar. As 11 decisões não mudam.
+
 Ainda não medido: o CPF no detalhe para mais de um deputado; os votos nominais da Câmara pela API (travaram em 504); a lista completa de valores de `voto`; discursos e apartes.
 
 ## Alternativas

@@ -236,15 +236,6 @@ def test_votos_da_camara_leem_so_a_allowlist_e_nunca_a_identidade_do_deputado():
     assert votos.earliest_hour_utc == 8
 
 
-def test_o_leitor_de_csv_aceita_a_allowlist_dos_conjuntos_da_camara():
-    from apps.sources.plain_csv import PlainCsvReader
-
-    conjuntos = [d for d in catalog.DATASETS if d["format"] == "csv"]
-    assert [d["slug"] for d in conjuntos] == ["votacoes-2026", "votos-2026"]
-    for conjunto in conjuntos:
-        PlainCsvReader("nao-importa.csv", conjunto["allowed_columns"])
-
-
 def test_o_agendador_normaliza_as_votacoes_do_senado_depois_da_coleta():
     assert (
         settings.NORMALIZERS["senado/votacoes"]

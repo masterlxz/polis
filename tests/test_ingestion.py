@@ -598,6 +598,23 @@ def test_csv_simples_com_coluna_permitida_faltando_falha_com_schema_e_nao_grava_
     assert RawRecord.objects.count() == 0
 
 
+def test_zip_valido_num_conjunto_csv_falha_com_schema_e_nao_grava_nada():
+    # Discrimina o ramo novo: na `main` o formato `csv` caía no leitor de ZIP e este ZIP entrava.
+    dataset = dataset_csv(allowed_columns=["SQ_CANDIDATO", "NM_URNA_CANDIDATO"])
+    run = ingest(dataset, FakeClient(zip_ok("1;ANA")))
+    assert run.state == IngestionRun.State.FAILED
+    assert run.error_code == IngestionRun.ErrorCode.SCHEMA
+    assert RawRecord.objects.count() == 0
+
+
+def test_csv_simples_num_conjunto_zip_csv_continua_falhando_com_schema():
+    # O ramo novo não vazou: `zip_csv` segue usando o leitor de ZIP.
+    run = ingest(make_dataset(), FakeClient(csv_ok("1;ANA")))
+    assert run.state == IngestionRun.State.FAILED
+    assert run.error_code == IngestionRun.ErrorCode.SCHEMA
+    assert RawRecord.objects.count() == 0
+
+
 def test_csv_simples_com_registro_multilinha_entra_e_guarda_o_texto_como_veio():
     dados = csv_ok('"2645346-18";"linha um\r\nlinha dois"', cabecalho="id;descricao")
     run = ingest(dataset_csv(allowed_columns=["id", "descricao"]), FakeClient(dados))

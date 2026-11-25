@@ -7,8 +7,15 @@ largura errada é rejeitada e contada, e nenhuma mensagem de erro cita valor de 
 
 O que muda para os arquivos anuais da Câmara (medidos em 2026-11-24):
 - UTF-8 com BOM por padrão (`utf-8-sig` lê com ou sem BOM);
-- `allow_multiline_records` existe porque `votacoes` tem registros em mais de uma linha física;
-- `max_bytes` (padrão 100 MB; o maior arquivo real foi 58 MB) recusa a carga antes de ler.
+- `allow_multiline_records` existe porque `votacoes` tem registros em mais de uma linha física, e
+  `max_record_lines` (padrão 100; o maior registro real ocupa 13) limita o quanto um registro
+  aceito pode juntar, porque o `csv.reader` junta linhas enquanto houver aspas abertas;
+- `max_bytes` (padrão 100 MB; o maior arquivo real foi 58 MB) recusa a carga antes de ler. Ele
+  protege o parse, não o download: o cliente HTTP aceita até 2 GiB antes de o leitor ver o arquivo;
+- só arquivo regular: diretório, FIFO e dispositivo são recusados.
+
+Erro de sistema (`OSError`: arquivo sumiu, disco, permissão) não é "CSV inválido" e sobe como no
+leitor de ZIP, para o `ingest` registrá-lo como erro inesperado.
 
 Usa `_open_text`, `_read_layout` e `_read_item` do `ZipCsvReader` com um item de mentira (só
 `filename` e `flag_bits`), porque esses métodos só tocam o ZIP para abrir o item. Se o
@@ -17,12 +24,14 @@ Usa `_open_text`, `_read_layout` e `_read_item` do `ZipCsvReader` com um item de
 
 import io
 import os
+import stat
 from pathlib import Path
 from types import SimpleNamespace
 
 from .zip_csv import _FOREIGN_ERRORS, InvalidFormatError, ZipCsvReader, _Rejected
 
 MAX_BYTES = 100 * 1024**2
+MAX_RECORD_LINES = 100
 
 
 class PlainCsvReader(ZipCsvReader):
@@ -32,30 +41,39 @@ class PlainCsvReader(ZipCsvReader):
         allowed_columns,
         *,
         encoding="utf-8-sig",
+        delimiter=";",
         allow_multiline_records=False,
         max_bytes=MAX_BYTES,
-        **limits,
+        max_record_lines=MAX_RECORD_LINES,
+        max_columns=1_000,
+        max_line_chars=200_000,
     ):
         super().__init__(
             path,
             allowed_columns,
+            delimiter=delimiter,
             encoding=encoding,
             allow_multiline_records=allow_multiline_records,
+            max_columns=max_columns,
+            max_line_chars=max_line_chars,
             max_uncompressed_bytes=max_bytes,
-            **limits,
+            max_record_lines=max_record_lines,
         )
 
     def _rows(self):
         failure = None
         try:
-            if os.stat(self.path).st_size > self.max_uncompressed_bytes:
+            file_status = os.stat(self.path)
+            if not stat.S_ISREG(file_status.st_mode):
+                raise _Rejected("não é um arquivo regular")
+            if file_status.st_size > self.max_uncompressed_bytes:
                 raise _Rejected("arquivo acima do limite de bytes")
             item = SimpleNamespace(filename=Path(self.path).name, flag_bits=0)
             indices, width, self.ignored_columns = self._read_layout(None, item)
             yield from self._read_item(None, item, indices, width)
         except _Rejected as exc:
             failure = exc.reason
-        except (*_FOREIGN_ERRORS, OSError) as exc:
+        except _FOREIGN_ERRORS as exc:
             failure = type(exc).__name__
         if failure is not None:
             # Fora do `except`: sem __context__ e sem os quadros da falha original.

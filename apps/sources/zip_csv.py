@@ -98,6 +98,7 @@ class ZipCsvReader:
         max_line_chars=200_000,
         max_items=1_000,
         max_uncompressed_bytes=64 * 1024**3,
+        max_record_lines=None,
     ):
         if isinstance(allowed_columns, str):
             raise ValueError("A allowlist deve ser uma lista de nomes, não um texto.")
@@ -117,6 +118,10 @@ class ZipCsvReader:
         limits = (max_columns, max_line_chars, max_items, max_uncompressed_bytes)
         if not all(isinstance(limit, int) and limit > 0 for limit in limits):
             raise ValueError("Os limites devem ser inteiros positivos.")
+        if max_record_lines is not None and not (
+            isinstance(max_record_lines, int) and max_record_lines > 0
+        ):
+            raise ValueError("Os limites devem ser inteiros positivos.")
         self.path = path
         self.allowed_columns = columns
         self.delimiter = delimiter
@@ -126,6 +131,8 @@ class ZipCsvReader:
         self.max_line_chars = max_line_chars
         self.max_items = max_items
         self.max_uncompressed_bytes = max_uncompressed_bytes
+        self.max_record_lines = max_record_lines
+        self._record_lines = 0
         self.rows_read = 0
         self.rejected_rows = 0
         self.ignored_columns = set()
@@ -182,6 +189,12 @@ class ZipCsvReader:
             if size > self.max_line_chars:
                 del line  # o quadro tem a linha inteira; não deixar no traceback
                 raise _Rejected(f"linha com mais de {self.max_line_chars} caracteres")
+            # O `csv.reader` junta linhas enquanto houver aspas abertas: sem teto por registro,
+            # linhas curtas com aspas alternadas viram um registro de milhões de campos.
+            self._record_lines += 1
+            if self.max_record_lines is not None and self._record_lines > self.max_record_lines:
+                del line
+                raise _Rejected(f"registro com mais de {self.max_record_lines} linhas")
             yield line
 
     def _read_layout(self, zf, info):
@@ -221,7 +234,9 @@ class ZipCsvReader:
             reader = csv.reader(self._lines(text), delimiter=self.delimiter)
             next(reader, None)  # cabeçalho, já validado
             previous = reader.line_num
+            self._record_lines = 0
             for record in reader:
+                self._record_lines = 0
                 physical = reader.line_num - previous
                 previous = reader.line_num
                 if not record:

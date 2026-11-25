@@ -255,7 +255,97 @@ def test_linha_acima_do_limite_de_caracteres_recusa_sem_vazar_o_conteudo(tmp_pat
     assert falha.value.__context__ is None
 
 
+# --- Teto por registro: o `csv.reader` junta linhas enquanto houver aspas abertas ---
+
+
+def test_registro_com_mais_linhas_que_o_teto_recusa_a_carga(tmp_path):
+    # Cada linha `";"` fecha o campo aberto, separa e abre outro: o registro nunca termina.
+    arquivo = tmp_path / "votacoes.csv"
+    arquivo.write_bytes(('a;b\n"x\n' + '";"\n' * 50).encode())
+
+    with pytest.raises(InvalidFormatError) as falha:
+        ler_tudo(leitor(arquivo, ["a", "b"], allow_multiline_records=True, max_record_lines=5))
+
+    assert falha.value.__context__ is None
+
+
+def test_o_teto_de_linhas_vale_por_registro_e_nao_pelo_arquivo_todo(tmp_path):
+    registros = [[f"2645346-{n}", "2026-11-23", "um\r\ndois\r\ntres"] for n in range(4)]
+    arquivo = escrever(tmp_path / "votacoes.csv", CABECALHO_VOTACOES, registros)
+
+    devolvidas = ler_tudo(
+        leitor(arquivo, CABECALHO_VOTACOES, allow_multiline_records=True, max_record_lines=3)
+    )
+
+    assert len(devolvidas) == 4
+
+
+def test_registro_exatamente_acima_do_teto_recusa(tmp_path):
+    arquivo = escrever(
+        tmp_path / "votacoes.csv",
+        CABECALHO_VOTACOES,
+        [["2645346-18", "2026-11-23", "um\r\ndois\r\ntres\r\nquatro"]],
+    )
+
+    with pytest.raises(InvalidFormatError):
+        ler_tudo(
+            leitor(arquivo, CABECALHO_VOTACOES, allow_multiline_records=True, max_record_lines=3)
+        )
+
+
+# --- Entradas que quebram (falha fechada) ---
+
+
+def test_utf8_invalido_recusa_a_carga_sem_vazar_o_conteudo(tmp_path):
+    arquivo = tmp_path / "votos.csv"
+    arquivo.write_bytes(
+        BOM + ";".join(CABECALHO_VOTOS).encode() + b"\n" + CANARIO.encode() + b"\xe3\x80\n"
+    )
+
+    with pytest.raises(InvalidFormatError) as falha:
+        ler_tudo(leitor(arquivo, PERMITIDAS_VOTOS))
+
+    assert CANARIO not in str(falha.value)
+    assert falha.value.__context__ is None
+
+
+def test_bom_duplicado_recusa_a_carga(tmp_path):
+    arquivo = tmp_path / "votos.csv"
+    arquivo.write_bytes(BOM + BOM + ";".join(CABECALHO_VOTOS).encode() + b"\n")
+
+    with pytest.raises(InvalidFormatError):
+        ler_tudo(leitor(arquivo, PERMITIDAS_VOTOS))
+
+
+def test_so_cabecalho_entrega_zero_linhas_e_quem_consome_olha_rows_read(tmp_path):
+    # Caracterização: o leitor não trata "só cabeçalho" como erro (como o de ZIP); o consumidor
+    # vê `rows_read == 0`. É um limite conhecido do ADR 0031.
+    arquivo = escrever(tmp_path / "votos.csv", CABECALHO_VOTOS, [])
+    leitor_ = leitor(arquivo, PERMITIDAS_VOTOS)
+
+    assert ler_tudo(leitor_) == []
+    assert (leitor_.rows_read, leitor_.rejected_rows) == (0, 0)
+
+
+def test_diretorio_nao_e_arquivo_regular(tmp_path):
+    with pytest.raises(InvalidFormatError):
+        ler_tudo(leitor(tmp_path, PERMITIDAS_VOTOS))
+
+
+def test_arquivo_inexistente_sobe_como_erro_de_sistema_e_nao_como_csv_invalido(tmp_path):
+    with pytest.raises(FileNotFoundError):
+        ler_tudo(leitor(tmp_path / "nao-existe.csv", PERMITIDAS_VOTOS))
+
+
 # --- Contrato do objeto ---
+
+
+@pytest.mark.parametrize("teto", [0, -1, "3", 1.5])
+def test_teto_de_linhas_por_registro_invalido_e_recusado(tmp_path, teto):
+    arquivo = escrever(tmp_path / "votos.csv", CABECALHO_VOTOS, [linha_de_voto()])
+
+    with pytest.raises(ValueError, match="limites"):
+        leitor(arquivo, PERMITIDAS_VOTOS, max_record_lines=teto)
 
 
 def test_leitor_e_de_uso_unico(tmp_path):

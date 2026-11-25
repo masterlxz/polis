@@ -26,15 +26,16 @@ Regras que este módulo aplica:
     passa do prazo falha (intencional). Com `Content-Length`, o `read1` que completa o corpo já
     fecha a conexão e o seguinte devolve `b""` sem I/O, então um "fim lento" só ocorre em
     resposta chunked ou sem `Content-Length`;
-  - conexão, TLS e cabeçalhos: só são conferidos depois da primeira leitura do corpo; antes disso
-    vale só o `timeout` por operação (o socket recebe `min(timeout, total_timeout)`, então com
-    `total_timeout < timeout` essa fase é limitada ao `total_timeout` por operação);
-  - resposta `chunked`: a linha do tamanho de cada pedaço, as extensões e os trailers são lidos
-    pelo `http.client` com `readline` (até 64 KiB) e `_safe_read`, possivelmente em mais de uma
-    leitura de socket dentro de uma única chamada de `read1`. Nesses trechos, e na fase de
-    cabeçalhos, o prazo NÃO limita: um host que goteja 1 byte a cada ~29 s ali ainda prende a
-    coleta, sem teto prático além dos limites do `http.client`. Lacuna conhecida e pendente (o
-    conserto seria um watchdog com thread; decisão do dono: não agora).
+  - watchdog (P-20): o `readline` do `http.client` (status, cabeçalhos, linha do tamanho de cada
+    pedaço `chunked`, extensões e trailers) lê várias vezes por chamada e não devolve o controle
+    a cada leitura. Por isso cada tentativa tem uma thread (`_Watchdog`, tempo REAL, não o `clock`
+    injetado) que, ao vencer o prazo, faz `shutdown` do socket (o público `conn.sock`, registrado
+    pela conexão ao ficar pronta); a leitura bloqueada acorda e o erro vira o do prazo. Vale para
+    tudo depois que a conexão (e o TLS) fica pronta; a thread nasce antes da abertura e, se vencer
+    antes, o socket é cortado ao ser registrado;
+  - NÃO coberto: DNS, conexão TCP e aperto de mão TLS só têm o `timeout` por operação (o socket
+    recebe `min(timeout, total_timeout)`), porque o socket TLS só existe depois do aperto de mão.
+    Um host que goteja o aperto de mão ainda ganha até algumas operações de `timeout`.
 
 Segurança dos erros: as mensagens citam só o host e o status (e, quando o limite de bytes recusa,
 o número do limite), nunca a URL completa (a query pode ter token), o corpo da resposta nem o
@@ -45,16 +46,21 @@ O módulo não importa Django nem toca no banco. Ligar o cliente ao `Dataset` e 
 (e mapear os erros para `error_code`) é da camada que o usa.
 
 Atenção para quem consome:
+- O cliente NÃO é seguro entre threads: o watchdog da tentativa em curso fica na instância
+  (`_watchdog`). Use uma instância por thread.
 - O bloqueio de host vale só para a instância; a persistência (`blocked` no `IngestionRun`) é de
   quem chama.
 - Não há proxy do ambiente nem verificação de IP privado: a URL vem do cadastro do `Dataset`.
 """
 
+import functools
 import hashlib
 import http.client
 import math
 import os
+import socket
 import tempfile
+import threading
 import time
 import urllib.request
 from dataclasses import dataclass
@@ -68,6 +74,96 @@ USER_AGENT = "polis-coletor (+https://github.com/masterlxz/polis)"
 BLOCKED_STATUSES = frozenset({401, 403, 451})
 BACKOFF_STATUSES = frozenset({429, 503})
 CHUNK_SIZE = 1024 * 1024
+WATCHDOG_THREAD_NAME = "polis-prazo-total"
+
+
+class _Watchdog:
+    """Prazo de tempo real de UM download (uma tentativa): ao vencer, desliga o socket.
+
+    O `shutdown` acorda qualquer leitura bloqueada em outra thread (o `recv` devolve fim de
+    arquivo), inclusive as que o `http.client` faz sozinho (status, cabeçalhos, tamanho do pedaço,
+    trailers). Chama-se o método da classe base `socket.socket`: o `SSLSocket.shutdown` zera o
+    objeto TLS enquanto a thread de leitura ainda está dentro dele. Sem prazo finito, não cria
+    thread.
+    """
+
+    def __init__(self, seconds):
+        self.expired = False
+        self._lock = threading.Lock()
+        self._sock = None
+        self._timer = None
+        if seconds != math.inf:
+            self._timer = threading.Timer(min(seconds, threading.TIMEOUT_MAX), self._fire)
+            self._timer.name = WATCHDOG_THREAD_NAME
+            self._timer.daemon = True
+            self._timer.start()
+
+    def register(self, sock):
+        """Chamado quando a conexão fica pronta; se o prazo já venceu, corta de uma vez."""
+        with self._lock:
+            self._sock = sock
+            expired = self.expired
+        if expired:
+            self._cut(sock)
+
+    def _fire(self):
+        with self._lock:
+            self.expired = True
+            sock = self._sock
+        if sock is not None:
+            self._cut(sock)
+
+    @staticmethod
+    def _cut(sock):
+        try:
+            socket.socket.shutdown(sock, socket.SHUT_RDWR)
+        except OSError:
+            pass  # já fechado ou desligado: o que se queria
+
+    def stop(self):
+        if self._timer is not None:
+            self._timer.cancel()
+            self._timer.join()
+
+
+class _WatchedConnectionMixin:
+    """Avisa o watchdog quando o socket (já com TLS, se houver) fica pronto."""
+
+    def __init__(self, *args, on_connect, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._on_connect = on_connect
+
+    def connect(self):
+        super().connect()
+        self._on_connect(self.sock)
+
+
+class _WatchedHTTPConnection(_WatchedConnectionMixin, http.client.HTTPConnection):
+    pass
+
+
+class _WatchedHTTPSConnection(_WatchedConnectionMixin, http.client.HTTPSConnection):
+    pass
+
+
+class _WatchedHTTPHandler(urllib.request.HTTPHandler):
+    def __init__(self, on_connect):
+        super().__init__()
+        self._connection = functools.partial(_WatchedHTTPConnection, on_connect=on_connect)
+
+    def http_open(self, req):
+        return self.do_open(self._connection, req)
+
+
+class _WatchedHTTPSHandler(urllib.request.HTTPSHandler):
+    def __init__(self, on_connect):
+        # Sem `context=`: o contexto é o padrão do urllib (o de `http.client`, com ALPN http/1.1 e
+        # verificação de certificado e de nome), que `https_open` original também usa.
+        super().__init__()
+        self._connection = functools.partial(_WatchedHTTPSConnection, on_connect=on_connect)
+
+    def https_open(self, req):
+        return self.do_open(self._connection, req, context=self._context)
 
 
 class DownloadError(Exception):
@@ -122,15 +218,18 @@ class PoliteClient:
         self._wall_clock = wall_clock
         self._last_request = {}
         self._blocked_hosts = set()
+        self._watchdog = None
         self._opener = self._build_opener()
 
-    @staticmethod
-    def _build_opener():
+    def _register_socket(self, sock):
+        self._watchdog.register(sock)
+
+    def _build_opener(self):
         # Sem HTTPRedirectHandler (3xx vira erro), sem ProxyHandler, sem File/FTP.
         opener = urllib.request.OpenerDirector()
         for handler in (
-            urllib.request.HTTPHandler(),
-            urllib.request.HTTPSHandler(),
+            _WatchedHTTPHandler(self._register_socket),
+            _WatchedHTTPSHandler(self._register_socket),
             urllib.request.HTTPDefaultErrorHandler(),
             urllib.request.HTTPErrorProcessor(),
         ):
@@ -163,9 +262,15 @@ class PoliteClient:
         for attempt in range(1, self._max_attempts + 1):
             self._pause(host)
             started = self._clock()
-            response, status, retry_after, network_failed = self._open(url)
-            if response is not None:
-                return self._save(response, host, Path(destination), limit, started)
+            watchdog = self._watchdog = _Watchdog(self._total_timeout)
+            try:
+                response, status, retry_after, network_failed = self._open(url)
+                if response is not None:
+                    return self._save(response, host, Path(destination), limit, started, watchdog)
+            finally:
+                watchdog.stop()
+            if watchdog.expired:
+                raise DownloadError(self._deadline_message(host))
             if network_failed:
                 raise DownloadError(f"Falha de rede ao acessar {host}.")
             if status in BLOCKED_STATUSES:
@@ -218,7 +323,11 @@ class PoliteClient:
             return None
         return max(0.0, moment.timestamp() - self._wall_clock())
 
-    def _save(self, response, host, destination, limit, started):
+    def _deadline_message(self, host):
+        # `.15g`: sem notação científica até 1e15 (`:g` daria "1e+06").
+        return f"Download de {host} acima do prazo de {self._total_timeout:.15g} segundos."
+
+    def _save(self, response, host, destination, limit, started, watchdog):
         declared = _parse_length(response.headers.get("Content-Length"))
         etag = response.headers.get("ETag", "")
         last_modified = response.headers.get("Last-Modified", "")
@@ -243,8 +352,7 @@ class PoliteClient:
                         # cada 29 s nunca estouraria o `timeout` nem devolveria o controle aqui.
                         chunk = response.read1(CHUNK_SIZE)
                         if self._clock() - started > self._total_timeout:
-                            # `.15g`: sem notação científica até 1e15 (`:g` daria "1e+06").
-                            problem = f"acima do prazo de {self._total_timeout:.15g} segundos"
+                            problem = "prazo"
                             break
                         if not chunk:
                             break
@@ -256,6 +364,11 @@ class PoliteClient:
                         file.write(chunk)
             except OSError, http.client.HTTPException:
                 problem = "interrompido"
+            if watchdog.expired and problem in (None, "interrompido"):
+                # O watchdog desligou o socket: o fim da leitura (limpo ou com erro) é do prazo.
+                # Vale também para o download que terminou no mesmo instante, como a regra do
+                # relógio (a leitura final que passa do prazo falha).
+                problem = "prazo"
             if problem is None and declared is not None and received != declared:
                 problem = "cortado"
             if problem is None:
@@ -264,6 +377,8 @@ class PoliteClient:
         finally:
             if not saved:
                 temporary.unlink(missing_ok=True)
+        if problem == "prazo":
+            raise DownloadError(self._deadline_message(host))
         if problem is not None:
             raise DownloadError(f"Download de {host} {problem}.")
         return DownloadResult(

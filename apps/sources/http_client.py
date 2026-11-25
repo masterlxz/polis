@@ -355,7 +355,7 @@ class PoliteClient:
             target=handoff.run, args=(self._open_blocking, url), name=OPEN_THREAD_NAME, daemon=True
         ).start()
         limit = None if self._total_timeout == math.inf else self._total_timeout
-        if not handoff.wait(None if limit is None else min(limit, threading.TIMEOUT_MAX)):
+        if not handoff.wait(None if limit is not None else None):
             watchdog.expire()
             return None, None, None, True
         return handoff.result()

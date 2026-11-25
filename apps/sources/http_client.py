@@ -46,6 +46,8 @@ O módulo não importa Django nem toca no banco. Ligar o cliente ao `Dataset` e 
 (e mapear os erros para `error_code`) é da camada que o usa.
 
 Atenção para quem consome:
+- O cliente NÃO é seguro entre threads: o watchdog da tentativa em curso fica na instância
+  (`_watchdog`). Use uma instância por thread.
 - O bloqueio de host vale só para a instância; a persistência (`blocked` no `IngestionRun`) é de
   quem chama.
 - Não há proxy do ambiente nem verificação de IP privado: a URL vem do cadastro do `Dataset`.
@@ -57,7 +59,6 @@ import http.client
 import math
 import os
 import socket
-import ssl
 import tempfile
 import threading
 import time
@@ -156,12 +157,13 @@ class _WatchedHTTPHandler(urllib.request.HTTPHandler):
 
 class _WatchedHTTPSHandler(urllib.request.HTTPSHandler):
     def __init__(self, on_connect):
-        self._tls_context = ssl.create_default_context()
-        super().__init__(context=self._tls_context)
+        # Sem `context=`: o contexto é o padrão do urllib (o de `http.client`, com ALPN http/1.1 e
+        # verificação de certificado e de nome), que `https_open` original também usa.
+        super().__init__()
         self._connection = functools.partial(_WatchedHTTPSConnection, on_connect=on_connect)
 
     def https_open(self, req):
-        return self.do_open(self._connection, req, context=self._tls_context)
+        return self.do_open(self._connection, req, context=self._context)
 
 
 class DownloadError(Exception):

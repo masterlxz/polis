@@ -5,8 +5,8 @@ O prazo conferido entre leituras do corpo não alcança o que o `http.client` l�
 cru em 127.0.0.1 que goteja 1 byte a cada `PASSO` s, e o prazo é de tempo real (a thread do
 watchdog espera de verdade). O relógio e o `sleep` do cliente continuam falsos: o relógio não anda,
 então só o watchdog pode cortar. Cada gotejamento dura bem mais que o prazo; sem o watchdog o
-download termina bem (ou só estoura o `timeout` por operação, que aqui é longo), e o teste falha
-por não levantar `DownloadError`.
+download termina bem e o teste falha por não levantar `DownloadError`. O socket recebe
+`min(timeout, total_timeout)` = 0,3 s por operação, contra um passo de 0,05 s (folga de 6x).
 """
 
 import socket
@@ -177,17 +177,12 @@ def test_download_normal_passa_e_nao_deixa_thread(gotejador, tmp_path):
 
 
 # Se o prazo é infinito, nenhuma thread de watchdog é criada.
-def test_prazo_infinito_nao_cria_thread(gotejador, tmp_path, monkeypatch):
-    criados = []
-
-    def espiao(*args, **kwargs):
-        criados.append(args)
-        raise AssertionError("não deve criar Timer com total_timeout=inf")
-
-    monkeypatch.setattr(http_client.threading, "Timer", espiao)
+def test_prazo_infinito_nao_cria_thread(gotejador, tmp_path):
+    assert http_client._Watchdog(float("inf"))._timer is None
     servidor = gotejador(HEADERS + b"abcd", b"")
-    cliente(total_timeout=float("inf")).download(servidor.url, tmp_path / "a.zip")
-    assert criados == []
+    resultado = cliente(total_timeout=float("inf")).download(servidor.url, tmp_path / "a.zip")
+    assert resultado.size_bytes == 4
+    assert not [t for t in threading.enumerate() if t.name == http_client.WATCHDOG_THREAD_NAME]
 
 
 # Se o prazo estoura, o erro não é retentado: um só pedido chega ao servidor.

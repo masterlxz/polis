@@ -6,6 +6,7 @@ do leitor, nem nos contadores, nem nas mensagens de erro.
 
 import csv
 import hashlib
+import inspect
 import io
 import traceback
 import tracemalloc
@@ -464,6 +465,41 @@ def test_tamanho_descomprimido_declarado_acima_do_limite_falha(tmp_path):
     zip_path = build_zip(tmp_path / "a.zip", {"a.csv": csv_bytes(ALLOW, [["1", "ANA", "PT"]])})
     with pytest.raises(InvalidFormatError):
         next(ZipCsvReader(zip_path, ALLOW, max_uncompressed_bytes=10).rows())
+
+
+# Teto padrão do tamanho DESCOMPRIMIDO declarado (Sessão 90): 2 GiB, ~4x o maior ZIP de candidatos
+# medido (2024, 2026-11-25: 513 MB descomprimidos, 78,7 MB comprimidos, razão 6,5; o de 2026 tem
+# 23,7 MB e razão 7,2; `project/fontes/tse.md`). Um ZIP no teto de download (256 MiB) com a razão
+# observada descomprime para ~1,6 a 1,8 GiB: o teto aceita o que o download aceita enquanto a
+# razão ficar abaixo de 8 (256 MiB x 8 = 2 GiB).
+
+
+def test_o_teto_padrao_do_descomprimido_e_de_2_gib():
+    padrao = inspect.signature(ZipCsvReader).parameters["max_uncompressed_bytes"].default
+    assert padrao == 2 * 1024**3
+
+
+def test_o_limite_e_exato_o_tamanho_declarado_igual_ao_limite_passa_e_um_a_menos_falha(tmp_path):
+    dados = csv_bytes(ALLOW, [["1", "ANA", "PT"]])
+    zip_path = build_zip(tmp_path / "a.zip", {"a.csv": dados})
+    assert len(list(ZipCsvReader(zip_path, ALLOW, max_uncompressed_bytes=len(dados)).rows())) == 1
+    with pytest.raises(InvalidFormatError, match="descomprimido"):
+        next(ZipCsvReader(zip_path, ALLOW, max_uncompressed_bytes=len(dados) - 1).rows())
+
+
+def test_zip_que_declara_mais_de_2_gib_descomprimidos_falha_com_o_padrao(tmp_path, monkeypatch):
+    zip_path = build_zip(tmp_path / "a.zip", {"a.csv": csv_bytes(ALLOW, [["1", "ANA", "PT"]])})
+    original = zipfile.ZipFile.infolist
+
+    def declarando_demais(self):
+        infos = original(self)
+        for info in infos:
+            info.file_size = 2 * 1024**3 + 1
+        return infos
+
+    monkeypatch.setattr(zipfile.ZipFile, "infolist", declarando_demais)
+    with pytest.raises(InvalidFormatError, match="descomprimido"):
+        next(ZipCsvReader(zip_path, ALLOW).rows())
 
 
 def test_linha_gigante_com_milhoes_de_delimitadores_falha_sem_estourar_memoria(tmp_path):

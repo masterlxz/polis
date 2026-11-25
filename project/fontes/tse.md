@@ -119,6 +119,8 @@ Tamanho dos ZIPs (medido, `HEAD`; o campo `size` do CKAN vem **vazio**, então s
 | boletim de urna (AC, 1º turno) | 17,0 MB | (não medido) |
 | `votacao_secao_<UF>` (TO) | (não medido) | 10,2 MB |
 
+**Remedido em 2026-11-25** (`HEAD` e `Range` dos últimos 256 KiB do ZIP, só o índice; nada foi baixado): `consulta_cand_2024.zip` está com **78.688.718 bytes** (eram 64,7 MB em 2026-11-05: o TSE regenerou o arquivo, `Last-Modified` 25 Nov 2026 05:26 GMT), **28 itens (27 CSVs)** e **513.129.169 bytes descomprimidos** (512.920.692 só nos CSVs), razão **6,5**; o maior item é `consulta_cand_2024_BRASIL.csv`, 256,5 MB descomprimidos (40,6 MB comprimidos). O de 2026 (3,3 MB, 23,7 MB descomprimidos) tem razão 7,2. Base dos tetos do polis: 256 MiB de download e 2 GiB descomprimidos (ADR 0031, Sessões 89 e 90).
+
 Os ZIPs de candidatos têm 28 a 30 itens (um CSV por UF, mais `leiame.pdf`). O de prestação de contas de candidatos de 2024 tem 112 itens (despesas pagas e contratadas por UF, entre outros); o tamanho descomprimido total **não foi somado**. O volume de 2026 reflete uma eleição geral ainda em andamento e é menor que o de 2024 em candidatos, mas maior em votação; não investiguei o motivo.
 
 ## Esquemas (medido, só nomes de colunas)
@@ -194,7 +196,7 @@ python3 -I -c "import zipfile,sys;sys.stdout.buffer.write(zipfile.ZipFile('c26.z
   | awk -F';' 'NR>1{v=$21; gsub(/"/,"",v); k=length(v) (v ~ /^[0-9]+$/ ? " dígitos" : " não-dígitos"); n[k]++} END{for(k in n) print "NR_CPF_CANDIDATO:", k, n[k]}'
 # esperado em 2026-11-05: "NR_CPF_CANDIDATO: 11 dígitos 479" (a coluna 21 é NR_CPF_CANDIDATO; mude para 38 e vem o título, 12 dígitos)
 ```
-A medição de 2024 (CPF constante de 2 caracteres) foi feita lendo o fim e o começo do ZIP de 64,7 MB por `Range`, com um script descartável não versionado; para reproduzir sem ele, baixe o ZIP inteiro e use o mesmo `awk` sobre `consulta_cand_2024_TO.csv`.
+A medição de 2024 (CPF constante de 2 caracteres) foi feita lendo o fim e o começo do ZIP de 64,7 MB (na época; hoje tem 78,7 MB, ver acima) por `Range`, com um script descartável não versionado; para reproduzir sem ele, baixe o ZIP inteiro e use o mesmo `awk` sobre `consulta_cand_2024_TO.csv`.
 
 ## Estado da integração
 Cadastrada (Sessão 26). `manage.py seed_sources` cria a `Source` `tse` (status `measured`) e o `Dataset` `consulta-cand-2026` (`enabled=False`, licença `declared` cc-by) a partir de `apps/sources/catalog.py`. **Primeira carga real feita em 2026-11-07 (Sessão 28), na máquina do dono, em banco de desenvolvimento (Docker Compose):** 1 `IngestionRun` `succeeded`; `consulta_cand_2026.zip` de 3.286.717 bytes (medido); 42.034 linhas lidas e 42.034 gravadas, igual à medição de 2026-11-06; 29 arquivos; cerca de 14 s; cabeçalho conferido contra as 34 colunas sem divergência; uma requisição, sem redirecionamento, 403 ou 429. Nenhum dos 42.034 `RawRecord` tem as chaves `NR_CPF_CANDIDATO`, `NR_TITULO_ELEITORAL_CANDIDATO` ou `DS_EMAIL` (conferido no banco, sem imprimir valores). Repetida na mesma sessão: segunda carga `succeeded` com 0 linhas (arquivo igual não relido), sem duplicar os registros. Fonte `tse` ficou em `integrating` e o conjunto `enabled` nesse banco local.

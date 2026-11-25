@@ -1,0 +1,393 @@
+// Votos do deputado na página `/deputados/<legislatura>-<id>/`, contra o servidor de produção e uma
+// API falsa. Dados todos sintéticos. O que mais importa: a página pede à API a rota e a página
+// certas, `voto` nulo aparece como "sem posição registrada" (e não como vazio ou "null"), o partido
+// é o da época do voto (não o do perfil), resposta fora do formato derruba a página sem vazar o
+// texto dela, e o 404 do perfil continua sendo 404 sem chamar a rota de votos.
+import assert from "node:assert/strict";
+import { after, before, test } from "node:test";
+
+import { iniciarApiFalsa, iniciarNext } from "./helpers.mjs";
+
+const ID = "57-204554";
+const CAMINHO_DO_PERFIL = `GET /internal/v1/deputados/${ID}/`;
+const CAMINHO_DOS_VOTOS = `GET /internal/v1/deputados/${ID}/votos/`;
+
+let api;
+let front;
+
+before(async () => {
+  api = await iniciarApiFalsa();
+  front = await iniciarNext({ apiUrl: api.url });
+});
+
+after(() => {
+  front?.parar();
+  api?.parar();
+});
+
+function atribuicaoPadrao(extra = {}) {
+  return {
+    fonte: "Câmara dos Deputados: Dados Abertos",
+    conjunto: "Deputados em exercício (legislatura atual)",
+    coletado_em: "2026-11-10T15:30:00+00:00",
+    url_origem: "https://dados.example.org/api/v2/deputados?itens=100",
+    licenca: { id: null, url: null },
+    ...extra,
+  };
+}
+
+// O partido do perfil é "XYZ"; os dos votos, "ABC" e "DEF": nenhum teste pode passar por acaso
+// porque o partido do voto coincide com o do perfil.
+function perfil() {
+  return {
+    deputado: { legislatura: 57, id_camara: 204554, nome: "ANA DA CÂMARA", partido: "XYZ", uf: "SP" },
+    atribuicao: atribuicaoPadrao(),
+  };
+}
+
+function atribuicaoDosVotos(extra = {}) {
+  return atribuicaoPadrao({
+    conjunto: "Votos nominais em plenário",
+    url_origem: "https://dados.example.org/api/v2/votacoes/votos.json",
+    ...extra,
+  });
+}
+
+function itemDeVoto(extra = {}) {
+  return {
+    id: "2641546-7",
+    data: "2026-11-12",
+    orgao: "Plenário",
+    descricao: "Aprovada a Medida Provisória nº 1/2026.",
+    aprovacao: "Aprovada",
+    id_proposicao: 9876543,
+    partido: "ABC",
+    voto: "Sim",
+    ...extra,
+  };
+}
+
+function historico({ votos = [itemDeVoto()], pagina = 1, total_paginas = 1, atribuicao } = {}) {
+  return {
+    deputado: { legislatura: 57, id_camara: 204554, nome: "ANA DA CÂMARA" },
+    votos,
+    pagina,
+    total_paginas,
+    atribuicao: atribuicao === undefined ? atribuicaoDosVotos() : atribuicao,
+  };
+}
+
+// A página chama duas rotas da API: o perfil e os votos. `resposta` vale para o perfil e `votos`
+// para a lista; `consulta` é a query string da página do front (ex.: "?pagina=2").
+async function pagina(
+  id = ID,
+  resposta = { status: 200, corpo: perfil() },
+  { votos = { status: 200, corpo: historico() }, consulta = "" } = {},
+) {
+  api.resposta = (req) => (req.url.startsWith(`/internal/v1/deputados/${id}/votos/`) ? votos : resposta);
+  const retorno = await fetch(`${front.base}/deputados/${id}/${consulta}`);
+  return { status: retorno.status, html: await retorno.text() };
+}
+
+const comVotos = (corpo, consulta = "") =>
+  pagina(ID, { status: 200, corpo: perfil() }, { votos: { status: 200, corpo }, consulta });
+
+// A linha da tabela que contém o texto dado, só até o `</tr>` (depois dela o HTML ainda tem o
+// resto da página e o payload do Next, que repetiria o texto das outras linhas).
+function linhaCom(html, texto) {
+  return html.split("</tr>").find((trecho) => trecho.includes(texto));
+}
+
+test("votos: uma linha mostra data, órgão, descrição, resultado, partido da época e voto", async () => {
+  const { status, html } = await comVotos(historico());
+
+  assert.equal(status, 200);
+  for (const trecho of [
+    "12/11/2026",
+    "Plenário",
+    "Aprovada a Medida Provisória nº 1/2026.",
+    "Aprovada",
+    "ABC",
+    "Sim",
+    "Partido (à época)",
+  ]) {
+    assert.ok(html.includes(trecho), `faltou "${trecho}" no HTML`);
+  }
+});
+
+test("votos: partidos diferentes na mesma página saem cada um na sua linha, não o do perfil", async () => {
+  const { status, html } = await comVotos(
+    historico({
+      votos: [
+        itemDeVoto({ id: "1-1", descricao: "Descrição A", partido: "ABC", voto: "Sim" }),
+        itemDeVoto({ id: "2-1", descricao: "Descrição B", partido: "DEF", voto: "Não" }),
+      ],
+    }),
+  );
+
+  assert.equal(status, 200);
+  const a = linhaCom(html, "Descrição A");
+  const b = linhaCom(html, "Descrição B");
+  assert.ok(a?.includes("ABC") && a.includes("Sim") && !a.includes("DEF"), "linha A");
+  assert.ok(b?.includes("DEF") && b.includes("Não") && !b.includes("ABC"), "linha B");
+  assert.ok(!a.includes("XYZ") && !b.includes("XYZ"), "o partido do perfil entrou na linha do voto");
+});
+
+test("votos: `voto` nulo aparece como 'sem posição registrada', nunca vazio nem 'null'", async () => {
+  const controle = await comVotos(historico());
+  assert.ok(!/sem posição registrada/i.test(controle.html), "controle: com voto a frase não aparece");
+
+  const { status, html } = await comVotos(
+    historico({
+      votos: [
+        itemDeVoto({ id: "1-1", descricao: "Descrição A", voto: "Sim" }),
+        itemDeVoto({ id: "2-1", descricao: "Descrição B", voto: null }),
+      ],
+    }),
+  );
+
+  assert.equal(status, 200);
+  assert.match(linhaCom(html, "Descrição B"), /sem posição registrada/i);
+  assert.ok(!/sem posição registrada/i.test(linhaCom(html, "Descrição A")));
+  assert.ok(!html.includes(">null<"));
+});
+
+test("votos: `aprovacao` nula some da linha; a outra linha mantém o resultado", async () => {
+  const { status, html } = await comVotos(
+    historico({
+      votos: [
+        itemDeVoto({ id: "1-1", descricao: "Descrição A", aprovacao: "Aprovada" }),
+        itemDeVoto({ id: "2-1", descricao: "Descrição B", aprovacao: null }),
+      ],
+    }),
+  );
+
+  assert.equal(status, 200);
+  assert.ok(linhaCom(html, "Descrição A").includes("Aprovada"));
+  assert.ok(!linhaCom(html, "Descrição B").includes("Aprovada"));
+  assert.ok(!html.includes(">null<"));
+});
+
+test("votos: `partido` nulo não vira 'null' na tela", async () => {
+  const { status, html } = await comVotos(historico({ votos: [itemDeVoto({ partido: null })] }));
+
+  assert.equal(status, 200);
+  assert.ok(html.includes("Aprovada a Medida Provisória nº 1/2026."));
+  assert.ok(!html.includes(">null<"));
+});
+
+test("votos: sem link para proposição e sem mostrar o id da proposição", async () => {
+  const { status, html } = await comVotos(historico());
+
+  assert.equal(status, 200);
+  assert.ok(html.includes("Aprovada a Medida Provisória nº 1/2026."), "controle: o voto aparece");
+  assert.ok(!html.includes("9876543"), "mostrou id_proposicao");
+  assert.ok(!html.includes('href="/camara'), "criou link para /camara");
+});
+
+test("votos: a API recebe o perfil e depois GET .../votos/?pagina=1", async () => {
+  api.chamadas.length = 0;
+
+  const { status } = await pagina();
+
+  assert.equal(status, 200);
+  assert.deepEqual(api.chamadas, [CAMINHO_DO_PERFIL, `${CAMINHO_DOS_VOTOS}?pagina=1`]);
+});
+
+test("votos: primeira de duas páginas tem 'Próxima' e não tem 'Anterior'", async () => {
+  const { html } = await comVotos(historico({ pagina: 1, total_paginas: 2 }));
+
+  assert.ok(html.includes(`href="/deputados/${ID}/?pagina=2"`));
+  assert.ok(html.includes("Próxima"));
+  assert.ok(!html.includes("Anterior"));
+});
+
+test("votos: última página tem 'Anterior' e não tem 'Próxima'", async () => {
+  const { html } = await comVotos(historico({ pagina: 2, total_paginas: 2 }), "?pagina=2");
+
+  assert.ok(html.includes(`href="/deputados/${ID}/?pagina=1"`));
+  assert.ok(html.includes("Anterior"));
+  assert.ok(!html.includes("Próxima"));
+});
+
+test("votos: página do meio de três tem as duas setas, com as páginas 2 e 4", async () => {
+  const { html } = await comVotos(historico({ pagina: 3, total_paginas: 5 }), "?pagina=3");
+
+  assert.ok(html.includes(`href="/deputados/${ID}/?pagina=2"`));
+  assert.ok(html.includes(`href="/deputados/${ID}/?pagina=4"`));
+  assert.ok(html.includes("Página 3 de 5"));
+});
+
+test("votos: a página pedida vai à API; página inválida vira 1", async () => {
+  api.chamadas.length = 0;
+  await comVotos(historico({ pagina: 2, total_paginas: 2 }), "?pagina=2");
+  assert.deepEqual(api.chamadas, [CAMINHO_DO_PERFIL, `${CAMINHO_DOS_VOTOS}?pagina=2`]);
+
+  // A regra do `?pagina=` é `[1-9][0-9]{0,3}` (sem zero à esquerda, ASCII).
+  for (const invalida of ["0", "abc", "-1", "12345", "02", "0002", "٢"]) {
+    api.chamadas.length = 0;
+    const { status } = await comVotos(historico(), `?pagina=${invalida}`);
+
+    assert.equal(status, 200, `a página não pode quebrar com ?pagina=${invalida}`);
+    assert.ok(api.chamadas.includes(`${CAMINHO_DOS_VOTOS}?pagina=1`), invalida);
+  }
+});
+
+test("votos: sem nenhum voto coletado a página diz isso e o perfil continua", async () => {
+  const { status, html } = await comVotos(
+    historico({ votos: [], pagina: 1, total_paginas: 0, atribuicao: null }),
+  );
+
+  assert.equal(status, 200);
+  assert.ok(html.includes("Nenhum voto coletado"));
+  assert.ok(html.includes("ANA DA CÂMARA"));
+});
+
+test("votos: página além da última volta para a primeira", async () => {
+  const { status, html } = await comVotos(
+    historico({ votos: [], pagina: 9, total_paginas: 2, atribuicao: null }),
+    "?pagina=9",
+  );
+
+  assert.equal(status, 200);
+  assert.ok(html.includes("Nenhum voto nesta página"));
+  assert.ok(html.includes(`href="/deputados/${ID}/"`));
+});
+
+test("votos: a atribuição dos votos aparece com o conjunto e o link do original", async () => {
+  const { html } = await comVotos(historico());
+
+  assert.ok(html.includes("Votos nominais em plenário"));
+  assert.ok(html.includes('href="https://dados.example.org/api/v2/votacoes/votos.json"'));
+});
+
+test("votos: link da atribuição que não é http(s) vira texto, sem href", async () => {
+  const atribuicao = atribuicaoDosVotos({ url_origem: "javascript:alert(1)" });
+  const { status, html } = await comVotos(historico({ atribuicao }));
+
+  assert.equal(status, 200, "controle: a página precisa existir");
+  assert.ok(!/href="javascript/i.test(html), "virou href");
+});
+
+test("votos: órgão, descrição e voto com HTML aparecem escapados", async () => {
+  const { status, html } = await comVotos(
+    historico({
+      votos: [
+        itemDeVoto({
+          orgao: "<img src=x>",
+          descricao: "<script>alert(1)</script>",
+          voto: "<b>Sim</b>",
+        }),
+      ],
+    }),
+  );
+
+  assert.equal(status, 200);
+  assert.ok(!html.includes("<script>alert(1)"));
+  assert.ok(!html.includes("<img src=x>"));
+  assert.ok(!html.includes("<b>Sim</b>"));
+  assert.ok(html.includes("&lt;script&gt;alert(1)&lt;/script&gt;"));
+});
+
+test("votos: chave desconhecida que a API devolva não chega ao HTML", async () => {
+  const corpo = historico({ votos: [itemDeVoto({ interno: "SEGREDO-NO-ITEM" })] });
+  corpo.extra = "SEGREDO-NA-RAIZ";
+  corpo.deputado.email = "SEGREDO-NO-DEPUTADO";
+  corpo.atribuicao.interno = "SEGREDO-NA-ATRIBUICAO";
+
+  const { status, html } = await comVotos(corpo);
+
+  assert.equal(status, 200, "controle: a página precisa existir");
+  assert.ok(!html.includes("SEGREDO"));
+});
+
+test("votos: estrutura: um h1 e a seção 'Votos'", async () => {
+  const { status, html } = await comVotos(historico());
+
+  assert.equal(status, 200);
+  assert.equal((html.match(/<h1[ >]/g) ?? []).length, 1);
+  assert.match(html, /<h2[^>]*>Votos<\/h2>/);
+});
+
+// Cada caso quebra uma única chave do formato; o controle (histórico íntegro) precisa dar 200.
+const CORPOS_FORA_DO_FORMATO = {
+  "voto de tipo errado": (c) => (c.votos[0].voto = 7),
+  "voto ausente": (c) => delete c.votos[0].voto,
+  "partido de tipo errado": (c) => (c.votos[0].partido = 7),
+  "partido ausente": (c) => delete c.votos[0].partido,
+  "aprovacao de tipo errado": (c) => (c.votos[0].aprovacao = 1),
+  "id do voto numérico": (c) => (c.votos[0].id = 2641546),
+  "data numérica": (c) => (c.votos[0].data = 20261112),
+  "orgao nulo": (c) => (c.votos[0].orgao = null),
+  "descricao nula": (c) => (c.votos[0].descricao = null),
+  "id_proposicao em texto": (c) => (c.votos[0].id_proposicao = "9876543"),
+  "item que não é objeto": (c) => (c.votos[0] = "SEGREDO-FORA-DO-FORMATO"),
+  "votos que não é lista": (c) => (c.votos = "SEGREDO-FORA-DO-FORMATO"),
+  "pagina em texto": (c) => (c.pagina = "1"),
+  "total_paginas ausente": (c) => delete c.total_paginas,
+  "atribuicao que não é objeto": (c) => (c.atribuicao = "SEGREDO-FORA-DO-FORMATO"),
+  "atribuicao sem conjunto": (c) => delete c.atribuicao.conjunto,
+  "deputado sem nome": (c) => delete c.deputado.nome,
+  "deputado.id_camara em texto": (c) => (c.deputado.id_camara = "204554"),
+};
+
+for (const [nome, estragar] of Object.entries(CORPOS_FORA_DO_FORMATO)) {
+  test(`votos: resposta fora do formato (${nome}) vira 500 sem vazar o texto`, async () => {
+    const controle = await comVotos(historico());
+    assert.equal(controle.status, 200, "controle: o histórico íntegro precisa dar 200");
+
+    const corpo = historico();
+    estragar(corpo);
+    const { status, html } = await comVotos(corpo);
+
+    assert.equal(status, 500);
+    assert.ok(!html.includes("SEGREDO"));
+  });
+}
+
+test("votos: corpo que não é JSON vira 500 sem vazar o texto", async () => {
+  const { status, html } = await comVotos("SEGREDO-NAO-E-JSON");
+
+  assert.equal(status, 500);
+  assert.ok(!html.includes("SEGREDO"));
+});
+
+test("votos: API de votos com erro dá 500 genérico, sem o endereço da API", async () => {
+  const controle = await comVotos(historico());
+  assert.equal(controle.status, 200, "controle: com os votos a página precisa existir");
+
+  const { status, html } = await pagina(
+    ID,
+    { status: 200, corpo: perfil() },
+    { votos: { status: 500, corpo: { erro: "boom" } } },
+  );
+
+  assert.equal(status, 500);
+  assert.ok(!html.includes(api.url));
+  assert.ok(!html.includes(new URL(api.url).host));
+});
+
+test("votos: 404 dos votos com o perfil existente é incoerência da API e vira 500", async () => {
+  const controle = await comVotos(historico());
+  assert.equal(controle.status, 200, "controle: a página precisa existir");
+
+  const { status } = await pagina(
+    ID,
+    { status: 200, corpo: perfil() },
+    { votos: { status: 404, corpo: { erro: "não encontrado" } } },
+  );
+
+  assert.equal(status, 500);
+});
+
+test("votos: perfil 404 continua 404 e não chama a API de votos", async () => {
+  const controle = await comVotos(historico());
+  assert.equal(controle.status, 200, "controle: a página precisa existir");
+  api.chamadas.length = 0;
+
+  const { status, html } = await pagina(ID, { status: 404, corpo: { erro: "não encontrado" } });
+
+  assert.equal(status, 404);
+  assert.match(html, /não encontrad/i);
+  assert.deepEqual(api.chamadas, [CAMINHO_DO_PERFIL]);
+});

@@ -534,6 +534,96 @@ def test_erro_inesperado_na_normalizacao_nao_vaza_a_mensagem(
     assert any("inesperad" in linha for linha in resultado.lines)
 
 
+class ErroDeTerceiros(Exception):
+    """Classe que não é a da fixture nem do Django: o nome no log tem de ser o dela."""
+
+
+@pytest.mark.parametrize(
+    ("erro", "nome"),
+    [
+        (IntegrityError("duplicate key"), "IntegrityError"),
+        (RuntimeError("falhou"), "RuntimeError"),
+        (KeyError("coluna"), "KeyError"),
+        (ErroDeTerceiros("falhou"), "ErroDeTerceiros"),
+    ],
+    ids=["integrity", "runtime", "key", "terceiros"],
+)
+def test_erro_inesperado_na_normalizacao_poe_o_nome_da_classe_na_linha_do_log(
+    agendador, ingest, registrar_normalizador, erro, nome
+):
+    registrar_normalizador("camara/deputados", FakeNormalizador(erro=erro))
+    make_dataset()
+
+    resultado = coletar(agendador)
+
+    linhas = [linha for linha in resultado.lines if "falhou de forma inesperada" in linha]
+    assert len(linhas) == 1  # a premissa: foi o ramo do erro inesperado que escreveu
+    assert linhas[0] == f"camara/deputados: normalização falhou de forma inesperada ({nome})"
+
+
+def _erro_do_banco_com_contexto(mensagem, contexto, causa):
+    """Um `IntegrityError` com a mensagem, o `__context__` e a `__cause__` citando valores."""
+    try:
+        try:
+            raise ValueError(contexto)
+        except ValueError:
+            raise IntegrityError(mensagem) from RuntimeError(causa)
+    except IntegrityError as erro:
+        return erro
+
+
+def test_erro_inesperado_nao_vaza_mensagem_contexto_nem_causa_no_log_nem_no_banco(
+    agendador, ingest, registrar_normalizador
+):
+    cpf = "123.456.789-09"
+    nome = "MARIA APARECIDA DA SILVA"
+    erro = _erro_do_banco_com_contexto(
+        f"DETAIL: Key (cpf)=({cpf}) already exists.",
+        f"linha com nome ({nome})",
+        f"causa com cpf ({cpf})",
+    )
+    assert erro.__context__ is not None
+    assert erro.__cause__ is not None
+    registrar_normalizador("camara/deputados", FakeNormalizador(erro=erro))
+    dataset = make_dataset()
+
+    resultado = coletar(agendador)
+
+    assert resultado.normalization_failed == 1
+    assert any("falhou de forma inesperada" in linha for linha in resultado.lines)  # a premissa
+    log = "\n".join(resultado.lines)
+    dataset.refresh_from_db()
+    for valor in (cpf, nome, "DETAIL", "already exists", "causa com"):
+        assert valor not in log
+        assert valor not in dataset.last_normalization_error
+
+
+@pytest.mark.parametrize("erro", [IntegrityError("duplicate key"), ErroDeTerceiros("falhou")])
+def test_o_nome_da_classe_vai_so_para_o_log_e_o_texto_gravado_continua_fixo(
+    agendador, ingest, registrar_normalizador, erro
+):
+    registrar_normalizador("camara/deputados", FakeNormalizador(erro=erro))
+    dataset = make_dataset()
+
+    resultado = coletar(agendador)
+
+    assert any(type(erro).__name__ in linha for linha in resultado.lines)
+    dataset.refresh_from_db()
+    assert dataset.last_normalization_error == agendador.UNEXPECTED_ERROR_TEXT
+
+
+def test_nome_de_classe_enorme_e_cortado_no_log(agendador, ingest, registrar_normalizador):
+    classe = type("X" * 500, (Exception,), {})
+    registrar_normalizador("camara/deputados", FakeNormalizador(erro=classe("falhou")))
+    make_dataset()
+
+    resultado = coletar(agendador)
+
+    linha = next(linha for linha in resultado.lines if "falhou de forma inesperada" in linha)
+    assert "X" * 80 in linha
+    assert "X" * 81 not in linha
+
+
 def test_um_conjunto_que_recusa_nao_impede_o_outro(agendador, ingest, registrar_normalizador):
     from apps.sources.normalization import NormalizationRefused
 

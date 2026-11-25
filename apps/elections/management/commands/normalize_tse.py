@@ -33,6 +33,10 @@ class Command(BaseCommand):
         if run is None:
             raise CommandError(f"Nenhuma carga com linhas para {name}; rode ingest_dataset.")
 
+        # MUTAÇÃO DO COORDENADOR: limpa antes de normalizar, também em recusa e falha
+        Dataset.objects.filter(pk=dataset.pk).update(
+            last_normalization_at=timezone.now(), last_normalization_error=""
+        )
         failed = False
         try:
             result = normalization.normalize(run, accept_retirements=options["aceitar_retiradas"])

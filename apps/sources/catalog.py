@@ -262,4 +262,61 @@ DATASETS = [
         "schedule_interval_hours": 24,
         "earliest_hour_utc": 8,
     },
+    {
+        # Proposições das votações da Câmara em 2026, primeiro arquivo (ADR 0033): 12 colunas,
+        # 7.160 linhas em 7.084 votações, 3,6 MB, medido em 2026-11-26 (regenerado às 07:11 GMT).
+        # Sem licença declarada: a base é a decisão do dono, no admin. Ano fixo no cadastro, como
+        # os outros. Só 7 colunas (ADR 0005): `uriVotacao`, `proposicao_uri`, `data`, `descricao`
+        # e `proposicao_codTipo` são descartados na leitura (a votação já tem data e descrição,
+        # e a sigla do tipo basta). A `ementa` tem quebra de linha e TAB: o formato `csv` aceita
+        # registro multilinha e a normalização troca os dois por espaço.
+        "source": "camara",
+        "slug": "votacoes-proposicoes-2026",
+        "name": "Proposições das votações da Câmara (2026)",
+        "url": "https://dadosabertos.camara.leg.br/arquivos/votacoesProposicoes/csv/votacoesProposicoes-2026.csv",
+        "format": "csv",
+        "allowed_columns": [
+            "idVotacao",
+            "proposicao_id",
+            "proposicao_titulo",
+            "proposicao_ementa",
+            "proposicao_siglaTipo",
+            "proposicao_numero",
+            "proposicao_ano",
+        ],
+        "internal_columns": [],
+        "license_basis": "owner_decision",
+        "license_id": "",
+        "license_url": "",
+        "license_check_url": "",
+        "schedule_interval_hours": 24,
+        "earliest_hour_utc": 8,
+    },
+    {
+        # Objetos das votações da Câmara em 2026, segundo arquivo (ADR 0033): 12 colunas, 39.416
+        # linhas em 8.842 votações (até 212 por votação), 17,2 MB, medido em 2026-11-26
+        # (regenerado às 07:23 GMT). Os dois arquivos não repetem nenhum par votação-proposição, e
+        # juntos cobrem as 9.417 votações. Mesma allowlist do primeiro.
+        "source": "camara",
+        "slug": "votacoes-objetos-2026",
+        "name": "Objetos das votações da Câmara (2026)",
+        "url": "https://dadosabertos.camara.leg.br/arquivos/votacoesObjetos/csv/votacoesObjetos-2026.csv",
+        "format": "csv",
+        "allowed_columns": [
+            "idVotacao",
+            "proposicao_id",
+            "proposicao_titulo",
+            "proposicao_ementa",
+            "proposicao_siglaTipo",
+            "proposicao_numero",
+            "proposicao_ano",
+        ],
+        "internal_columns": [],
+        "license_basis": "owner_decision",
+        "license_id": "",
+        "license_url": "",
+        "license_check_url": "",
+        "schedule_interval_hours": 24,
+        "earliest_hour_utc": 8,
+    },
 ]

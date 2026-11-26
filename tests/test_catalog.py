@@ -112,6 +112,8 @@ def test_seed_cria_as_tres_fontes_e_os_conjuntos_do_tse_da_camara_e_do_senado():
         "camara/deputados",
         "camara/votacoes-2026",
         "camara/votos-2026",
+        "camara/votacoes-proposicoes-2026",
+        "camara/votacoes-objetos-2026",
         "senado/senadores",
         "senado/votacoes",
     }
@@ -121,7 +123,7 @@ def test_seed_cria_as_tres_fontes_e_os_conjuntos_do_tse_da_camara_e_do_senado():
 def test_os_conjuntos_sem_licenca_declarada_nascem_desabilitados_e_sem_justificativa():
     seed()
     conjuntos = Dataset.objects.filter(source__slug__in=("camara", "senado"))
-    assert conjuntos.count() == 5
+    assert conjuntos.count() == 7
     for conjunto in conjuntos:
         assert conjunto.enabled is False
         assert conjunto.license_basis == Dataset.LicenseBasis.OWNER_DECISION
@@ -236,6 +238,53 @@ def test_votos_da_camara_leem_so_a_allowlist_e_nunca_a_identidade_do_deputado():
     assert votos.earliest_hour_utc == 8
 
 
+COLUNAS_PROPOSICOES = [
+    "idVotacao",
+    "proposicao_id",
+    "proposicao_titulo",
+    "proposicao_ementa",
+    "proposicao_siglaTipo",
+    "proposicao_numero",
+    "proposicao_ano",
+]
+
+
+@pytest.mark.parametrize(
+    ("slug", "arquivo", "pasta"),
+    [
+        ("votacoes-proposicoes-2026", "votacoesProposicoes-2026", "votacoesProposicoes"),
+        ("votacoes-objetos-2026", "votacoesObjetos-2026", "votacoesObjetos"),
+    ],
+)
+def test_proposicoes_das_votacoes_da_camara_leem_so_a_allowlist_e_nascem_desabilitadas(
+    slug, arquivo, pasta
+):
+    seed()
+    conjunto = Dataset.objects.get(source__slug="camara", slug=slug)
+    assert conjunto.format == Dataset.Format.CSV
+    # Medido em 2026-11-26 (`fontes/camara.md`, Rodada 4): 12 colunas, regeneradas às 07:11 e
+    # 07:23 GMT.
+    assert conjunto.url == f"https://dadosabertos.camara.leg.br/arquivos/{pasta}/csv/{arquivo}.csv"
+    assert conjunto.allowed_columns == COLUNAS_PROPOSICOES
+    # Minimização (ADR 0005): `uri*`, a data e a descrição (a votação já as tem) e o código do
+    # tipo (a sigla basta) ficam de fora.
+    for fora in ("uriVotacao", "proposicao_uri", "data", "descricao", "proposicao_codTipo"):
+        assert fora not in conjunto.allowed_columns
+    assert conjunto.internal_columns == []
+    assert conjunto.license_basis == Dataset.LicenseBasis.OWNER_DECISION
+    assert conjunto.enabled is False
+    assert conjunto.schedule_interval_hours == 24
+    assert conjunto.earliest_hour_utc == 8
+
+
+@pytest.mark.parametrize("slug", ["votacoes-proposicoes-2026", "votacoes-objetos-2026"])
+def test_o_agendador_normaliza_as_proposicoes_das_votacoes_da_camara_depois_da_coleta(slug):
+    assert (
+        settings.NORMALIZERS[f"camara/{slug}"]
+        == "apps.legislature.camara_proposition_normalization.normalize_latest"
+    )
+
+
 def test_o_agendador_normaliza_as_votacoes_do_senado_depois_da_coleta():
     assert (
         settings.NORMALIZERS["senado/votacoes"]
@@ -296,7 +345,7 @@ def test_segunda_execucao_nao_duplica_nem_cria():
     seed()
     texto = seed()
     assert Source.objects.count() == 3
-    assert Dataset.objects.count() == 6
+    assert Dataset.objects.count() == 8
     assert "0 criad" in texto
 
 

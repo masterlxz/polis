@@ -2,7 +2,7 @@ from django.core.management.base import BaseCommand, CommandError
 
 from apps.legislature import camara_proposition_normalization as normalization
 from apps.sources.models import Dataset
-from apps.sources.normalization import record_success, unexpected_error_class
+from apps.sources.normalization import unexpected_error_class
 
 
 class Command(BaseCommand):
@@ -47,8 +47,6 @@ class Command(BaseCommand):
                 f"A normalização falhou de forma inesperada ({error_class}); nada foi gravado."
             ) from None
 
-        # Só no sucesso: limpa a recusa que o agendador gravou antes neste conjunto.
-        record_success(dataset)
         self.stdout.write(
             f"{dataset.slug}, execução {run.pk}: linhas lidas {result.rows_read}, "
             f"proposições {result.unique}, criadas {result.created}, "

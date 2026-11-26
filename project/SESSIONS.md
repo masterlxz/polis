@@ -2,6 +2,13 @@
 
 Mais recente no topo.
 
+### 2026-11-26 — Sessão 98 (premissa dos "5 registros multilinha" do ADR 0031; sessão individual)
+
+- **Pedido**: o dono escolheu conferir a pendência da Sessão 95: `votacoes-2026` leu 11.286 linhas físicas para 9.242 registros, e eu havia dito que o ADR 0031 trazia só 5 registros com quebra de linha.
+- **Medido (2026-11-26, uma requisição ao CSV público com o `User-Agent` do polis, analisado fora do repo com o `csv.reader` e a mesma contagem de linhas do `_lines`)**: 5.721.326 bytes, BOM UTF-8, 20 colunas, **9.417 registros, ids sem repetição, nenhuma largura errada, 11.503 linhas físicas de dados**; **977 registros ocupam mais de uma linha** (385 com 2, 297 com 3, 148 com 4, 105 com 5, 30 com 6, 3 com 7, 4 com 8, 1 com 9, 3 com 10, 1 com 13). A razão linhas/registros é 1,221, a mesma da coleta do dono (11.286/9.242).
+- **Conclusão**: não há discrepância. Quem errou fui eu na Sessão 95: li "5" como o total, mas o ADR 0031 já dizia **951 registros multilinha** (946 só na coluna descartada `ultimaApresentacaoProposicao_descricao`, 4 só em `descricao`, 1 nos dois); o 5 é o que toca a coluna permitida. O erro estava só em uma frase das alternativas descartadas do ADR ("5 linhas parariam a coleta"), corrigida neste PR: o leitor não distingue a coluna, então a falha fechada pararia a coleta por 951 (hoje 977) registros, o que reforça a decisão de aceitar multilinha.
+- **Não verificado**: a causa de a fonte ter 977 e não 951 além do crescimento do arquivo (9.153 para 9.417 votações entre 2026-11-24 e 26); o conjunto de votos (`votos-2026`) não foi medido de novo.
+
 ### 2026-11-26 — Sessão 97 (aviso de totais zerados no detalhe da votação da Câmara; sessão individual)
 
 - **Pedido**: decisão do dono sobre o aviso para totais `0/0/0` sem voto nominal (pendência da Sessão 95). Escolheu a opção B, frase de fato: "Os totais da fonte estão zerados e não são mostrados."

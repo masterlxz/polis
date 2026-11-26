@@ -1,6 +1,15 @@
 from django.contrib import admin
 
-from .models import CamaraVote, CamaraVoting, Deputy, SenateVote, SenateVoting, Senator
+from .models import (
+    CamaraProposition,
+    CamaraVote,
+    CamaraVoting,
+    CamaraVotingProposition,
+    Deputy,
+    SenateVote,
+    SenateVoting,
+    Senator,
+)
 
 
 @admin.register(Deputy)
@@ -75,3 +84,24 @@ class CamaraVoteAdmin(DeputyAdmin):
     list_select_related = ["voting"]
     search_fields = ["voting__camara_voting_id"]
     raw_id_fields = ["ingestion_run", "voting"]
+
+
+@admin.register(CamaraProposition)
+class CamaraPropositionAdmin(DeputyAdmin):
+    """Idem: só leitura (ADR 0033)."""
+
+    list_display = ["camara_id", "title", "type_acronym", "number", "year"]
+    list_filter = ["type_acronym", "year"]
+    search_fields = ["title", "ementa"]
+    raw_id_fields = ["ingestion_run"]
+
+
+@admin.register(CamaraVotingProposition)
+class CamaraVotingPropositionAdmin(DeputyAdmin):
+    """Idem: só leitura (ADR 0033). A votação é só o texto do id, sem chave."""
+
+    list_display = ["camara_voting_id", "proposition", "origin"]
+    list_filter = ["origin"]
+    list_select_related = ["proposition"]
+    search_fields = ["camara_voting_id", "proposition__title"]
+    raw_id_fields = ["ingestion_run", "proposition"]

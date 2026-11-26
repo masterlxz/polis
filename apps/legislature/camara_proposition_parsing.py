@@ -24,7 +24,7 @@ _BREAK_OR_TAB = re.compile(f"{_LINE_BREAK.pattern}|\t")
 def _ementa(values):
     value = values.get("proposicao_ementa")
     if type(value) is str:
-        value = _BREAK_OR_TAB.sub(" ", value)
+        value = re.sub(r"[\x00-\x1f\x7f]", "", _BREAK_OR_TAB.sub(" ", value))
     return _text({"proposicao_ementa": value}, "proposicao_ementa", _EMENTA_MAX, required=False)
 
 

@@ -22,7 +22,6 @@ export const LEGENDA_DAS_SIGLAS =
 // O texto da nota com as legendas que a página precisa (a da aprovação, a das siglas ou as duas);
 // `null` se não precisa de nenhuma.
 export function textoDaNota({ aprovacao, siglas }) {
-  if (!aprovacao && !siglas) return null;
   return [PREFIXO_DA_NOTA, aprovacao && LEGENDA_DA_APROVACAO, siglas && LEGENDA_DAS_SIGLAS]
     .filter(Boolean)
     .join(" ");

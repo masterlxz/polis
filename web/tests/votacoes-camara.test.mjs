@@ -769,6 +769,27 @@ for (const [nome, montar] of Object.entries(detalhesFora)) {
   });
 }
 
+// O contrário dos casos acima: só quem tem link precisa de um par que a rota do deputado aceite. Um
+// voto sem perfil pode ter legislatura 0 ou id de 10 dígitos (`PositiveIntegerField` os admite) e a
+// página tem de mostrá-lo, não dar 500 por causa de um link que nem existe.
+for (const [nome, extra, idCamara] of [
+  ["legislatura 0", { legislatura: 0 }, 1],
+  ["id da Câmara 0", {}, 0],
+  ["id da Câmara de 10 dígitos", {}, 1234567890],
+]) {
+  test(`detalhe: voto sem perfil e ${nome} é aceito, sem link`, async () => {
+    const { status, html } = await detalhe(
+      nominal({ votos: [voto(idCamara, null, "ABC", "Sim", extra)] }),
+    );
+
+    assert.equal(status, 200);
+    assert.deepEqual(tabela(html, "Votos").linhas, [
+      [`Deputado sem perfil (id ${idCamara})`, "ABC", "Sim"],
+    ]);
+    assert.ok(!html.includes('href="/deputados/'));
+  });
+}
+
 test("estrutura: um h1, título com o descritor e noindex", async () => {
   for (const { status, html } of [await listaOk(), await detalhe()]) {
     assert.equal(status, 200, "controle: a 404 do Next também tem h1, título e noindex");

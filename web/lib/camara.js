@@ -1,12 +1,32 @@
 // Como as páginas das votações da Câmara mostram o que a fonte manda (ADR 0031 e 0032). A API
-// devolve `aprovacao` e as siglas de voto como a fonte as manda; o significado delas não foi
-// verificado, então nada aqui as traduz.
+// devolve `aprovacao` e as siglas de voto como a fonte as manda, e as páginas as mostram assim, com
+// a legenda do que a documentação oficial da Câmara diz (ADR 0032, emenda 2; lida em 2026-11-26).
 import { dataBr } from "./formatar.js";
 
 export const ROTULO_DA_APROVACAO = "Aprovação (código da fonte)";
 
-export const NOTA_DO_CODIGO =
-  "Códigos como a fonte os manda; o significado de 1/0 e das siglas de voto não foi verificado.";
+export const URL_DA_DOCUMENTACAO =
+  "https://dadosabertos.camara.leg.br/howtouse/2020-02-07-dados-votacoes.html";
+
+export const PREFIXO_DA_NOTA = "Códigos como a fonte os manda.";
+
+// `aprovacao`: 1 "resultou em aprovação"; 0 "não foi aprovada" (rejeitada ou sem quórum); vazio
+// quando não é possível afirmar o resultado sem leitura humana da descrição.
+export const LEGENDA_DA_APROVACAO =
+  "Aprovação, segundo a documentação da Câmara: 1 é votação que resultou em aprovação; 0, proposição não aprovada (rejeitada ou sem quórum); sem código, a Câmara não afirma o resultado.";
+
+// Só o que a documentação descreve (em `votosOutros`); ela não lista todos os valores de voto.
+export const LEGENDA_DAS_SIGLAS =
+  "Votos: Abstenção, Obstrução (o parlamentar se abstém e não quer ser contado no quórum) e Artigo 17 (abstenção obrigatória do presidente, em referência ao Regimento da Câmara) entram em “outros” nos totais da Câmara.";
+
+// O texto da nota com as legendas que a página precisa (a da aprovação, a das siglas ou as duas);
+// `null` se não precisa de nenhuma.
+export function textoDaNota({ aprovacao, siglas }) {
+  if (!aprovacao && !siglas) return null;
+  return [PREFIXO_DA_NOTA, aprovacao && LEGENDA_DA_APROVACAO, siglas && LEGENDA_DAS_SIGLAS]
+    .filter(Boolean)
+    .join(" ");
+}
 
 // `voto` nulo é a ausência de posição na fonte (a Câmara publica a presença sem o voto).
 export const SEM_POSICAO = "Sem posição registrada";

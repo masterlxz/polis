@@ -2,6 +2,13 @@
 
 Mais recente no topo.
 
+### 2026-11-26 — Sessão 100 (significado de `aprovacao` e das siglas de voto; legenda no lugar da nota; sessão individual)
+
+- **Pedido**: o item 4 da emenda 2 do ADR 0032: conferir o significado de `aprovacao` e das siglas na documentação oficial da Câmara; se confirmasse, a nota "não foi verificado" viraria legenda.
+- **Conferido** (leitura de [O que você precisa saber sobre votações no Dados Abertos](https://dadosabertos.camara.leg.br/howtouse/2020-02-07-dados-votacoes.html), tutorial de 2020; o dicionário formal não foi achado): `aprovacao` 1 é aprovação, 0 é não aprovada (rejeitada ou sem quórum), vazio é "não é possível afirmar"; `votosOutros` junta abstenção, nulo/branco, "favorável com restrições", "Art. 17" (abstenção obrigatória do presidente) e obstrução; os totais são contagens dos registros de voto cadastrados. Coerência com o CSV de 2026-11-26 (uma requisição, 9.417 votações): `1` ↔ "aprovado" em 9.129 de 9.148, `0` ↔ "rejeitado/prejudicado" em 214 de 215, vazio nunca com "aprovado" nem "rejeitado" (54). **Não confirmado**: a lista completa dos valores de `voto` (só Abstenção, Obstrução e Artigo 17 são descritos; `Sim` e `Não` ficam sem legenda). Registro no ADR 0032, **emenda 3**.
+- **Feito**: a nota `Códigos como a fonte os manda. <legenda da aprovação> <legenda das siglas> Fonte: documentação da Câmara` (componente `web/app/camara/Nota.js`, textos em `web/lib/camara.js`) nas páginas do deputado e do detalhe da votação, só com as legendas que cada página precisa. O código continua cru na tela.
+- **Prova e não verificado**: ver o corpo do PR (controle, cabeça e mutações pelo CI). A documentação tem 6 anos (versão 0.4): se a Câmara mudar o significado, a legenda envelhece. A página nunca foi vista num navegador.
+
 ### 2026-11-26 — Sessão 99 (as cinco decisões da emenda 1 do ADR 0032; sessão individual)
 
 - **Pedido**: o dono seguiu a recomendação para as cinco decisões abertas da emenda 1. Decisões e motivos no ADR 0032, **emenda 2**: (1) duas atribuições no histórico do deputado; (2) 400 antes de 404 mantido; (3) falha de `/votos/` derruba o perfil até o P-16; (4) nota dos códigos mantida, e conferir o significado na documentação da Câmara fica como tarefa à parte; (5) bidi em `descricao` não tratado (0 casos em 9.417).

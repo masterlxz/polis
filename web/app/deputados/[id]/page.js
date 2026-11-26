@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 
 import { buscarDeputado, buscarVotosDoDeputado, prepararPagina } from "../../../lib/api.js";
 import { dataBr } from "../../../lib/formatar.js";
+import Nota from "../../camara/Nota.js";
 import Atribuicao from "../../pessoas/[id]/Atribuicao.js";
 
 // Sem cache: quem a fonte retirar (lápide, ADR 0005) precisa sumir na hora.
@@ -51,8 +52,8 @@ function SemVotos({ caminho, totalPaginas }) {
 }
 
 // `voto` nulo é a ausência de posição na fonte: a tela diz isso em vez de deixar a célula vazia.
-// `aprovacao` e as siglas de voto saem cruas: o significado delas não foi verificado (ADR 0031 e
-// 0032). Partido é o do momento do voto, não o do perfil.
+// `aprovacao` e as siglas de voto saem cruas, com a legenda da documentação da Câmara (ADR 0032,
+// emenda 2). Partido é o do momento do voto, não o do perfil.
 function Votos({ caminho, historico }) {
   const {
     votos,
@@ -93,12 +94,7 @@ function Votos({ caminho, historico }) {
           </tbody>
         </table>
       )}
-      {votos.length > 0 && (
-        <p className="nota">
-          Códigos como a fonte os manda; o significado de 1/0 e das siglas de voto não foi
-          verificado.
-        </p>
-      )}
+      {votos.length > 0 && <Nota aprovacao siglas />}
       <Navegacao caminho={caminho} pagina={pagina} totalPaginas={totalPaginas} />
       {atribuicaoDasVotacoes && <Atribuicao atribuicao={atribuicaoDasVotacoes} />}
       {atribuicaoDosVotos && <Atribuicao atribuicao={atribuicaoDosVotos} />}

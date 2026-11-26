@@ -397,7 +397,7 @@ export async function buscarVotosDoDeputado(id, pagina) {
 // Id da votação da Câmara: texto `<n>-<m>`, de 1 a 10 dígitos ASCII de cada lado e até 20 caracteres
 // no total (o `varchar(20)` do banco), como a rota `camara/votacoes/<id>/` (ADR 0032, decisão 4).
 // Zero à esquerda é válido: o id é texto, e `01-2` e `1-2` são registros distintos.
-const PADRAO_DA_VOTACAO_DA_CAMARA = /^(?=[0-9-]{3,20}$)[0-9]{1,10}-[0-9]{1,10}$/;
+const PADRAO_DA_VOTACAO_DA_CAMARA = /^(?=[0-9-]{3,20}$)[0-9]{1,10}-[0-9]{1,9}$/;
 
 export function idDeVotacaoDaCamaraValido(id) {
   return PADRAO_DA_VOTACAO_DA_CAMARA.test(id);

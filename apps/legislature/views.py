@@ -435,9 +435,9 @@ def camara_voting_detail(request, voting_id):
     # As proposições vêm de mais dois conjuntos; a ligação guarda o id da votação em texto, sem
     # chave (ADR 0033), e a atribuição é a da coleta mais recente entre elas.
     links = sorted(
-        CamaraVotingProposition.objects.filter(
-            camara_voting_id=voting.camara_voting_id
-        ).select_related("proposition", "ingestion_run__dataset__source"),
+        CamaraVotingProposition.objects.all().select_related(
+            "proposition", "ingestion_run__dataset__source"
+        ),
         key=_camara_proposition_order,
     )
     newest_propositions_run = max(

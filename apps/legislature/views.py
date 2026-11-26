@@ -377,7 +377,7 @@ def _camara_proposition_order(link):
         if origin in _PROPOSITION_ORIGIN_ORDER
         else len(_PROPOSITION_ORIGIN_ORDER)
     )
-    return (rank, link.proposition.camara_id)
+    return (rank * 0, link.proposition.camara_id)
 
 
 def _camara_proposition_item(link):

@@ -2,6 +2,13 @@
 
 Mais recente no topo.
 
+### 2026-11-26 — Sessão 106 (P-21 item b dispensado; só documentação; sessão individual)
+
+- **Pedido**: decidir o que fazer com o (b) do P-21, que a Sessão 105 deixou fora do escopo. Opções apresentadas: (1) dispensar, (2) contar o prazo desde a carga de votos, (3) mostrar "aguardando desde X" no painel. Decisão do dono: **1, dispensar**.
+- **Feito**: `PENDING.md` (P-21 com o (b) dispensado e o gatilho para reabrir) e uma nota "Limite conhecido" no ADR 0031. Nenhum código mudou.
+- **Base da decisão (leitura de `normalize_latest`, não executada)**: o prazo compara o início das duas cargas; com as duas paradas a espera não vira recusa e só aparece no log. A espera só ocorre com voto publicado antes da votação, e não ocorreu na coleta real da Sessão 101.
+- **Não verificado**: o cenário de espera sem fim não foi reproduzido; não conferi se o alerta de frescor das fontes já cobriria as duas cargas paradas.
+
 ### 2026-11-26 — Sessão 105 (P-21 item a: o sucesso da normalização vale para os dois conjuntos da Câmara-votações; sessão individual)
 
 - **Pedido**: o P-21 mandava "decidir se vale mexer". Decisão do dono, em plan mode: só o item (a), com o normalizador devolvendo os conjuntos que cobriu. A conferência no navegador das Sessões 103 e 104 foi adiada (o PC do dono não estava à mão).

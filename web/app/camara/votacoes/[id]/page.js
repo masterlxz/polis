@@ -114,8 +114,9 @@ function Proposicoes({ proposicoes }) {
     <>
       <h2>Proposições</h2>
       <ul className="proposicoes">
-        {proposicoes.map((item) => (
-          <li key={`${item.origem}-${item.id_camara}`}>
+        {proposicoes.map((item, indice) => (
+          // A key é o índice (lista fixa, sem reordenação): `origem` e o id vazariam no payload do React.
+          <li key={indice}>
             <strong>{item.titulo}</strong>
             {item.ementa && <p className="ementa">{item.ementa}</p>}
           </li>

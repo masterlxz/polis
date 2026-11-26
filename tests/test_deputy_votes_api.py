@@ -3,9 +3,9 @@
 `GET /internal/v1/deputados/<legislatura>-<id>/votos/?pagina=`. Dados sintéticos. O que mais
 importa: só saem os votos do par (legislatura, id da Câmara) pedido, nunca os de outro deputado nem
 os de outra legislatura com o mesmo id; `voto` vazio sai `null` (é "sem posição", nunca string
-vazia nem chave ausente); `partido` é o do momento do voto, não o do perfil; a atribuição é a do
-conjunto de VOTOS (outro `Dataset` que o das votações), pela coleta mais recente entre os itens da
-página; só saem campos de listas explícitas. Os testes de 404, 400 e 405 pedem antes um 200 de
+vazia nem chave ausente); `partido` é o do momento do voto, não o do perfil; são duas atribuições
+(ADR 0008, decisão 3), a do conjunto de VOTOS e a do de VOTAÇÕES (outro `Dataset`), cada uma pela
+coleta mais recente entre os itens da página; só saem campos de listas explícitas. Os testes de 404, 400 e 405 pedem antes um 200 de
 controle: sem isso, uma rota que não existe passaria por "erro esperado".
 
 Valores de referência lidos do código: 50 por página (`VOTINGS_PER_PAGE` em `apps/legislature/

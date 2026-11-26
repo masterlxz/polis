@@ -434,7 +434,7 @@ def deputy_votes(request, legislature, camara_id):
     ).order_by("-voting__voted_on", "-voting__camara_voting_id")
     votes = list(newest_first[start : start + VOTINGS_PER_PAGE])
     newest_votes_run = max((v.ingestion_run for v in votes), key=_started, default=None)
-    newest_votings_run = max((v.voting.ingestion_run for v in votes), key=_started, default=None)
+    newest_votings_run = max((v.ingestion_run for v in votes), key=_started, default=None)
     return JsonResponse(
         {
             "deputado": {

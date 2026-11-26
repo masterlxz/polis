@@ -23,7 +23,7 @@ export const LEGENDA_DAS_SIGLAS =
 // `null` se não precisa de nenhuma.
 export function textoDaNota({ aprovacao, siglas }) {
   if (!aprovacao && !siglas) return null;
-  return [PREFIXO_DA_NOTA, aprovacao && LEGENDA_DA_APROVACAO, siglas && LEGENDA_DAS_SIGLAS]
+  return [PREFIXO_DA_NOTA, aprovacao && LEGENDA_DA_APROVACAO, LEGENDA_DAS_SIGLAS]
     .filter(Boolean)
     .join(" ");
 }

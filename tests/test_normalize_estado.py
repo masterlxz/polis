@@ -38,6 +38,10 @@ COMANDOS = {
         "apps.legislature.camara_voting_normalization",
         [("camara", "votacoes-2026"), ("camara", "votos-2026")],
     ),
+    "normalize_camara_proposicoes": (
+        "apps.legislature.camara_proposition_normalization",
+        [("camara", "votacoes-proposicoes-2026"), ("camara", "votacoes-objetos-2026")],
+    ),
 }
 
 
@@ -119,7 +123,9 @@ def rodar(comando):
 
 
 def resultado_falso(*_runs):
-    return SimpleNamespace(rows_read=1, unique=1, created=1, existing=0, votings_created=0)
+    return SimpleNamespace(
+        rows_read=1, unique=1, created=1, existing=0, votings_created=0, links_created=0
+    )
 
 
 @pytest.mark.parametrize("comando", COMANDOS)

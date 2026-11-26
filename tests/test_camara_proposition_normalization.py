@@ -419,6 +419,67 @@ def test_comando_repassa_a_recusa_sem_valores(conjuntos):
     assert "proposicao_titulo" in str(erro.value)
 
 
+# --- encadeamento com o agendador (conjuntos registrados em `settings.NORMALIZERS`) ------------
+
+
+@pytest.mark.parametrize("atributo", ["proposicoes", "objetos"])
+def test_o_agendador_normaliza_o_conjunto_depois_da_coleta_e_grava_o_estado(conjuntos, atributo):
+    from apps.sources import scheduling
+
+    dataset = getattr(conjuntos, atributo)
+    carga(dataset, [linha()])
+    agora = timezone.now()
+    resultado = scheduling.Result()
+
+    scheduling._normalize(dataset, str(dataset), resultado, agora)
+
+    dataset.refresh_from_db()
+    assert (dataset.last_normalization_error, dataset.last_normalization_at) == ("", agora)
+    assert contagens() == (1, 1)
+    assert resultado.normalization_failed == 0
+    assert any("normalizado, linhas lidas 1, criadas 1" in texto for texto in resultado.lines)
+
+
+def test_recusa_no_agendador_grava_o_erro_so_no_conjunto_que_disparou(conjuntos):
+    from apps.sources import scheduling
+
+    antes = timezone.now()
+    Dataset.objects.filter(pk=conjuntos.objetos.pk).update(
+        last_normalization_error="Recusada antes.", last_normalization_at=antes
+    )
+    carga(conjuntos.proposicoes, [linha(proposicao_titulo="x" * 101)])
+    resultado = scheduling.Result()
+
+    scheduling._normalize(conjuntos.proposicoes, str(conjuntos.proposicoes), resultado, antes)
+
+    conjuntos.proposicoes.refresh_from_db()
+    conjuntos.objetos.refresh_from_db()
+    assert "proposicao_titulo" in conjuntos.proposicoes.last_normalization_error
+    assert conjuntos.objetos.last_normalization_error == "Recusada antes."
+    assert resultado.normalization_failed == 1
+    assert contagens() == (0, 0)
+
+
+# --- admin -------------------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("modelo", ["CamaraProposition", "CamaraVotingProposition"])
+def test_o_admin_e_so_leitura_e_os_campos_de_busca_existem_no_modelo(modelo):
+    from django.contrib import admin
+
+    import apps.legislature.models as modulo
+
+    classe = getattr(modulo, modelo)
+    registro = admin.site._registry[classe]
+    assert not registro.has_add_permission(None)
+    assert not registro.has_change_permission(None)
+    assert not registro.has_delete_permission(None)
+    assert registro.search_fields
+    for campo in registro.search_fields:
+        caminho = campo.lstrip("=^@")
+        classe.objects.filter(**{f"{caminho}__icontains": "x"}).exists()
+
+
 # --- modelos -----------------------------------------------------------------------------------
 
 

@@ -366,11 +366,22 @@ def test_normalize_latest_de_carga_ja_normalizada_devolve_none(conjuntos):
     assert normalizacao.normalize_latest(conjuntos.proposicoes) is None
 
 
-def test_normalize_latest_ignora_execucao_que_nao_terminou_bem(conjuntos):
+@pytest.mark.parametrize(
+    "estado",
+    [
+        {"state": IngestionRun.State.FAILED, "error_code": IngestionRun.ErrorCode.DOWNLOAD},
+        {"state": IngestionRun.State.RUNNING, "finished_at": None},
+    ],
+    ids=["falhou", "em_andamento"],
+)
+def test_execucao_que_nao_terminou_bem_nao_e_a_carga_mais_recente(conjuntos, estado):
     from apps.legislature import camara_proposition_normalization as normalizacao
 
-    carga(conjuntos.proposicoes, [linha()], state=IngestionRun.State.FAILED)
-    assert normalizacao.normalize_latest(conjuntos.proposicoes) is None
+    agora = timezone.now()
+    carga(conjuntos.proposicoes, [linha("1-1", "1")], started_at=agora)
+    carga(conjuntos.proposicoes, [linha("9-9", "9")], started_at=agora, **estado)
+    assert normalizacao.normalize_latest(conjuntos.proposicoes).created == 1
+    assert not modelos()[0].objects.filter(camara_id=9).exists()
 
 
 def comando():

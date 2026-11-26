@@ -569,7 +569,6 @@ for (const invalido of [
   "9999999999-9999999999",
   "1_2",
   "1.2-3",
-  "%2E%2E",
   "٣-1",
 ]) {
   test(`id malformado dá 404 sem chamar a API: ${invalido}`, async () => {

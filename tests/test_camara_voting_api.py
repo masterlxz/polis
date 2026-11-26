@@ -16,7 +16,13 @@ from datetime import UTC, date, datetime, timedelta
 
 import pytest
 
-from apps.legislature.models import CamaraVote, CamaraVoting, Deputy
+from apps.legislature.models import (
+    CamaraProposition,
+    CamaraVote,
+    CamaraVoting,
+    CamaraVotingProposition,
+    Deputy,
+)
 from apps.sources.models import Dataset, IngestionRun, Source
 
 pytestmark = pytest.mark.django_db
@@ -41,7 +47,16 @@ CHAVES_ITEM_DA_LISTA = {
     "id_proposicao",
     "tem_votos_nominais",
 }
-CHAVES_DETALHE = {"votacao", "votos", "contagem_por_voto", "atribuicao", "atribuicao_dos_votos"}
+CHAVES_DETALHE = {
+    "votacao",
+    "votos",
+    "contagem_por_voto",
+    "proposicoes",
+    "atribuicao",
+    "atribuicao_dos_votos",
+    "atribuicao_das_proposicoes",
+}
+CHAVES_PROPOSICAO = {"id_camara", "titulo", "tipo", "numero", "ano", "ementa", "origem"}
 CHAVES_VOTACAO = CHAVES_ITEM_DA_LISTA - {"tem_votos_nominais"}
 CHAVES_TOTAIS = {"sim", "nao", "outros"}
 CHAVES_VOTO = {"legislatura", "id_camara", "partido", "voto", "tem_perfil", "nome"}
@@ -503,7 +518,7 @@ def test_id_com_zero_a_esquerda_e_o_id_sem_zero_sao_registros_distintos(client, 
     assert _detalhe(client, "1-2")["votacao"]["descricao"] == "Sem zero."
 
 
-def test_o_detalhe_custa_tres_consultas_mesmo_com_muitos_votos(
+def test_o_detalhe_custa_quatro_consultas_mesmo_com_muitos_votos(
     client, run, django_assert_num_queries
 ):
     votacao = _votacao(run, NOMINAL)
@@ -513,16 +528,227 @@ def test_o_detalhe_custa_tres_consultas_mesmo_com_muitos_votos(
             _deputado(run, camara_id)
     _detalhe(client, NOMINAL)  # controle (e aquece o que o Django guarda em cache)
 
-    # votação com a atribuição, votos, e os deputados dos pares (uma consulta só, sem N+1)
-    with django_assert_num_queries(3):
+    # votação com a atribuição, votos, os deputados dos pares (uma consulta só, sem N+1) e as
+    # proposições (uma consulta só, com a proposição e a atribuição num JOIN)
+    with django_assert_num_queries(4):
         client.get(f"{LISTA}{NOMINAL}/")
 
 
 def test_o_detalhe_sem_votos_nao_consulta_deputados(client, sem_votos, django_assert_num_queries):
     _detalhe(client, SEM_VOTOS)  # controle
 
-    with django_assert_num_queries(2):
+    # votação com a atribuição e as proposições; sem votos não há consulta de deputados
+    with django_assert_num_queries(3):
         client.get(f"{LISTA}{SEM_VOTOS}/")
+
+
+# --- Proposições da votação (ADR 0033; emenda 5 do ADR 0032) -------------------------------------
+
+URL_ORIGEM_DAS_PROPOSICOES = (
+    "https://example.org/arquivos/votacoesProposicoes/csv/votacoesProposicoes-2026.csv"
+)
+URL_ORIGEM_DOS_OBJETOS = "https://example.org/arquivos/votacoesObjetos/csv/votacoesObjetos-2026.csv"
+COLETADO_EM_DAS_PROPOSICOES = datetime(2026, 11, 26, 8, 0, tzinfo=UTC)
+COLETADO_EM_DOS_OBJETOS = datetime(2026, 11, 26, 9, 30, tzinfo=UTC)
+# Ementa de `votacoesProposicoes-2026` (proposição 104333, "PL 11/2003"), lida da fonte em
+# 2026-11-26; o resto dos dados das proposições é sintético no formato medido.
+EMENTA_REAL = (
+    "Proíbe a veiculação de peças publicitárias, em qualquer meio de comunicação, "
+    "que utilizem imagens sexuais como atrativo."
+)
+
+
+def _criar_run_das_proposicoes(started_at=COLETADO_EM_DAS_PROPOSICOES):
+    return _criar_run(
+        started_at,
+        slug="votacoes-proposicoes-2026",
+        nome="Proposições das votações da Câmara (2026)",
+        url=URL_ORIGEM_DAS_PROPOSICOES,
+    )
+
+
+def _criar_run_dos_objetos(started_at=COLETADO_EM_DOS_OBJETOS):
+    return _criar_run(
+        started_at,
+        slug="votacoes-objetos-2026",
+        nome="Objetos das votações da Câmara (2026)",
+        url=URL_ORIGEM_DOS_OBJETOS,
+    )
+
+
+def _proposicao(run, camara_id, **extra):
+    campos = {
+        "camara_id": camara_id,
+        "title": f"PL {camara_id}/2026",
+        "type_acronym": "PL",
+        "number": camara_id,
+        "year": 2026,
+        "ementa": "Ementa de teste.",
+        "ingestion_run": run,
+        **extra,
+    }
+    return CamaraProposition.objects.create(**campos)
+
+
+def _ligar(codigo, proposicao, origem="proposicoes", run=None):
+    return CamaraVotingProposition.objects.create(
+        camara_voting_id=codigo,
+        proposition=proposicao,
+        origin=origem,
+        ingestion_run=run or proposicao.ingestion_run,
+    )
+
+
+def _ids_das_proposicoes(corpo):
+    return [item["id_camara"] for item in corpo["proposicoes"]]
+
+
+def test_proposicoes_so_com_as_chaves_das_listas_explicitas(client, nominal):
+    run_proposicoes = _criar_run_das_proposicoes()
+    run_objetos = _criar_run_dos_objetos()
+    _ligar(NOMINAL, _proposicao(run_proposicoes, 1), "proposicoes")
+    _ligar(NOMINAL, _proposicao(run_objetos, 2), "objetos")
+
+    corpo = _detalhe(client, NOMINAL)
+
+    assert set(corpo) == CHAVES_DETALHE
+    assert len(corpo["proposicoes"]) == 2
+    assert all(set(item) == CHAVES_PROPOSICAO for item in corpo["proposicoes"])
+    assert set(corpo["atribuicao_das_proposicoes"]) == CHAVES_ATRIBUICAO
+    chaves = set(_todas_as_chaves(corpo["proposicoes"]))
+    assert not chaves & {"pk", "proposition", "proposition_id", "ingestion_run", "uri", "camara_id"}
+
+
+def test_proposicao_com_os_campos_da_fonte(client, nominal):
+    run_proposicoes = _criar_run_das_proposicoes()
+    proposicao = _proposicao(
+        run_proposicoes,
+        104333,
+        title="PL 11/2003",
+        number=11,
+        year=2003,
+        ementa=EMENTA_REAL,
+    )
+    _ligar(NOMINAL, proposicao, "proposicoes")
+
+    assert _detalhe(client, NOMINAL)["proposicoes"] == [
+        {
+            "id_camara": 104333,
+            "titulo": "PL 11/2003",
+            "tipo": "PL",
+            "numero": 11,
+            "ano": 2003,
+            "ementa": EMENTA_REAL,
+            "origem": "proposicoes",
+        }
+    ]
+
+
+def test_ano_nulo_e_ementa_vazia_saem_null_nunca_zero_nem_string_vazia(client, nominal):
+    run_objetos = _criar_run_dos_objetos()
+    _ligar(NOMINAL, _proposicao(run_objetos, 7, year=None, ementa=""), "objetos")
+
+    [item] = _detalhe(client, NOMINAL)["proposicoes"]
+
+    assert "ano" in item and item["ano"] is None
+    assert "ementa" in item and item["ementa"] is None
+
+
+def test_proposicoes_saem_em_ordem_numerica_de_id_e_nao_de_texto(client, nominal):
+    run_proposicoes = _criar_run_das_proposicoes()
+    for camara_id in (100, 9, 10):
+        _ligar(NOMINAL, _proposicao(run_proposicoes, camara_id), "proposicoes")
+
+    assert _ids_das_proposicoes(_detalhe(client, NOMINAL)) == [9, 10, 100]
+
+
+def test_proposicoes_vem_antes_de_objetos_mesmo_com_id_maior(client, nominal):
+    run_proposicoes = _criar_run_das_proposicoes()
+    run_objetos = _criar_run_dos_objetos()
+    _ligar(NOMINAL, _proposicao(run_objetos, 5), "objetos")
+    _ligar(NOMINAL, _proposicao(run_proposicoes, 50), "proposicoes")
+    _ligar(NOMINAL, _proposicao(run_objetos, 3), "objetos")
+
+    corpo = _detalhe(client, NOMINAL)
+
+    assert [(i["origem"], i["id_camara"]) for i in corpo["proposicoes"]] == [
+        ("proposicoes", 50),
+        ("objetos", 3),
+        ("objetos", 5),
+    ]
+
+
+def test_proposicoes_de_outra_votacao_nao_aparecem(client, nominal, sem_votos):
+    run_proposicoes = _criar_run_das_proposicoes()
+    _ligar(NOMINAL, _proposicao(run_proposicoes, 1))
+    _ligar(SEM_VOTOS, _proposicao(run_proposicoes, 2))
+
+    assert _ids_das_proposicoes(_detalhe(client, NOMINAL)) == [1]
+    assert _ids_das_proposicoes(_detalhe(client, SEM_VOTOS)) == [2]
+
+
+def test_votacao_sem_proposicao_devolve_lista_vazia_e_atribuicao_nula(client, nominal):
+    corpo = _detalhe(client, NOMINAL)
+
+    assert corpo["proposicoes"] == []
+    assert corpo["atribuicao_das_proposicoes"] is None
+
+
+def test_o_sentinela_zero_da_votacao_nao_esconde_as_proposicoes(client, run):
+    _votacao(run, NOMINAL, proposition_id=0)
+    _ligar(NOMINAL, _proposicao(_criar_run_dos_objetos(), 8), "objetos")
+
+    corpo = _detalhe(client, NOMINAL)
+
+    assert corpo["votacao"]["id_proposicao"] == 0
+    assert _ids_das_proposicoes(corpo) == [8]
+
+
+def test_atribuicao_das_proposicoes_e_a_da_coleta_mais_recente_entre_elas(client, nominal):
+    run_proposicoes = _criar_run_das_proposicoes()
+    run_objetos = _criar_run_dos_objetos()
+    _ligar(NOMINAL, _proposicao(run_proposicoes, 1), "proposicoes")
+    _ligar(NOMINAL, _proposicao(run_objetos, 2), "objetos")
+
+    atribuicao = _detalhe(client, NOMINAL)["atribuicao_das_proposicoes"]
+
+    assert atribuicao["conjunto"] == "Objetos das votações da Câmara (2026)"
+    assert datetime.fromisoformat(atribuicao["coletado_em"]) == COLETADO_EM_DOS_OBJETOS
+    assert atribuicao["url_origem"] == URL_ORIGEM_DOS_OBJETOS
+    assert atribuicao["licenca"] == {"id": None, "url": None}
+
+
+def test_a_atribuicao_das_proposicoes_nao_e_a_da_votacao_nem_a_dos_votos(client, nominal):
+    _ligar(NOMINAL, _proposicao(_criar_run_das_proposicoes(), 1))
+
+    corpo = _detalhe(client, NOMINAL)
+
+    assert corpo["atribuicao_das_proposicoes"]["conjunto"] == (
+        "Proposições das votações da Câmara (2026)"
+    )
+    assert corpo["atribuicao"]["conjunto"] == "Votações da Câmara em 2026"
+
+
+def test_todas_as_213_proposicoes_saem_com_custo_constante_de_consultas(
+    client, nominal, django_assert_num_queries
+):
+    run_objetos = _criar_run_dos_objetos()
+    for camara_id in range(1, 214):
+        _ligar(NOMINAL, _proposicao(run_objetos, camara_id), "objetos")
+    corpo = _detalhe(client, NOMINAL)  # controle
+    assert len(corpo["proposicoes"]) == 213
+
+    # votação, votos, deputados dos pares e as 213 proposições numa consulta só (sem N+1)
+    with django_assert_num_queries(4):
+        client.get(f"{LISTA}{NOMINAL}/")
+
+
+def test_votacao_inexistente_nao_consulta_proposicoes(client, nominal, django_assert_num_queries):
+    _ligar(NOMINAL, _proposicao(_criar_run_das_proposicoes(), 1))
+    _detalhe(client, NOMINAL)  # controle
+
+    with django_assert_num_queries(1):  # só a busca da votação
+        assert client.get(f"{LISTA}999-1/").status_code == 404
 
 
 # --- Junção com o perfil do deputado (`tem_perfil` e `nome`) -------------------------------------

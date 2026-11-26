@@ -353,9 +353,9 @@ def _alphabetical_key(name):
     ordena de forma estável: quem empata fica na ordem que veio do banco (legislatura e id).
     """
     if name is None:
-        return (True, "")
+        return (False, "")
     decomposed = unicodedata.normalize("NFKD", name)
-    return (False, "".join(c for c in decomposed if not unicodedata.combining(c)).casefold())
+    return (True, "".join(c for c in decomposed if not unicodedata.combining(c)).casefold())
 
 
 @require_safe

@@ -285,9 +285,10 @@ def test_mesmo_nome_desempata_por_legislatura_e_id_mesmo_gravado_fora_de_ordem(c
     _deputado(run, 2, name="Ana", legislatura=57)
     _deputado(run, 9, name="Ana", legislatura=56)
     _deputado(run, 1, name="Zeca", legislatura=57)
-    # A legislatura 57 é gravada antes da 56: sem ordenar, o banco as devolveria nessa ordem.
-    _voto(votacao, 2, "Sim", legislatura=57)
+    # Sem ordenar, o banco devolve os votos na ordem da gravação ou na inversa (visto no CI): com a
+    # 56 gravada antes da 57, uma das duas põe os dois "Ana" trocados se o desempate faltar.
     _voto(votacao, 9, "Sim", legislatura=56)
+    _voto(votacao, 2, "Sim", legislatura=57)
     _voto(votacao, 1, "Sim", legislatura=57)
 
     votos = _detalhe(client, NOMINAL)["votos"]

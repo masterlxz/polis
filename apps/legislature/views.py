@@ -349,8 +349,8 @@ def _alphabetical_key(name):
     """Chave de ordem alfabética de um nome: sem acento e sem diferença de caixa; sem nome, no fim.
 
     Comparar o texto cru poria "Átila" e "Érika" depois de "Zeca" (o acento vale mais que o Z). A
-    ordem não depende da collation do banco, que o ADR 0032 já registra como variável. Python
-    ordena de forma estável: quem empata fica na ordem que veio do banco (legislatura e id).
+    ordem não depende da collation do banco, que o ADR 0032 já registra como variável. O desempate
+    (legislatura e id) vem de quem chama, na mesma chave; o banco não ordena nada.
     """
     if name is None:
         return (True, "")
@@ -379,13 +379,15 @@ def camara_voting_detail(request, voting_id):
     if voting is None:
         return JsonResponse({"erro": "não encontrado"}, status=404)
 
-    votes = list(
-        voting.votes.select_related("ingestion_run__dataset__source").order_by(
-            "legislature_id", "camara_id"
+    votes = list(voting.votes.select_related("ingestion_run__dataset__source"))
+    names = _deputy_names_by_pair({(v.legislature_id, v.camara_id) for v in votes})
+    votes.sort(
+        key=lambda v: (
+            _alphabetical_key(names.get((v.legislature_id, v.camara_id))),
+            v.legislature_id,
+            v.camara_id,
         )
     )
-    names = _deputy_names_by_pair({(v.legislature_id, v.camara_id) for v in votes})
-    votes.sort(key=lambda v: _alphabetical_key(names.get((v.legislature_id, v.camara_id))))
     counts = Counter(_or_none(v.vote) for v in votes)
     # Os votos vêm de outro conjunto (`camara/votos-2026`) que a votação (`camara/votacoes-2026`):
     # a fonte dos votos é citada à parte, pela coleta mais recente entre eles (ADR 0008, decisão 3).

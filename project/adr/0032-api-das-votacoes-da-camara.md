@@ -59,7 +59,7 @@ Espelho de `senator_votes` (ADR 0030, emenda 7), PRs #192 (API) e #194 (página 
 ## Emenda 4 (2026-11-26): os votos do detalhe saem em ordem alfabética de nome (substitui a ordem do item 6)
 **Motivo:** visto no navegador com a votação `2394518-60` (423 votos): a ordem por `legislature_id, camara_id` não tem sentido para quem lê, e achar um deputado numa lista longa é o uso principal da página. O Senado já ordena por nome.
 - **Regra:** nome em ordem alfabética **sem acento e sem diferença de caixa** (comparar o texto cru poria "Átila" e "Érika" depois de "Zeca"); quem não tem perfil (`tem_perfil` falso, `nome` nulo) vai **depois** de todos, por legislatura e id; empate de nome também por legislatura e id.
-- **Onde:** na view, em Python, depois da junção que já traz os nomes. A ordem não depende da collation do banco, sem schema novo e sem consulta a mais (o detalhe continua em 3).
+- **Onde:** na view, em Python, depois da junção que já traz os nomes. A ordem não depende da collation do banco, sem schema novo e sem consulta a mais (o detalhe continua em 3). O desempate (legislatura e id) está na própria chave de ordenação e o banco não ordena nada: antes eram dois pontos a manter juntos (`order_by` e `sort` estável), e só testes antigos seguravam o primeiro.
 - **Descartadas:** ordenar no banco (o nome não está na tabela de votos, e a collation varia); ordenar por voto e depois por nome (agrupa posições, mas é escolha de produto que o dono não pediu); paginar (resolve o tamanho, não o problema visto).
 - **Não muda:** a ordem do histórico por deputado (mais recente primeiro) e o formato de cada item.
 

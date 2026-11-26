@@ -493,6 +493,15 @@ def test_depois_que_a_votacao_chega_a_normalizacao_que_esperava_conclui(conjunto
     assert (resultado.created, resultado.votings_created) == (2, 2)
 
 
+def test_normalize_latest_diz_quais_conjuntos_leu_para_o_agendador_gravar_nos_dois(conjuntos):
+    from apps.legislature import camara_voting_normalization as normalizacao
+
+    cargas(conjuntos, [votacao("2641546-7")], [voto("2641546-7")])
+    # Disparado pela coleta de votos ou pela de votações, o resultado é o mesmo: os dois conjuntos.
+    resultado = normalizacao.normalize_latest(conjuntos.votos)
+    assert resultado.datasets == (conjuntos.votacoes, conjuntos.votos)
+
+
 def cargas_com_orfao(conjuntos, atraso_dos_votos):
     """Votações em `agora`, votos (com um sem votação) `atraso_dos_votos` depois."""
     agora = timezone.now()

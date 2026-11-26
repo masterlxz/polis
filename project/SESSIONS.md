@@ -2,6 +2,13 @@
 
 Mais recente no topo.
 
+### 2026-11-26 — Sessão 105 (P-21 item a: o sucesso da normalização vale para os dois conjuntos da Câmara-votações; sessão individual)
+
+- **Pedido**: o P-21 mandava "decidir se vale mexer". Decisão do dono, em plan mode: só o item (a), com o normalizador devolvendo os conjuntos que cobriu. A conferência no navegador das Sessões 103 e 104 foi adiada (o PC do dono não estava à mão).
+- **Feito**: `Result.datasets` (`apps/legislature/camara_voting_normalization.py`), preenchido por `normalize_latest`; `_record_normalization` aceita `also` e `_normalize` o alimenta com `getattr(summary, "datasets", ())` (`apps/sources/scheduling.py`). Recusa, falha inesperada e espera continuam só no conjunto que disparou. Sem schema, sem migração.
+- **Prova**: testes primeiro, no CI do commit só de testes (`26d05b0`): **2 falharam e 1.763 passaram** (os 2 novos: `test_sucesso_limpa_o_erro_antigo_tambem_do_conjunto_irmao_...` e `test_normalize_latest_diz_quais_conjuntos_leu_...`). Depois da implementação (`0b93ccb`): 1.765 verdes, com `dco`, `compose`, `web` e `ci-private-files`. Quatro mutações em PRs rascunho (#255 a #258, fechados), cada uma derrubando o teste previsto na tabela: (1) ignorar `summary.datasets`: `test_sucesso_limpa_o_erro_antigo_...` (1 falha); (2) recusa grava no irmão: `test_recusa_e_falha_inesperada_gravam_so_no_que_disparou[recusa]` (1); (3) `normalize_latest` sem `datasets`: `test_normalize_latest_diz_quais_conjuntos_leu_...` (1); (4) espera grava: `test_a_espera_nao_grava_nem_no_irmao` e mais 2 testes antigos de espera (3).
+- **Não verificado**: o agendador com coleta real (só normalizador falso e os testes existentes); o ramo `None` ("já normalizada") não ganhou irmão por leitura do código, não por teste (uma recusa gravada implica cargas não normalizadas, então `None` não ocorre com erro pendente). `ruff` não existe na VM; o CI o rodou. A página da Câmara segue sem revisão no navegador depois das Sessões 103 e 104.
+
 ### 2026-11-26 — Sessão 104 (desempate explícito na chave de ordenação dos votos da Câmara; sessão individual)
 
 - **Pedido**: fechar o ponto da Sessão 103: o teste do desempate não provava o `order_by`. Decisão do dono: seguir a recomendação (desempate dentro da chave e `order_by` do banco fora).

@@ -988,6 +988,89 @@ def test_a_linha_de_espera_nao_cita_a_mensagem_da_excecao(
     assert segredo not in " ".join(resultado.lines)
 
 
+# --- Normalização que cobre mais de um conjunto (Câmara-votações; P-21 (a), Sessão 105) ---
+# O sucesso vale para todos os conjuntos que o normalizador leu (`resumo.datasets`); a recusa, a
+# falha inesperada e a espera continuam sem mexer no irmão.
+
+ERRO_ANTIGO = "Recusada antes."
+ANTES = NOW - timedelta(days=1)
+
+
+def _com_irmao_com_erro_antigo():
+    """O conjunto que a coleta dispara e o irmão (fora da janela), que guarda uma recusa antiga."""
+    fonte = make_source()
+    dataset = make_dataset(fonte=fonte, slug="deputados")
+    irmao = make_dataset(fonte=fonte, slug="votos", next_at=NOW + timedelta(days=1))
+    Dataset.objects.filter(pk=irmao.pk).update(
+        last_normalization_error=ERRO_ANTIGO, last_normalization_at=ANTES
+    )
+    return dataset, irmao
+
+
+def test_sucesso_limpa_o_erro_antigo_tambem_do_conjunto_irmao_que_a_normalizacao_cobriu(
+    agendador, ingest, registrar_normalizador
+):
+    dataset, irmao = _com_irmao_com_erro_antigo()
+    resumo = SimpleNamespace(rows_read=3, created=3, existing=0, datasets=(dataset, irmao))
+    registrar_normalizador("camara/deputados", FakeNormalizador(resultado=resumo))
+
+    coletar(agendador)
+
+    for conjunto in (dataset, irmao):
+        conjunto.refresh_from_db()
+        assert (conjunto.last_normalization_error, conjunto.last_normalization_at) == ("", NOW)
+
+
+def test_resumo_sem_conjuntos_grava_so_no_que_disparou_e_o_irmao_fica_como_estava(
+    agendador, ingest, registrar_normalizador
+):
+    dataset, irmao = _com_irmao_com_erro_antigo()
+    registrar_normalizador("camara/deputados", FakeNormalizador())  # RESUMO, sem `datasets`
+
+    coletar(agendador)
+
+    dataset.refresh_from_db()
+    irmao.refresh_from_db()
+    assert (dataset.last_normalization_error, dataset.last_normalization_at) == ("", NOW)
+    assert (irmao.last_normalization_error, irmao.last_normalization_at) == (ERRO_ANTIGO, ANTES)
+
+
+@pytest.mark.parametrize(
+    ("erro", "gravado_no_que_disparou"),
+    [
+        (_recusa("Recusada agora."), "Recusada agora."),
+        (RuntimeError("segredo"), "Falha inesperada na normalização (veja o log do agendador)."),
+    ],
+    ids=["recusa", "falha_inesperada"],
+)
+def test_recusa_e_falha_inesperada_gravam_so_no_que_disparou(
+    agendador, ingest, registrar_normalizador, erro, gravado_no_que_disparou
+):
+    dataset, irmao = _com_irmao_com_erro_antigo()
+    registrar_normalizador("camara/deputados", FakeNormalizador(erro=erro))
+
+    coletar(agendador)
+
+    dataset.refresh_from_db()
+    irmao.refresh_from_db()
+    assert dataset.last_normalization_error == gravado_no_que_disparou
+    assert (irmao.last_normalization_error, irmao.last_normalization_at) == (ERRO_ANTIGO, ANTES)
+
+
+def test_a_espera_nao_grava_nem_no_irmao(agendador, ingest, registrar_normalizador):
+    from apps.sources.normalization import NormalizationWaiting
+
+    dataset, irmao = _com_irmao_com_erro_antigo()
+    registrar_normalizador("camara/deputados", FakeNormalizador(erro=NormalizationWaiting("x")))
+
+    coletar(agendador)
+
+    for conjunto in (dataset, irmao):
+        conjunto.refresh_from_db()
+    assert dataset.last_normalization_at is None
+    assert (irmao.last_normalization_error, irmao.last_normalization_at) == (ERRO_ANTIGO, ANTES)
+
+
 def test_so_o_conjunto_que_recusou_fica_marcado(agendador, ingest, registrar_normalizador):
     fonte = make_source()
     ruim = make_dataset(fonte=fonte, slug="a-ruim")

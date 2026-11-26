@@ -22,9 +22,21 @@ from django.db.models import Exists, OuterRef
 from django.http import JsonResponse
 from django.views.decorators.http import require_safe
 
-from .models import CamaraVote, CamaraVoting, Deputy, SenateVote, SenateVoting, Senator
+from .models import (
+    CamaraVote,
+    CamaraVoting,
+    CamaraVotingProposition,
+    Deputy,
+    SenateVote,
+    SenateVoting,
+    Senator,
+)
 
 VOTINGS_PER_PAGE = 50
+# Ordem das proposições do detalhe: primeiro as do arquivo `votacoesProposicoes`, depois as de
+# `votacoesObjetos` (a ordem dos arquivos no catálogo; o significado de cada um não foi verificado,
+# ADR 0033). Feita em Python: o banco ordenaria o texto de `origin` pela collation.
+_PROPOSITION_ORIGIN_ORDER = ("proposicoes", "objetos")
 # Só a forma canônica, de 1 a 9999: sem zero à esquerda (nem `0`) e só dígitos ASCII (`\d`
 # aceitaria dígitos de outras escritas). Mesma regra das rotas (`[1-9][0-9]{0,N}`).
 _PAGE_PATTERN = re.compile(r"[1-9][0-9]{0,3}")
@@ -358,6 +370,30 @@ def _alphabetical_key(name):
     return (False, "".join(c for c in decomposed if not unicodedata.combining(c)).casefold())
 
 
+def _camara_proposition_order(link):
+    origin = link.origin
+    rank = (
+        _PROPOSITION_ORIGIN_ORDER.index(origin)
+        if origin in _PROPOSITION_ORIGIN_ORDER
+        else len(_PROPOSITION_ORIGIN_ORDER)
+    )
+    return (rank, link.proposition.camara_id)
+
+
+def _camara_proposition_item(link):
+    """Uma proposição da votação, campo a campo (ADR 0033): sem `uri` nem id interno."""
+    proposition = link.proposition
+    return {
+        "id_camara": proposition.camara_id,
+        "titulo": proposition.title,
+        "tipo": proposition.type_acronym,
+        "numero": proposition.number,
+        "ano": proposition.year,
+        "ementa": _or_none(proposition.ementa),
+        "origem": link.origin,
+    }
+
+
 @require_safe
 def camara_voting_detail(request, voting_id):
     """Uma votação da Câmara com os votos nominais, se houver (ADR 0031 e 0032).
@@ -369,7 +405,9 @@ def camara_voting_detail(request, voting_id):
     uma contagem: a fonte não informou). `atribuicao` é a do conjunto de votações e
     `atribuicao_dos_votos` a do conjunto de votos (nula se não há votos). Os votos saem em ordem
     alfabética de nome (sem acento nem caixa), quem não tem perfil por último, e o empate fica por
-    legislatura e id (ADR 0032, emenda 4).
+    legislatura e id (ADR 0032, emenda 4). `proposicoes` são TODAS as da votação (até 213 medidas),
+    por origem e depois por id numérico, com `ano` e `ementa` vazios como `null`;
+    `atribuicao_das_proposicoes` é a da coleta mais recente entre elas, nula se não há (emenda 5).
     """
     voting = (
         CamaraVoting.objects.select_related("ingestion_run__dataset__source")
@@ -394,6 +432,17 @@ def camara_voting_detail(request, voting_id):
     newest_votes_run = max(
         (v.ingestion_run for v in votes), key=lambda r: r.started_at, default=None
     )
+    # As proposições vêm de mais dois conjuntos; a ligação guarda o id da votação em texto, sem
+    # chave (ADR 0033), e a atribuição é a da coleta mais recente entre elas.
+    links = sorted(
+        CamaraVotingProposition.objects.filter(
+            camara_voting_id=voting.camara_voting_id
+        ).select_related("proposition", "ingestion_run__dataset__source"),
+        key=_camara_proposition_order,
+    )
+    newest_propositions_run = max(
+        (link.ingestion_run for link in links), key=_started, default=None
+    )
     return JsonResponse(
         {
             "votacao": _camara_voting_fields(voting),
@@ -412,8 +461,12 @@ def camara_voting_detail(request, voting_id):
                 {"voto": vote, "quantidade": quantity}
                 for vote, quantity in sorted(counts.items(), key=_vote_count_order)
             ],
+            "proposicoes": [_camara_proposition_item(link) for link in links],
             "atribuicao": _attribution(voting.ingestion_run),
             "atribuicao_dos_votos": _attribution(newest_votes_run) if newest_votes_run else None,
+            "atribuicao_das_proposicoes": (
+                _attribution(newest_propositions_run) if newest_propositions_run else None
+            ),
         },
         json_dumps_params={"ensure_ascii": False},
     )

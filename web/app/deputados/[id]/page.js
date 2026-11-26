@@ -100,7 +100,6 @@ function Votos({ caminho, historico }) {
         </p>
       )}
       <Navegacao caminho={caminho} pagina={pagina} totalPaginas={totalPaginas} />
-      {atribuicaoDasVotacoes && <Atribuicao atribuicao={atribuicaoDasVotacoes} />}
       {atribuicaoDosVotos && <Atribuicao atribuicao={atribuicaoDosVotos} />}
     </section>
   );

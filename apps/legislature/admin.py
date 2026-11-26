@@ -95,6 +95,9 @@ class CamaraPropositionAdmin(DeputyAdmin):
     search_fields = ["title", "ementa"]
     raw_id_fields = ["ingestion_run"]
 
+    def has_add_permission(self, request):
+        return True
+
 
 @admin.register(CamaraVotingProposition)
 class CamaraVotingPropositionAdmin(DeputyAdmin):

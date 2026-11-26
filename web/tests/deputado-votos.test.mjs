@@ -9,6 +9,24 @@ import { after, before, test } from "node:test";
 import { iniciarApiFalsa, iniciarNext } from "./helpers.mjs";
 
 const ID = "57-204554";
+
+// A legenda copia o que a documentação oficial diz, lida em 2026-11-26 em
+// https://dadosabertos.camara.leg.br/howtouse/2020-02-07-dados-votacoes.html (ver o mesmo bloco em
+// `votacoes-camara.test.mjs`).
+const PREFIXO_DA_NOTA = "Códigos como a fonte os manda.";
+const LEGENDA_DA_APROVACAO =
+  "Aprovação, segundo a documentação da Câmara: 1 é votação que resultou em aprovação; 0, proposição não aprovada (rejeitada ou sem quórum); sem código, a Câmara não afirma o resultado.";
+const LEGENDA_DAS_SIGLAS =
+  "Votos: Abstenção, Obstrução (o parlamentar se abstém e não quer ser contado no quórum) e Artigo 17 (abstenção obrigatória do presidente, em referência ao Regimento da Câmara) entram em “outros” nos totais da Câmara.";
+const LINK_DA_DOCUMENTACAO =
+  '<a href="https://dadosabertos.camara.leg.br/howtouse/2020-02-07-dados-votacoes.html">documentação da Câmara</a>';
+
+function semNota(html) {
+  assert.ok(!html.includes(PREFIXO_DA_NOTA), "prefixo da nota fora de hora");
+  assert.ok(!html.includes(LINK_DA_DOCUMENTACAO), "link da documentação fora de hora");
+  assert.ok(!html.includes(LEGENDA_DA_APROVACAO) && !html.includes(LEGENDA_DAS_SIGLAS));
+  assert.ok(!html.includes("não foi verificado"));
+}
 const CAMINHO_DO_PERFIL = `GET /internal/v1/deputados/${ID}/`;
 const CAMINHO_DOS_VOTOS = `GET /internal/v1/deputados/${ID}/votos/`;
 
@@ -70,7 +88,7 @@ function itemDeVoto(extra = {}) {
     data: "2026-11-12",
     orgao: "Plenário",
     descricao: "Aprovada a Medida Provisória nº 1/2026.",
-    // A API só emite "1", "0" ou null aqui; o significado não foi verificado (ADR 0031 e 0032).
+    // A API só emite "1", "0" ou null aqui (significado: documentação da Câmara, ADR 0032 emenda 2).
     aprovacao: "1",
     id_proposicao: 9876543,
     partido: "ABC",
@@ -182,15 +200,16 @@ test("votos: cada dado cai na sua coluna (data, órgão, descrição, aprovaçã
   ]);
 });
 
-test("votos: o código da fonte não é traduzido e a nota diz que o significado não foi verificado", async () => {
+test("votos: o código da fonte não é traduzido, e a nota traz as legendas da documentação da Câmara", async () => {
   const { status, html } = await comVotos(historico());
 
   assert.equal(status, 200);
   assert.ok(!/<th\s[^>]*>Resultado/.test(html), "a coluna ainda se chama Resultado");
-  assert.match(
-    html,
-    /Códigos como a fonte os manda; o significado de 1\/0 e das siglas de voto não foi verificado\./,
-  );
+  assert.ok(html.includes(PREFIXO_DA_NOTA));
+  assert.ok(html.includes(LEGENDA_DA_APROVACAO));
+  assert.ok(html.includes(LEGENDA_DAS_SIGLAS));
+  assert.ok(html.includes(LINK_DA_DOCUMENTACAO));
+  assert.ok(!html.includes("não foi verificado"), "a nota antiga não pode ficar ao lado da legenda");
 });
 
 test("votos: partidos diferentes na mesma página saem cada um na sua linha, não o do perfil", async () => {
@@ -330,7 +349,7 @@ test("votos: sem nenhum voto coletado a página diz isso e o perfil continua", a
   assert.ok(!html.includes("Votos nominais em plenário"), "sem votos não há o que citar");
   assert.ok(!html.includes("Votações em plenário"), "sem votos não há o que citar");
   assert.ok(html.includes("ANA DA CÂMARA"));
-  assert.ok(!html.includes("não foi verificado"), "a nota dos códigos sem tabela não faz sentido");
+  semNota(html); // sem tabela, as legendas dos códigos não fazem sentido
 });
 
 test("votos: página além da última volta para a primeira", async () => {
@@ -344,7 +363,7 @@ test("votos: página além da última volta para a primeira", async () => {
   assert.ok(html.includes(`href="/deputados/${ID}/"`));
   assert.ok(!html.includes("Anterior"), "não há setas na página vazia");
   assert.ok(!html.includes("Próxima"), "não há setas na página vazia");
-  assert.ok(!html.includes("não foi verificado"), "a nota dos códigos sem tabela não faz sentido");
+  semNota(html); // sem tabela, as legendas dos códigos não fazem sentido
 });
 
 test("votos: a atribuição dos votos aparece com o conjunto e o link do original", async () => {

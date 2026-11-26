@@ -3,7 +3,6 @@ import { notFound } from "next/navigation";
 
 import { buscarVotacaoDaCamara } from "../../../../lib/api.js";
 import {
-  NOTA_DO_CODIGO,
   ROTULO_DA_APROVACAO,
   SEM_LISTA_NOMINAL,
   SEM_POSICAO,
@@ -13,6 +12,7 @@ import {
 } from "../../../../lib/camara.js";
 import { dataBr } from "../../../../lib/formatar.js";
 import Atribuicao from "../../../pessoas/[id]/Atribuicao.js";
+import Nota from "../../Nota.js";
 
 // Sem cache: o que a fonte corrigir precisa aparecer na hora.
 export const dynamic = "force-dynamic";
@@ -130,7 +130,7 @@ export default async function VotacaoDaCamara({ params }) {
         <Campo rotulo={ROTULO_DA_APROVACAO}>{votacao.aprovacao}</Campo>
       </dl>
       {votacao.descricao && <p className="ementa">{votacao.descricao}</p>}
-      {(votacao.aprovacao !== null || temVotos) && <p className="nota">{NOTA_DO_CODIGO}</p>}
+      <Nota aprovacao={votacao.aprovacao !== null} siglas={temVotos} />
 
       {!temVotos && (
         <p className="aviso">

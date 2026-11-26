@@ -155,6 +155,46 @@ Duas leituras dos arquivos em massa (`HEAD` e um `GET` de cada, com `User-Agent`
 - **Totais da fonte contra a contagem dos votos:** `votosSim` e `votosNao` batem em 169 das 170 votações nominais (não verifiquei qual diverge nem por quê).
 - **Não verificado:** `votacoesVotos-2025` por dentro (só o tamanho, 58,2 MB, da Rodada 2); `Last-Modified` por mais de um dia; (o significado de `Artigo 17`, `Obstrução` e `aprovacao` foi conferido em 2026-11-26 na documentação oficial: ADR 0032, emenda 3); por que 2025 tem arquivo de votos 3 vezes maior que 2026 em 11 meses.
 
+## Rodada 4: proposições e o "objeto" das votações (2026-11-26, Sessão 107)
+
+Medido com `curl` (uma requisição por arquivo, `User-Agent` genérico) e análise em Python fora do repo, sobre os arquivos de 2026-11-26 (`Last-Modified` entre 04:34 e 07:23 GMT). **Nada foi integrado**; é insumo para a decisão do dono sobre o modelo.
+
+**Arquivos (CSV, separador `;`, BOM, texto entre aspas, registro multilinha):**
+
+| Conjunto | Tamanho (2026) | Linhas | Chave | Colunas relevantes |
+|---|---|---|---|---|
+| `proposicoes-2026` | 47,1 MB (2025: 90,2 MB) | 54.799 (2025: 107.589) | `id`, único | 31: `siglaTipo`, `numero`, `ano`, `ementa`, `ementaDetalhada`, `keywords`, `dataApresentacao`, `ultimoStatus_*` |
+| `votacoesProposicoes-2026` | 3,6 MB | 7.160 | (`idVotacao`, `proposicao_id`), sem repetição | 12: `proposicao_titulo` (ex. "PL 11/2003"), `proposicao_ementa`, `proposicao_siglaTipo`, `_numero`, `_ano` |
+| `votacoesObjetos-2026` | 17,2 MB | 39.416 | (`idVotacao`, `proposicao_id`), sem repetição | 12: as mesmas colunas de proposição |
+| `proposicoesTramitacoes-2026` | 38,9 MB (2025: 51,7 MB) | não contado | `idTramitacao` | 14: `dataHora`, `sequencia`, `uriProposicao`, `siglaOrgao`, `descricaoTramitacao`, `despacho` (texto livre), `url` |
+
+`proposicoesAutores-2026` (17,1 MB) e `proposicoesTemas-2026` (3,3 MB) existem; as colunas não foram lidas (autores são pessoas: ADR 0005).
+
+**Cobertura das votações de 2026 (9.417 em `votacoes-2026`):**
+- **O `0` do `ultimaApresentacaoProposicao_idProposicao` agora é 4.180 votações** (eram 4.101 de 9.153 na medição de 2026-11-24). **Todas** têm proposição em `votacoesProposicoes` (1.850) ou em `votacoesObjetos` (3.618); nenhuma ficou sem. A união dos dois arquivos cobre **as 9.417 votações**.
+- `votacoesProposicoes` cobre 7.084 votações (4.749 proposições distintas, no máximo 3 por votação); `votacoesObjetos` cobre 8.842 (22.017 proposições distintas, **até 212 por votação**).
+- Dos 4.340 ids distintos e diferentes de 0 em `ultimaApresentacaoProposicao_idProposicao`: 4.306 estão em `votacoesObjetos`, 3 em `votacoesProposicoes`, 3.612 em `proposicoes-2026`, **mais 579 só em `proposicoes-2025`** e 14 em nenhum dos quatro arquivos (anos anteriores não medidos). Ou seja, o arquivo anual de proposições **não basta**: 13% dos ids das votações de 2026 estão no arquivo de 2025.
+- Os dois arquivos de votação trazem título, tipo, número, ano e ementa da proposição, então **o que se votou sai deles sem precisar de `proposicoes-YYYY`**.
+
+**Qualidade e risco:**
+- `ano` é `0` em 27.940 das 54.799 proposições de 2026 e em 59.259 das 107.589 de 2025: não serve de chave nem de filtro. `proposicoes-2026` traz `dataApresentacao` desde 2005-04-12 (o ano do arquivo não é o ano da apresentação).
+- Texto livre, ADR 0005 e ADR 0031 (caracteres de controle em `descricao` recusam a carga): `ementa` chega a 5.259 caracteres em 2026 e **29.947 em 2025**; em `proposicoes-2026` há 528 ementas com quebra de linha e 67 caracteres de controle; em `votacoesProposicoes` o máximo é 993, com 37 quebras e 7 caracteres de controle; em `votacoesObjetos`, 5.259, com 1.355 ementas com quebra e 35 caracteres de controle (contagem de caracteres, não de linhas). `ementa` vazia: 1.398 em `proposicoes-2026`, 612 em `votacoesObjetos`. Ou seja, copiar o padrão de `votacoes-2026` (recusar controle) **pararia a carga**: a política do texto precisa de decisão.
+- Tipos mais frequentes em `proposicoes-2026`: PRL 8.506, RPD 8.344, REQ 7.407, PL 5.455, PAR 3.785, RIC 3.068. A maioria não é lei.
+- **Plebiscito, só por texto** ("plebiscito" na `ementa`, `ementaDetalhada` ou `keywords`, sem acento e sem caixa): 5 proposições em `proposicoes-2026` (2 PL, 2 REQ, 1 PDL), 5 em `proposicoes-2025`, 4 REQ em `votacoesObjetos`, 0 em `votacoesProposicoes`. Não há campo estruturado de tema por esse critério, e "consulta popular" não foi buscada.
+- Tramitação: a API `/proposicoes/{id}/tramitacoes` responde (uma requisição de amostra, 200); o arquivo em massa existe (acima). `despacho` é texto livre e cita agentes públicos pelo nome: não avaliado contra o ADR 0005.
+
+**Não medido:** o significado de `votacoesProposicoes` versus `votacoesObjetos` (qual é a proposição "principal" da votação; a documentação oficial não foi lida: só os ids batem, 4.306 contra 3); as 14 proposições fora dos quatro arquivos; anos anteriores a 2025; as colunas de autores e temas; tramitações (linhas, tamanho de `despacho`, caracteres de controle); estabilidade dos ids entre cargas; licença (segue sem declaração, ver a seção "Termos de uso e licença"). A procura de algo pronto antes de criar (`avaliar-dependencia`, passo 0) **não foi feita** nesta sessão.
+
+**Decisões para o dono (recomendação minha, sem ADR ainda):**
+
+| Decisão | Opção recomendada | Alternativa |
+|---|---|---|
+| Fonte do "objeto" da votação | `votacoesProposicoes` + `votacoesObjetos` (20,8 MB, 9.417/9.417 votações) | `proposicoes-YYYY` (47 a 90 MB por ano e não cobre o ano anterior) |
+| Modelo | Uma tabela de proposições (id, título, tipo, número, ano, ementa) e uma ligação votação–proposição; o `0` vira "sem proposição" na leitura, sem gravar | Só um texto de ementa dentro da votação |
+| Tramitações | Fora desta fatia (fatia própria, depois) | Junto, com mais 39 MB por ano |
+| Política de texto livre (`ementa`) | Decidir antes de codar: normalizar quebra de linha para espaço (como `descricao`) e recusar ou descartar controle | Recusar a carga inteira, como em `descricao` |
+| Plebiscito | Não é fatia própria: ~5 proposições por ano por texto; atender por busca de texto quando a busca cobrir proposições | Fatia dedicada (não recomendo) |
+
 ## Reproduzir as medições
 Use um `User-Agent` genérico e espere alguns segundos entre as requisições.
 ```bash

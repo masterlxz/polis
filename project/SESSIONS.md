@@ -2,6 +2,13 @@
 
 Mais recente no topo.
 
+### 2026-11-26 — Sessão 107 (etapa 0 das proposições da Câmara: fonte medida; só documentação; sessão individual)
+
+- **Pedido**: a próxima fatia de código da Etapa 1 (proposições e tramitações, PRD §15) e a ideia das propostas de plebiscito. Plano aprovado em plan mode: medir a fonte antes de modelar; nenhum código.
+- **Medido (2026-11-26, `curl` e Python fora do repo)**: seção "Rodada 4" em `project/fontes/camara.md`. Achados que mudam o desenho: (1) `votacoesProposicoes-2026` (3,6 MB) e `votacoesObjetos-2026` (17,2 MB) trazem título, tipo, número, ano e ementa da proposição e, juntos, cobrem **as 9.417 votações**, inclusive as 4.180 em que `ultimaApresentacaoProposicao_idProposicao` é `0`; (2) `proposicoes-2026` (47,1 MB) **não basta**: 579 dos 4.340 ids das votações de 2026 só estão no arquivo de 2025 (90,2 MB); (3) `ano` é `0` em 51% das proposições de 2026; (4) `ementa` tem até 29.947 caracteres, quebras de linha e caracteres de controle, então copiar a recusa de `descricao` pararia a carga; (5) plebiscito por texto: cerca de 5 proposições por ano, não justifica fatia própria; (6) há arquivo em massa de tramitações (38,9 MB em 2026) e API.
+- **Decisão pedida ao dono (tabela na Rodada 4, com recomendação)**: fonte do objeto da votação, modelo, tramitações fora da fatia, política do texto livre, plebiscito sem fatia própria.
+- **Não verificado**: o significado de `votacoesProposicoes` versus `votacoesObjetos` (qual é a proposição principal); as 14 proposições fora dos quatro arquivos; anos anteriores a 2025; autores, temas e tramitações em detalhe; licença (segue sem declaração). A procura de algo pronto (`avaliar-dependencia`, passo 0) não foi feita; fica para a sessão do plano.
+
 ### 2026-11-26 — Sessão 106 (P-21 item b dispensado; só documentação; sessão individual)
 
 - **Pedido**: decidir o que fazer com o (b) do P-21, que a Sessão 105 deixou fora do escopo. Opções apresentadas: (1) dispensar, (2) contar o prazo desde a carga de votos, (3) mostrar "aguardando desde X" no painel. Decisão do dono: **1, dispensar**.

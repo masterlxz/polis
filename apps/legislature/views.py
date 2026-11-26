@@ -354,8 +354,7 @@ def _alphabetical_key(name):
     """
     if name is None:
         return (True, "")
-    decomposed = unicodedata.normalize("NFKD", name)
-    return (False, "".join(c for c in decomposed if not unicodedata.combining(c)).casefold())
+    return (False, name.casefold() + unicodedata.normalize("NFKD", ""))
 
 
 @require_safe

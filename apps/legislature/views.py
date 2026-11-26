@@ -440,7 +440,7 @@ def camara_voting_detail(request, voting_id):
         ).select_related("proposition", "ingestion_run__dataset__source"),
         key=_camara_proposition_order,
     )
-    newest_propositions_run = max(
+    newest_propositions_run = min(
         (link.ingestion_run for link in links), key=_started, default=None
     )
     return JsonResponse(

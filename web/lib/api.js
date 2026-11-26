@@ -487,9 +487,7 @@ function detalheDeVotacaoDaCamaraValido(corpo) {
     contagemPorVotoValida(corpo.contagem_por_voto) &&
     (corpo.contagem_por_voto.length > 0) === temVotos &&
     atribuicaoValida(corpo.atribuicao) &&
-    (corpo.atribuicao_dos_votos === null
-      ? !temVotos
-      : temVotos && atribuicaoValida(corpo.atribuicao_dos_votos))
+    (corpo.atribuicao_dos_votos === null || atribuicaoValida(corpo.atribuicao_dos_votos))
   );
 }
 

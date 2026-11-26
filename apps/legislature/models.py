@@ -265,3 +265,75 @@ class CamaraVote(models.Model):
 
     def __str__(self):
         return f"{self.camara_id}: {self.vote or 'sem posição'}"
+
+
+class CamaraProposition(models.Model):
+    """Proposição que uma votação da Câmara tem como objeto, dos arquivos anuais em massa
+    `votacoesProposicoes` e `votacoesObjetos` (Rodada 4 de `fontes/camara.md`).
+
+    A chave é o id da proposição. `year` é nulo quando a fonte não o informa (32.899 linhas de
+    `votacoesObjetos`); `ementa` pode ser vazia (404 proposições medidas). O texto vem da fonte
+    com quebra de linha e TAB trocados por espaço; a página futura deve escapá-lo.
+    """
+
+    camara_id = models.PositiveIntegerField("id da proposição na Câmara")
+    title = models.CharField("título", max_length=100)
+    type_acronym = models.CharField("sigla do tipo", max_length=10)
+    number = models.PositiveIntegerField("número")
+    year = models.PositiveIntegerField("ano", null=True, blank=True)
+    ementa = models.TextField("ementa", blank=True)
+    ingestion_run = models.ForeignKey(
+        IngestionRun,
+        on_delete=models.PROTECT,
+        related_name="camara_propositions",
+        verbose_name="última execução de coleta que a viu",
+    )
+
+    class Meta:
+        verbose_name = "proposição da Câmara"
+        verbose_name_plural = "proposições da Câmara"
+        constraints = [
+            models.UniqueConstraint(fields=["camara_id"], name="camara_proposition_unique_id"),
+        ]
+
+    def __str__(self):
+        return self.title
+
+
+class CamaraVotingProposition(models.Model):
+    """Ligação entre uma votação da Câmara e uma proposição dela.
+
+    Sem chave para `CamaraVoting`: guarda o id da votação em texto e a junção é na leitura (como
+    `CamaraVote` com `Deputy`, ADR 0029 e 0031), então a normalização não espera a votação nem
+    corre contra a coleta dela. `origin` diz de qual arquivo veio a ligação ("proposicoes" ou
+    "objetos"); o significado de cada um não foi verificado, e os dois não repetem nenhum par
+    (votação, proposição) na medição de 2026-11-26.
+    """
+
+    camara_voting_id = models.CharField("id da votação na Câmara", max_length=20)
+    proposition = models.ForeignKey(
+        CamaraProposition,
+        on_delete=models.PROTECT,
+        related_name="voting_links",
+        verbose_name="proposição",
+    )
+    origin = models.CharField("arquivo de origem", max_length=20)
+    ingestion_run = models.ForeignKey(
+        IngestionRun,
+        on_delete=models.PROTECT,
+        related_name="camara_voting_propositions",
+        verbose_name="última execução de coleta que a viu",
+    )
+
+    class Meta:
+        verbose_name = "proposição de votação da Câmara"
+        verbose_name_plural = "proposições de votações da Câmara"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["camara_voting_id", "proposition"],
+                name="camara_voting_proposition_unique",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.camara_voting_id}: {self.proposition_id}"

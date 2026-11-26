@@ -157,9 +157,7 @@ def _write(run, origin, rows_read, propositions, links):
         for start in range(0, len(proposition_objects), BATCH_SIZE):
             CamaraProposition.objects.bulk_create(
                 proposition_objects[start : start + BATCH_SIZE],
-                update_conflicts=True,
-                unique_fields=["camara_id"],
-                update_fields=PROPOSITION_UPDATABLE,
+                ignore_conflicts=True,
             )
         created = CamaraProposition.objects.count() - before
         ids = {}

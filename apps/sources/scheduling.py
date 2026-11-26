@@ -160,6 +160,7 @@ def _normalize(dataset, name, result, now):
         # Espera outra coleta: nem sucesso (não limpa uma recusa real de antes) nem recusa (não
         # grava erro novo). O resultado gravado fica como está; o texto da exceção não é usado.
         result.lines.append(f"{name}: normalização aguardando outra coleta")
+        _record_normalization(dataset, now, also=Dataset.objects.filter(source=dataset.source))
         return
     except NormalizationRefused as error:
         result.lines.append(f"{name}: normalização recusada: {error}")

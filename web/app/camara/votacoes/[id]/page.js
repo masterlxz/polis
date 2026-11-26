@@ -118,6 +118,7 @@ function Proposicoes({ proposicoes }) {
           // A key é o índice (lista fixa, sem reordenação): `origem` e o id vazariam no payload do React.
           <li key={indice}>
             <strong>{item.titulo}</strong>
+            <small>{item.origem}</small>
             {item.ementa && <p className="ementa">{item.ementa}</p>}
           </li>
         ))}

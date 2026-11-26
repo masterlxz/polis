@@ -464,7 +464,6 @@ function votoNominalValido(item) {
     textoNaoVazioOuNulo(item.voto) &&
     typeof item.tem_perfil === "boolean" &&
     textoNaoVazioOuNulo(item.nome) &&
-    item.tem_perfil === (item.nome !== null) &&
     (!item.tem_perfil || idDeDeputadoValido(`${item.legislatura}-${item.id_camara}`))
   );
 }

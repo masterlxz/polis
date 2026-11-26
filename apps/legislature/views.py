@@ -379,11 +379,7 @@ def camara_voting_detail(request, voting_id):
     if voting is None:
         return JsonResponse({"erro": "não encontrado"}, status=404)
 
-    votes = list(
-        voting.votes.select_related("ingestion_run__dataset__source").order_by(
-            "legislature_id", "camara_id"
-        )
-    )
+    votes = list(voting.votes.select_related("ingestion_run__dataset__source"))
     names = _deputy_names_by_pair({(v.legislature_id, v.camara_id) for v in votes})
     votes.sort(key=lambda v: _alphabetical_key(names.get((v.legislature_id, v.camara_id))))
     counts = Counter(_or_none(v.vote) for v in votes)

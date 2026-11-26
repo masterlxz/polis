@@ -430,7 +430,7 @@ def deputy_votes(request, legislature, camara_id):
     total = votes_of_deputy.count()
     start = (page - 1) * VOTINGS_PER_PAGE
     newest_first = votes_of_deputy.select_related(
-        "ingestion_run__dataset__source", "voting__ingestion_run__dataset__source"
+        "ingestion_run__dataset__source", "voting"
     ).order_by("-voting__voted_on", "-voting__camara_voting_id")
     votes = list(newest_first[start : start + VOTINGS_PER_PAGE])
     newest_votes_run = max((v.ingestion_run for v in votes), key=_started, default=None)

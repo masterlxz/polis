@@ -186,8 +186,11 @@ test("lista: data e órgão no link, descrição e a marca de voto nominal de ca
   assert.ok(html.includes("Aprovado o requerimento de teste."));
   assert.ok(html.includes("Rejeitado o destaque de teste."));
   // Cada marca fica no item certo: contar as ocorrências não pegaria as duas trocadas de lugar.
-  const itemComNominais = html.split("<li").find((trecho) => trecho.includes("/2332174-59/"));
-  const itemSemNominais = html.split("<li").find((trecho) => trecho.includes("/2332175-1/"));
+  // O trecho vai só até o `</li>`: o último iria até o fim da página, e o payload do React
+  // (`self.__next_f`) repete o texto da lista inteira.
+  const itens = html.split("<li").map((trecho) => trecho.split("</li>")[0]);
+  const itemComNominais = itens.find((trecho) => trecho.includes("/2332174-59/"));
+  const itemSemNominais = itens.find((trecho) => trecho.includes("/2332175-1/"));
   assert.ok(itemComNominais?.includes('<span class="detalhe">Com votos nominais</span>'));
   assert.ok(itemSemNominais?.includes('<span class="detalhe">Sem votos nominais</span>'));
   assert.ok(!itemComNominais.includes("Sem votos nominais"));

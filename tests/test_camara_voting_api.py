@@ -234,6 +234,56 @@ def test_votos_saem_ordenados_por_legislatura_e_id_da_camara(client, run):
     }
 
 
+def _nomes_na_ordem(corpo):
+    return [v["nome"] for v in corpo["votos"]]
+
+
+def test_votos_de_quem_tem_perfil_saem_em_ordem_alfabetica_de_nome(client, run):
+    votacao = _votacao(run, NOMINAL)
+    for camara_id, nome in ((1, "Carla"), (2, "Ana"), (3, "Bia")):
+        _deputado(run, camara_id, name=nome)
+        _voto(votacao, camara_id, "Sim")
+
+    assert _nomes_na_ordem(_detalhe(client, NOMINAL)) == ["Ana", "Bia", "Carla"]
+
+
+def test_ordem_de_nome_ignora_acento_e_caixa(client, run):
+    votacao = _votacao(run, NOMINAL)
+    for camara_id, nome in ((1, "Zeca"), (2, "Átila Lins"), (3, "bruno"), (4, "Érika")):
+        _deputado(run, camara_id, name=nome)
+        _voto(votacao, camara_id, "Sim")
+
+    # Comparar o texto cru poria "Átila" e "Érika" depois de "Zeca" (o acento vale mais que o Z).
+    assert _nomes_na_ordem(_detalhe(client, NOMINAL)) == ["Átila Lins", "bruno", "Érika", "Zeca"]
+
+
+def test_quem_nao_tem_perfil_vem_depois_de_quem_tem_nome_por_legislatura_e_id(client, run):
+    votacao = _votacao(run, NOMINAL)
+    _deputado(run, 2, name="Zeca")
+    for camara_id, legislatura in ((3, 57), (2, 57), (1, 57), (9, 56)):
+        _voto(votacao, camara_id, "Sim", legislatura=legislatura)
+
+    votos = _detalhe(client, NOMINAL)["votos"]
+
+    pares = [(v["legislatura"], v["id_camara"]) for v in votos]
+    assert pares == [(57, 2), (56, 9), (57, 1), (57, 3)]
+    assert [v["tem_perfil"] for v in votos] == [True, False, False, False]
+
+
+def test_mesmo_nome_desempata_por_legislatura_e_id_mesmo_gravado_fora_de_ordem(client, run):
+    votacao = _votacao(run, NOMINAL)
+    _deputado(run, 3, name="Ana")
+    _deputado(run, 2, name="Ana")
+    _deputado(run, 1, name="Zeca")
+    # Gravados do último para o primeiro: sem ordenar, o banco os devolveria assim.
+    for camara_id in (3, 2, 1):
+        _voto(votacao, camara_id, "Sim")
+
+    votos = _detalhe(client, NOMINAL)["votos"]
+
+    assert [(v["nome"], v["id_camara"]) for v in votos] == [("Ana", 2), ("Ana", 3), ("Zeca", 1)]
+
+
 def test_voto_vazio_sai_null_nunca_string_vazia_nem_chave_ausente(client, run):
     votacao = _votacao(run, NOMINAL)
     _voto(votacao, 1, "Sim")

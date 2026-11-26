@@ -300,7 +300,7 @@ DATASETS = [
         "source": "camara",
         "slug": "votacoes-objetos-2026",
         "name": "Objetos das votações da Câmara (2026)",
-        "url": "https://dadosabertos.camara.leg.br/arquivos/votacoesObjetos/csv/votacoesObjetos-2026.csv",
+        "url": "https://dadosabertos.camara.leg.br/arquivos/votacoesProposicoes/csv/votacoesProposicoes-2026.csv",
         "format": "csv",
         "allowed_columns": [
             "idVotacao",

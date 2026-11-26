@@ -2,6 +2,12 @@
 
 Mais recente no topo.
 
+### 2026-11-26 — Sessão 97 (aviso de totais zerados no detalhe da votação da Câmara; sessão individual)
+
+- **Pedido**: decisão do dono sobre o aviso para totais `0/0/0` sem voto nominal (pendência da Sessão 95). Escolheu a opção B, frase de fato: "Os totais da fonte estão zerados e não são mostrados."
+- **Feito**: o aviso "Esta votação não tem lista de votos nominais nos dados coletados." ganha essa segunda frase, no mesmo parágrafo, só quando não há votos e os totais são zero; os dois textos viraram constantes em `web/lib/camara.js`. **Descartado**: "a fonte não informou o placar" (afirma uma causa que os ADRs 0031 e 0032 só inferem; o significado do zero não foi verificado). Com voto nominal e totais zero não sai aviso (a contagem do polis já está na página).
+- **Prova e não verificado**: ver o corpo do PR (controle, cabeça e mutação pelo CI). Nenhum leitor real foi visto reagindo ao texto; a página nunca foi vista num navegador.
+
 ### 2026-11-26 — Sessão 96 (link da lista de votações da Câmara descrito pela ementa; sessão individual)
 
 - **Pedido**: decisão do dono sobre o texto do link da lista, que repete "data · órgão" em votações do mesmo dia (pendência da Sessão 95). Escolheu a opção D: `aria-describedby` apontando para a ementa, sem mudar o que se vê.

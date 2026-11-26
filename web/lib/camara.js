@@ -11,6 +11,14 @@ export const NOTA_DO_CODIGO =
 // `voto` nulo é a ausência de posição na fonte (a Câmara publica a presença sem o voto).
 export const SEM_POSICAO = "Sem posição registrada";
 
+// Só o que os dados coletados mostram: os votos vêm de outro conjunto (`votos-2026`), e a fonte pode
+// ter publicado o placar e não os votos, ou o contrário.
+export const SEM_LISTA_NOMINAL =
+  "Esta votação não tem lista de votos nominais nos dados coletados.";
+
+// Frase de fato, sem causa: o significado do zero na fonte não foi verificado (ADR 0031 e 0032).
+export const TOTAIS_ZERADOS = "Os totais da fonte estão zerados e não são mostrados.";
+
 // "24/11/2026 · PLEN": a Câmara não tem uma identificação curta como a do Senado.
 export function tituloDaVotacao(votacao) {
   return `${dataBr(votacao.data) ?? votacao.data} · ${votacao.orgao}`;

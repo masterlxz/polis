@@ -533,13 +533,21 @@ test("detalhe: cita a origem da votação e a dos votos, cada uma com o seu conj
 // "Não temos a lista nos dados coletados", e não "a Câmara não publicou": os votos vêm de outro
 // conjunto (`votos-2026`), e uma coleta que falhou ou ainda não rodou daria a mesma lista vazia.
 const SEM_LISTA = "Esta votação não tem lista de votos nominais nos dados coletados";
+// Frase de fato, sem causa: o significado do zero na fonte não foi verificado (ADR 0031 e 0032).
+const TOTAIS_ZERADOS = "Os totais da fonte estão zerados e não são mostrados.";
 
 test("detalhe sem voto nominal e totais 0/0/0: diz que não há lista nos dados, sem números", async () => {
   const { status, html } = await detalhe(semVotos());
 
   assert.equal(status, 200);
   assert.ok(html.includes(SEM_LISTA));
+  assert.match(
+    html,
+    new RegExp(`<p class="aviso">${SEM_LISTA}[^<]*\\. ${TOTAIS_ZERADOS.replace(/\./g, "\\.")}</p>`),
+    "a frase dos totais zerados fica no mesmo aviso, depois da de 'sem lista'",
+  );
   assert.ok(!html.includes("A Câmara não publicou"));
+  assert.ok(!html.includes("não informou"), "o aviso não afirma uma causa que ninguém verificou");
   assert.equal(tabela(html, "Totais informados pela Câmara"), null);
   assert.equal(tabela(html, "Votos"), null);
   assert.equal(tabela(html, "Contagem por voto, contado pelo polis a partir dos votos"), null);
@@ -559,6 +567,7 @@ test("detalhe sem voto nominal e totais 10/5/1: os totais saem como informados p
     ["Outros", "1"],
   ]);
   assert.ok(html.includes(SEM_LISTA));
+  assert.ok(!html.includes(TOTAIS_ZERADOS), "os totais aparecem, então não estão zerados");
 });
 
 // Qualquer total diferente de zero basta para mostrar a tabela, e cada valor cai na sua linha: um só
@@ -580,6 +589,7 @@ for (const [nome, [sim, nao, outros]] of Object.entries({
       ["Não", String(nao)],
       ["Outros", String(outros)],
     ]);
+    assert.ok(!html.includes(TOTAIS_ZERADOS), "um total diferente de zero não é 'zerado'");
   });
 }
 
@@ -591,6 +601,7 @@ test("detalhe com voto nominal e totais 0/0/0: sem a tabela de totais, com os vo
   assert.equal(tabela(html, "Totais informados pela Câmara"), null);
   assert.ok(tabela(html, "Votos"));
   assert.ok(!html.includes(SEM_LISTA));
+  assert.ok(!html.includes(TOTAIS_ZERADOS), "com votos, a contagem do polis já está na página");
 });
 
 test("detalhe com voto nominal e totais 2/1/1: a tabela de totais aparece ao lado da contagem do polis", async () => {

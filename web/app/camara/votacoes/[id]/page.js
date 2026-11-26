@@ -5,8 +5,10 @@ import { buscarVotacaoDaCamara } from "../../../../lib/api.js";
 import {
   NOTA_DO_CODIGO,
   ROTULO_DA_APROVACAO,
+  SEM_LISTA_NOMINAL,
   SEM_POSICAO,
   tituloDaVotacao,
+  TOTAIS_ZERADOS,
   totaisInformados,
 } from "../../../../lib/camara.js";
 import { dataBr } from "../../../../lib/formatar.js";
@@ -131,7 +133,9 @@ export default async function VotacaoDaCamara({ params }) {
       {(votacao.aprovacao !== null || temVotos) && <p className="nota">{NOTA_DO_CODIGO}</p>}
 
       {!temVotos && (
-        <p className="aviso">Esta votação não tem lista de votos nominais nos dados coletados.</p>
+        <p className="aviso">
+          {totais === null ? `${SEM_LISTA_NOMINAL} ${TOTAIS_ZERADOS}` : SEM_LISTA_NOMINAL}
+        </p>
       )}
       {totais && <Totais linhas={totais} />}
       {temVotos && <Contagem contagem={contagem} />}

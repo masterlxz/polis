@@ -21,7 +21,8 @@ export default function RootLayout({ children }) {
             <strong>polis</strong>: {DESCRITOR}
           </p>
           <nav aria-label="Principal">
-            <a href="/busca/">Buscar</a> <a href="/senado/votacoes/">Votações do Senado</a>
+            <a href="/busca/">Buscar</a> <a href="/senado/votacoes/">Votações do Senado</a>{" "}
+            <a href="/camara/votacoes/">Votações da Câmara</a>
           </nav>
         </header>
         <main id="conteudo" tabIndex={-1}>

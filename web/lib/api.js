@@ -394,6 +394,116 @@ export async function buscarVotosDoDeputado(id, pagina) {
   return corpo;
 }
 
+// Id da votação da Câmara: texto `<n>-<m>`, de 1 a 10 dígitos ASCII de cada lado e até 20 caracteres
+// no total (o `varchar(20)` do banco), como a rota `camara/votacoes/<id>/` (ADR 0032, decisão 4).
+// Zero à esquerda é válido: o id é texto, e `01-2` e `1-2` são registros distintos.
+const PADRAO_DA_VOTACAO_DA_CAMARA = /^(?=[0-9-]{3,20}$)[0-9]{1,10}-[0-9]{1,10}$/;
+
+export function idDeVotacaoDaCamaraValido(id) {
+  return PADRAO_DA_VOTACAO_DA_CAMARA.test(id);
+}
+
+function totaisDaFonteValidos(totais) {
+  return (
+    Number.isInteger(totais?.sim) && Number.isInteger(totais.nao) && Number.isInteger(totais.outros)
+  );
+}
+
+// Texto não vazio ou nulo: onde o contrato diz "vazio sai `null`, nunca a string vazia" (ADR 0032,
+// decisão 6), uma string vazia é dado que a API não manda.
+function textoNaoVazioOuNulo(valor) {
+  return valor === null || (typeof valor === "string" && valor !== "");
+}
+
+// Os campos que a lista e o detalhe têm em comum. `aprovacao` é texto ou nulo (a chave sempre vem).
+// O id vira `href` na lista, então só o formato que a rota aceita passa.
+function votacaoDaCamaraValida(votacao) {
+  return (
+    typeof votacao?.id === "string" &&
+    idDeVotacaoDaCamaraValido(votacao.id) &&
+    typeof votacao.data === "string" &&
+    typeof votacao.orgao === "string" &&
+    textoOuNulo(votacao.aprovacao) &&
+    totaisDaFonteValidos(votacao.totais_da_fonte) &&
+    typeof votacao.descricao === "string" &&
+    Number.isInteger(votacao.id_proposicao)
+  );
+}
+
+function itemDaListaDaCamaraValido(item) {
+  return votacaoDaCamaraValida(item) && typeof item.tem_votos_nominais === "boolean";
+}
+
+function listaDeVotacoesDaCamaraValida(corpo) {
+  return (
+    Array.isArray(corpo?.votacoes) &&
+    corpo.votacoes.every(itemDaListaDaCamaraValido) &&
+    Number.isInteger(corpo.pagina) &&
+    Number.isInteger(corpo.total_paginas) &&
+    (corpo.atribuicao === null || atribuicaoValida(corpo.atribuicao))
+  );
+}
+
+// A lista nunca é 404 na API; se vier, é erro.
+export async function buscarVotacoesDaCamara(pagina) {
+  const corpo = await lerDaApi(`/internal/v1/camara/votacoes/?pagina=${pagina}`);
+  if (!listaDeVotacoesDaCamaraValida(corpo)) {
+    throw new ErroDaApi("a API devolveu uma lista de votações da Câmara fora do formato esperado");
+  }
+  return corpo;
+}
+
+// `voto` e `partido` nulos são ausência na fonte (a chave sempre vem, nunca `""`). `nome` só vem com
+// perfil (ADR 0032, decisão 7): `tem_perfil` e `nome` têm de concordar, senão sairia um link sem
+// texto ou um nome sem link. O link do perfil só existe para o par que a rota do deputado aceita.
+function votoNominalValido(item) {
+  return (
+    Number.isInteger(item?.legislatura) &&
+    Number.isInteger(item.id_camara) &&
+    textoNaoVazioOuNulo(item.partido) &&
+    textoNaoVazioOuNulo(item.voto) &&
+    typeof item.tem_perfil === "boolean" &&
+    textoNaoVazioOuNulo(item.nome) &&
+    item.tem_perfil === (item.nome !== null) &&
+    (!item.tem_perfil || idDeDeputadoValido(`${item.legislatura}-${item.id_camara}`))
+  );
+}
+
+function contagemPorVotoValida(contagem) {
+  return (
+    Array.isArray(contagem) &&
+    contagem.every((item) => textoOuNulo(item?.voto) && Number.isInteger(item.quantidade))
+  );
+}
+
+// `atribuicao_dos_votos` nula quer dizer "não há votos" e só nesse caso (ADR 0032, decisão 5); a
+// contagem é calculada a partir dos votos, então só é vazia quando eles são. Ausente é recusado.
+function detalheDeVotacaoDaCamaraValido(corpo) {
+  const temVotos = Array.isArray(corpo?.votos) && corpo.votos.length > 0;
+  return (
+    votacaoDaCamaraValida(corpo?.votacao) &&
+    Array.isArray(corpo.votos) &&
+    corpo.votos.every(votoNominalValido) &&
+    contagemPorVotoValida(corpo.contagem_por_voto) &&
+    (corpo.contagem_por_voto.length > 0) === temVotos &&
+    atribuicaoValida(corpo.atribuicao) &&
+    (corpo.atribuicao_dos_votos === null
+      ? !temVotos
+      : temVotos && atribuicaoValida(corpo.atribuicao_dos_votos))
+  );
+}
+
+// Mesmo desenho de `buscarVotacaoDoSenado`: uma chamada por requisição, nunca em cache de dado.
+export const buscarVotacaoDaCamara = cache(async (id) => {
+  if (!idDeVotacaoDaCamaraValido(id)) return null;
+  const corpo = await lerDaApi(`/internal/v1/camara/votacoes/${id}/`);
+  if (corpo === null) return null;
+  if (!detalheDeVotacaoDaCamaraValido(corpo)) {
+    throw new ErroDaApi("a API devolveu uma votação da Câmara fora do formato esperado");
+  }
+  return corpo;
+});
+
 // Mesmo desenho de `buscarPerfil`: uma chamada por requisição, nunca em cache de dado.
 export const buscarDeputado = cache(async (id) => {
   if (!idDeDeputadoValido(id)) return null;

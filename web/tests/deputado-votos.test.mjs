@@ -53,6 +53,17 @@ function atribuicaoDosVotos(extra = {}) {
   });
 }
 
+// Data, órgão, descrição e aprovação de cada item vêm do conjunto das votações, outro arquivo que o
+// dos votos: a página cita os dois.
+function atribuicaoDasVotacoes(extra = {}) {
+  return atribuicaoPadrao({
+    conjunto: "Votações em plenário",
+    coletado_em: "2026-11-10T12:00:00+00:00",
+    url_origem: "https://dados.example.org/api/v2/votacoes/votacoes.json",
+    ...extra,
+  });
+}
+
 function itemDeVoto(extra = {}) {
   return {
     id: "2641546-7",
@@ -68,13 +79,32 @@ function itemDeVoto(extra = {}) {
   };
 }
 
-function historico({ votos = [itemDeVoto()], pagina = 1, total_paginas = 1, atribuicao } = {}) {
+// Como a API: as duas atribuições existem juntas, e só quando a página tem votos.
+function historico({
+  votos = [itemDeVoto()],
+  pagina = 1,
+  total_paginas = 1,
+  atribuicao_dos_votos,
+  atribuicao_das_votacoes,
+} = {}) {
+  const temVotos = votos.length > 0;
   return {
     deputado: { legislatura: 57, id_camara: 204554, nome: "ANA DA CÂMARA" },
     votos,
     pagina,
     total_paginas,
-    atribuicao: atribuicao === undefined ? atribuicaoDosVotos() : atribuicao,
+    atribuicao_das_votacoes:
+      atribuicao_das_votacoes === undefined
+        ? temVotos
+          ? atribuicaoDasVotacoes()
+          : null
+        : atribuicao_das_votacoes,
+    atribuicao_dos_votos:
+      atribuicao_dos_votos === undefined
+        ? temVotos
+          ? atribuicaoDosVotos()
+          : null
+        : atribuicao_dos_votos,
   };
 }
 
@@ -292,18 +322,20 @@ test("votos: a página pedida vai à API; página inválida vira 1", async () =>
 
 test("votos: sem nenhum voto coletado a página diz isso e o perfil continua", async () => {
   const { status, html } = await comVotos(
-    historico({ votos: [], pagina: 1, total_paginas: 0, atribuicao: null }),
+    historico({ votos: [], pagina: 1, total_paginas: 0 }),
   );
 
   assert.equal(status, 200);
   assert.ok(html.includes("Nenhum voto coletado"));
+  assert.ok(!html.includes("Votos nominais em plenário"), "sem votos não há o que citar");
+  assert.ok(!html.includes("Votações em plenário"), "sem votos não há o que citar");
   assert.ok(html.includes("ANA DA CÂMARA"));
   assert.ok(!html.includes("não foi verificado"), "a nota dos códigos sem tabela não faz sentido");
 });
 
 test("votos: página além da última volta para a primeira", async () => {
   const { status, html } = await comVotos(
-    historico({ votos: [], pagina: 9, total_paginas: 2, atribuicao: null }),
+    historico({ votos: [], pagina: 9, total_paginas: 2 }),
     "?pagina=9",
   );
 
@@ -322,10 +354,50 @@ test("votos: a atribuição dos votos aparece com o conjunto e o link do origina
   assert.ok(html.includes('href="https://dados.example.org/api/v2/votacoes/votos.json"'));
 });
 
+test("votos: a atribuição das votações aparece à parte, com o conjunto e o link do original", async () => {
+  const { html } = await comVotos(historico());
+
+  assert.ok(html.includes("Votações em plenário"));
+  assert.ok(html.includes('href="https://dados.example.org/api/v2/votacoes/votacoes.json"'));
+});
+
+test("votos: as três origens da página (perfil, votações e votos) aparecem, cada uma uma vez", async () => {
+  const { html } = await comVotos(historico());
+
+  for (const conjunto of [
+    "Deputados em exercício (legislatura atual)",
+    "Votações em plenário",
+    "Votos nominais em plenário",
+  ]) {
+    assert.equal(html.split(`<dd>${conjunto}</dd>`).length - 1, 1, conjunto);
+  }
+  assert.equal((html.match(/<h3>Origem dos dados<\/h3>/g) ?? []).length, 3);
+});
+
+test("votos: a atribuição das votações fica dentro da seção de votos", async () => {
+  const { html } = await comVotos(historico());
+
+  // A seção de votos é a última da página: tudo o que vem depois do seu `aria-labelledby` é dela.
+  const inicio = html.indexOf('aria-labelledby="deputado-votos"');
+  assert.ok(inicio > 0, "não achei a seção de votos");
+  const antes = html.slice(0, inicio);
+  const depois = html.slice(inicio);
+  assert.ok(antes.includes("<dd>Deputados em exercício (legislatura atual)</dd>"));
+  assert.ok(!antes.includes("<dd>Votações em plenário</dd>"));
+  assert.ok(depois.includes("<dd>Votações em plenário</dd>"));
+  assert.ok(depois.includes("<dd>Votos nominais em plenário</dd>"));
+  assert.ok(!depois.includes("<dd>Deputados em exercício"), "a origem do perfil fica na outra seção");
+});
+
 // Guarda de regressão, passa antes e depois da implementação (o `Atribuicao` já recusava o link).
 test("votos: link da atribuição que não é http(s) vira texto, sem href", async () => {
-  const atribuicao = atribuicaoDosVotos({ url_origem: "javascript:alert(1)" });
-  const { status, html } = await comVotos(historico({ atribuicao }));
+  const perigosa = { url_origem: "javascript:alert(1)" };
+  const { status, html } = await comVotos(
+    historico({
+      atribuicao_dos_votos: atribuicaoDosVotos(perigosa),
+      atribuicao_das_votacoes: atribuicaoDasVotacoes(perigosa),
+    }),
+  );
 
   assert.equal(status, 200, "controle: a página precisa existir");
   assert.ok(!/href="javascript/i.test(html), "virou href");
@@ -371,7 +443,8 @@ test("votos: chave desconhecida que a API devolva não chega ao HTML", async () 
   const corpo = historico({ votos: [itemDeVoto({ interno: "SEGREDO-NO-ITEM" })] });
   corpo.extra = "SEGREDO-NA-RAIZ";
   corpo.deputado.email = "SEGREDO-NO-DEPUTADO";
-  corpo.atribuicao.interno = "SEGREDO-NA-ATRIBUICAO";
+  corpo.atribuicao_dos_votos.interno = "SEGREDO-NA-ATRIBUICAO-DOS-VOTOS";
+  corpo.atribuicao_das_votacoes.interno = "SEGREDO-NA-ATRIBUICAO-DAS-VOTACOES";
 
   const { status, html } = await comVotos(corpo);
 
@@ -403,8 +476,29 @@ const CORPOS_FORA_DO_FORMATO = {
   "votos que não é lista": (c) => (c.votos = "SEGREDO-FORA-DO-FORMATO"),
   "pagina em texto": (c) => (c.pagina = "1"),
   "total_paginas ausente": (c) => delete c.total_paginas,
-  "atribuicao que não é objeto": (c) => (c.atribuicao = "SEGREDO-FORA-DO-FORMATO"),
-  "atribuicao sem conjunto": (c) => delete c.atribuicao.conjunto,
+  "atribuicao_dos_votos que não é objeto": (c) =>
+    (c.atribuicao_dos_votos = "SEGREDO-FORA-DO-FORMATO"),
+  "atribuicao_dos_votos sem conjunto": (c) => delete c.atribuicao_dos_votos.conjunto,
+  "atribuicao_dos_votos ausente": (c) => delete c.atribuicao_dos_votos,
+  "atribuicao_dos_votos nula com votos": (c) => (c.atribuicao_dos_votos = null),
+  "atribuicao_das_votacoes que não é objeto": (c) =>
+    (c.atribuicao_das_votacoes = "SEGREDO-FORA-DO-FORMATO"),
+  "atribuicao_das_votacoes sem conjunto": (c) => delete c.atribuicao_das_votacoes.conjunto,
+  "atribuicao_das_votacoes ausente": (c) => delete c.atribuicao_das_votacoes,
+  "atribuicao_das_votacoes nula com votos": (c) => (c.atribuicao_das_votacoes = null),
+  "só a chave antiga 'atribuicao'": (c) => {
+    c.atribuicao = c.atribuicao_dos_votos;
+    delete c.atribuicao_dos_votos;
+    delete c.atribuicao_das_votacoes;
+  },
+  "atribuicao_dos_votos com a lista vazia": (c) => {
+    c.votos = [];
+    c.atribuicao_das_votacoes = null;
+  },
+  "atribuicao_das_votacoes com a lista vazia": (c) => {
+    c.votos = [];
+    c.atribuicao_dos_votos = null;
+  },
   "deputado sem nome": (c) => delete c.deputado.nome,
   "deputado.legislatura em texto": (c) => (c.deputado.legislatura = "57"),
   "deputado.id_camara em texto": (c) => (c.deputado.id_camara = "204554"),

@@ -2,6 +2,12 @@
 
 Mais recente no topo.
 
+### 2026-11-26 — Sessão 99 (as cinco decisões da emenda 1 do ADR 0032; sessão individual)
+
+- **Pedido**: o dono seguiu a recomendação para as cinco decisões abertas da emenda 1. Decisões e motivos no ADR 0032, **emenda 2**: (1) duas atribuições no histórico do deputado; (2) 400 antes de 404 mantido; (3) falha de `/votos/` derruba o perfil até o P-16; (4) nota dos códigos mantida, e conferir o significado na documentação da Câmara fica como tarefa à parte; (5) bidi em `descricao` não tratado (0 casos em 9.417).
+- **Feito**: só o item 1 mexe em código. `GET /internal/v1/deputados/<l>-<id>/votos/` devolve `atribuicao_dos_votos` e `atribuicao_das_votacoes` (a chave `atribuicao` saiu), a página do deputado cita as duas e o validador do front recusa uma só, ou alguma com a lista vazia. Sem consulta a mais.
+- **Prova e não verificado**: ver o corpo do PR (controle, cabeça e mutações pelo CI). `ruff` não rodou na VM; a página nunca foi vista num navegador.
+
 ### 2026-11-26 — Sessão 98 (premissa dos "5 registros multilinha" do ADR 0031; sessão individual)
 
 - **Pedido**: o dono escolheu conferir a pendência da Sessão 95: `votacoes-2026` leu 11.286 linhas físicas para 9.242 registros, e eu havia dito que o ADR 0031 trazia só 5 registros com quebra de linha.

@@ -3,10 +3,11 @@
 `GET /internal/v1/deputados/<legislatura>-<id>/votos/?pagina=`. Dados sintéticos. O que mais
 importa: só saem os votos do par (legislatura, id da Câmara) pedido, nunca os de outro deputado nem
 os de outra legislatura com o mesmo id; `voto` vazio sai `null` (é "sem posição", nunca string
-vazia nem chave ausente); `partido` é o do momento do voto, não o do perfil; a atribuição é a do
-conjunto de VOTOS (outro `Dataset` que o das votações), pela coleta mais recente entre os itens da
-página; só saem campos de listas explícitas. Os testes de 404, 400 e 405 pedem antes um 200 de
-controle: sem isso, uma rota que não existe passaria por "erro esperado".
+vazia nem chave ausente); `partido` é o do momento do voto, não o do perfil; são duas atribuições
+(ADR 0008, decisão 3), a do conjunto de VOTOS e a do de VOTAÇÕES (outro `Dataset`), cada uma pela
+coleta mais recente entre os itens da página; só saem campos de listas explícitas. Os testes de
+404, 400 e 405 pedem antes um 200 de controle: sem isso, uma rota que não existe passaria por
+"erro esperado".
 
 Valores de referência lidos do código: 50 por página (`VOTINGS_PER_PAGE` em `apps/legislature/
 views.py`), ordem `-voting__voted_on`, `-voting__camara_voting_id` (a mesma da lista da Câmara; o
@@ -37,7 +38,14 @@ def _url(legislatura=LEGISLATURA, camara_id=DEPUTADO):
     return f"/internal/v1/deputados/{legislatura}-{camara_id}/votos/"
 
 
-CHAVES_RESPOSTA = {"deputado", "votos", "pagina", "total_paginas", "atribuicao"}
+CHAVES_RESPOSTA = {
+    "deputado",
+    "votos",
+    "pagina",
+    "total_paginas",
+    "atribuicao_das_votacoes",
+    "atribuicao_dos_votos",
+}
 CHAVES_DEPUTADO = {"legislatura", "id_camara", "nome"}
 CHAVES_ITEM = {
     "id",
@@ -205,7 +213,8 @@ def test_resposta_so_com_as_chaves_da_lista_explicita(client, historico):
     assert set(corpo) == CHAVES_RESPOSTA
     assert set(corpo["deputado"]) == CHAVES_DEPUTADO
     assert all(set(item) == CHAVES_ITEM for item in corpo["votos"])
-    assert set(corpo["atribuicao"]) == CHAVES_ATRIBUICAO
+    assert set(corpo["atribuicao_das_votacoes"]) == CHAVES_ATRIBUICAO
+    assert set(corpo["atribuicao_dos_votos"]) == CHAVES_ATRIBUICAO
 
 
 def test_deputado_traz_legislatura_id_e_nome_do_perfil(client, historico):
@@ -370,7 +379,8 @@ def test_deputado_sem_votos_devolve_lista_vazia_e_sem_atribuicao(client, run):
     corpo = _ok(client, _url())
 
     assert corpo["votos"] == []
-    assert corpo["atribuicao"] is None
+    assert corpo["atribuicao_das_votacoes"] is None
+    assert corpo["atribuicao_dos_votos"] is None
     assert (corpo["pagina"], corpo["total_paginas"]) == (1, 0)
 
 
@@ -384,14 +394,32 @@ def test_deputado_fora_da_lista_de_exercicio_ainda_tem_historico(client, run):
 # --- Atribuição ----------------------------------------------------------------------------------
 
 
-def test_atribuicao_e_a_do_conjunto_de_votos_e_nao_a_das_votacoes(client, historico):
-    atribuicao = _ok(client, _url())["atribuicao"]
+def test_atribuicao_dos_votos_e_a_do_conjunto_de_votos(client, historico):
+    atribuicao = _ok(client, _url())["atribuicao_dos_votos"]
 
     assert atribuicao["fonte"] == "Câmara dos Deputados: Dados Abertos"
     assert atribuicao["conjunto"] == "Votos da Câmara em 2026"
     assert datetime.fromisoformat(atribuicao["coletado_em"]) == COLETADO_EM_DOS_VOTOS
     assert atribuicao["url_origem"] == URL_ORIGEM_DOS_VOTOS
     assert atribuicao["licenca"] == {"id": None, "url": None}
+
+
+def test_atribuicao_das_votacoes_e_a_do_conjunto_de_votacoes(client, historico):
+    # Data, órgão, descrição e aprovação de cada item vêm de `votacoes-2026`: a citação é dele.
+    atribuicao = _ok(client, _url())["atribuicao_das_votacoes"]
+
+    assert atribuicao["fonte"] == "Câmara dos Deputados: Dados Abertos"
+    assert atribuicao["conjunto"] == "Votações da Câmara em 2026"
+    assert datetime.fromisoformat(atribuicao["coletado_em"]) == COLETADO_EM
+    assert atribuicao["url_origem"] == URL_ORIGEM
+    assert atribuicao["licenca"] == {"id": None, "url": None}
+
+
+def test_as_duas_atribuicoes_sao_de_conjuntos_diferentes(client, historico):
+    corpo = _ok(client, _url())
+
+    assert corpo["atribuicao_das_votacoes"] != corpo["atribuicao_dos_votos"]
+    assert "atribuicao" not in corpo, "a chave antiga, ambígua, não pode ficar ao lado das novas"
 
 
 def test_atribuicao_e_a_da_coleta_de_votos_mais_recente_da_pagina(client, run):
@@ -401,7 +429,22 @@ def test_atribuicao_e_a_da_coleta_de_votos_mais_recente_da_pagina(client, run):
     _voto(_votacao(run, "1-1", voted_on=date(2026, 1, 1)), DEPUTADO, "Sim", ingestion_run=antiga)
     _voto(_votacao(run, "1-2", voted_on=date(2025, 1, 1)), DEPUTADO, "Sim", ingestion_run=nova)
 
-    atribuicao = _ok(client, _url())["atribuicao"]
+    atribuicao = _ok(client, _url())["atribuicao_dos_votos"]
+
+    assert datetime.fromisoformat(atribuicao["coletado_em"]) == nova.started_at
+
+
+def test_atribuicao_das_votacoes_e_a_da_coleta_de_votacoes_mais_recente_da_pagina(client, run):
+    antiga = _criar_run(datetime(2026, 11, 20, 9, 0, tzinfo=UTC))
+    nova = _criar_run(datetime(2026, 11, 25, 9, 0, tzinfo=UTC))
+    dos_votos = _criar_run_dos_votos()
+    _deputado(run)
+    velha = _votacao(antiga, "1-1", voted_on=date(2026, 1, 1))
+    recente = _votacao(nova, "1-2", voted_on=date(2025, 1, 1))
+    _voto(velha, DEPUTADO, "Sim", ingestion_run=dos_votos)
+    _voto(recente, DEPUTADO, "Sim", ingestion_run=dos_votos)
+
+    atribuicao = _ok(client, _url())["atribuicao_das_votacoes"]
 
     assert datetime.fromisoformat(atribuicao["coletado_em"]) == nova.started_at
 
@@ -416,8 +459,26 @@ def test_atribuicao_so_considera_os_itens_da_propria_pagina(client, run):
         coleta = nova if numero == 1 else antiga
         _voto(_votacao(run, f"1-{numero}", voted_on=dia), DEPUTADO, "Sim", ingestion_run=coleta)
 
-    primeira = _ok(client, _url())["atribuicao"]
-    segunda = _ok(client, f"{_url()}?pagina=2")["atribuicao"]
+    primeira = _ok(client, _url())["atribuicao_dos_votos"]
+    segunda = _ok(client, f"{_url()}?pagina=2")["atribuicao_dos_votos"]
+
+    assert datetime.fromisoformat(primeira["coletado_em"]) == antiga.started_at
+    assert datetime.fromisoformat(segunda["coletado_em"]) == nova.started_at
+
+
+def test_atribuicao_das_votacoes_so_considera_os_itens_da_propria_pagina(client, run):
+    antiga = _criar_run(datetime(2026, 11, 20, 9, 0, tzinfo=UTC))
+    nova = _criar_run(datetime(2026, 11, 25, 9, 0, tzinfo=UTC))
+    dos_votos = _criar_run_dos_votos()
+    _deputado(run)
+    for numero in range(1, 52):
+        dia = date(2026, 1, 1) + timedelta(days=numero)
+        coleta = nova if numero == 1 else antiga
+        votacao = _votacao(coleta, f"1-{numero}", voted_on=dia)
+        _voto(votacao, DEPUTADO, "Sim", ingestion_run=dos_votos)
+
+    primeira = _ok(client, _url())["atribuicao_das_votacoes"]
+    segunda = _ok(client, f"{_url()}?pagina=2")["atribuicao_das_votacoes"]
 
     assert datetime.fromisoformat(primeira["coletado_em"]) == antiga.started_at
     assert datetime.fromisoformat(segunda["coletado_em"]) == nova.started_at
@@ -575,7 +636,8 @@ def test_exatamente_50_votos_cabem_em_1_pagina(client, run):
     assert len(primeira["votos"]) == 50
     assert alem["votos"] == []
     assert (alem["pagina"], alem["total_paginas"]) == (2, 1)
-    assert alem["atribuicao"] is None
+    assert alem["atribuicao_das_votacoes"] is None
+    assert alem["atribuicao_dos_votos"] is None
 
 
 def test_exatamente_100_votos_sao_2_paginas(client, run):
@@ -597,7 +659,8 @@ def test_pagina_alem_da_ultima_devolve_lista_vazia(client, historico):
 
     assert corpo["votos"] == []
     assert (corpo["pagina"], corpo["total_paginas"]) == (9, 1)
-    assert corpo["atribuicao"] is None
+    assert corpo["atribuicao_das_votacoes"] is None
+    assert corpo["atribuicao_dos_votos"] is None
 
 
 def test_o_historico_custa_tres_consultas_mesmo_com_muitos_votos(
@@ -605,12 +668,13 @@ def test_o_historico_custa_tres_consultas_mesmo_com_muitos_votos(
 ):
     _deputado(run)
     outra_coleta = _criar_run_dos_votos(datetime(2026, 11, 25, 9, 0, tzinfo=UTC))
+    outra_coleta_das_votacoes = _criar_run(datetime(2026, 11, 25, 8, 0, tzinfo=UTC))
     for numero in range(1, 40):
-        votacao = _votacao(run, f"1-{numero}")
+        votacao = _votacao(outra_coleta_das_votacoes if numero % 3 else run, f"1-{numero}")
         _voto(votacao, DEPUTADO, "Sim", ingestion_run=outra_coleta if numero % 2 else run)
     _ok(client, _url())  # controle (e aquece o que o Django guarda em cache)
 
-    # o deputado, a contagem e a página com votação e atribuição num JOIN (sem N+1)
+    # o deputado, a contagem e a página com votação e as duas atribuições num JOIN (sem N+1)
     with django_assert_num_queries(3):
         client.get(_url())
 

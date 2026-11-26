@@ -13,7 +13,7 @@ export const PREFIXO_DA_NOTA = "Códigos como a fonte os manda.";
 // `aprovacao`: 1 "resultou em aprovação"; 0 "não foi aprovada" (rejeitada ou sem quórum); vazio
 // quando não é possível afirmar o resultado sem leitura humana da descrição.
 export const LEGENDA_DA_APROVACAO =
-  "Aprovação, segundo a documentação da Câmara: 1 é votação que resultou em aprovação; 0, proposição não aprovada (rejeitada ou sem quórum); sem código, a Câmara não afirma o resultado.";
+  "Aprovação, segundo a documentação da Câmara: 0 é votação que resultou em aprovação; 1, proposição não aprovada (rejeitada ou sem quórum); sem código, a Câmara não afirma o resultado.";
 
 // Só o que a documentação descreve (em `votosOutros`); ela não lista todos os valores de voto.
 export const LEGENDA_DAS_SIGLAS =

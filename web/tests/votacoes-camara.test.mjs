@@ -233,9 +233,12 @@ test("lista: sem ementa, o link não aponta para um id que não existe", async (
   const { status, html } = await listaOk(lista({ votacoes: [itemDaLista({ descricao: "" })] }));
 
   assert.equal(status, 200);
-  assert.ok(html.includes('<a href="/camara/votacoes/2332174-59/"'), "controle: o link existe");
-  assert.ok(!html.includes("aria-describedby"));
-  assert.ok(!html.includes('class="ementa"'));
+  // Só a tag do link conta: o payload do React (`self.__next_f`) lista `aria-describedby` como
+  // `$undefined` mesmo quando o atributo não sai no HTML.
+  const link = html.match(/<a [^>]*href="\/camara\/votacoes\/2332174-59\/"[^>]*>/)?.[0];
+  assert.ok(link, "controle: o link existe");
+  assert.ok(!link.includes("aria-describedby"));
+  assert.ok(!html.includes('<p class="ementa"'));
 });
 
 test("lista: o id da proposição não aparece (0 é sentinela de 'sem proposição')", async () => {

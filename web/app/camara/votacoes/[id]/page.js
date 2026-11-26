@@ -106,6 +106,25 @@ function Votantes({ votos }) {
   );
 }
 
+// Todas as proposições, na ordem que a API manda (ADR 0032, emenda 5). Título e ementa são texto
+// livre da fonte: o React os escapa. Nem `origem` nem o id da Câmara aparecem (sem significado
+// verificado e sem rota para a proposição).
+function Proposicoes({ proposicoes }) {
+  return (
+    <>
+      <h2>Proposições</h2>
+      <ul className="proposicoes">
+        {proposicoes.map((item) => (
+          <li key={`${item.origem}-${item.id_camara}`}>
+            <strong>{item.titulo}</strong>
+            {item.ementa && <p className="ementa">{item.ementa}</p>}
+          </li>
+        ))}
+      </ul>
+    </>
+  );
+}
+
 export default async function VotacaoDaCamara({ params }) {
   const { id } = await params;
   const detalhe = await buscarVotacaoDaCamara(id);
@@ -117,6 +136,8 @@ export default async function VotacaoDaCamara({ params }) {
     contagem_por_voto: contagem,
     atribuicao,
     atribuicao_dos_votos: atribuicaoDosVotos,
+    proposicoes,
+    atribuicao_das_proposicoes: atribuicaoDasProposicoes,
   } = detalhe;
   const temVotos = votos.length > 0;
   const totais = totaisInformados(votacao.totais_da_fonte);
@@ -140,8 +161,10 @@ export default async function VotacaoDaCamara({ params }) {
       {totais && <Totais linhas={totais} />}
       {temVotos && <Contagem contagem={contagem} />}
       {temVotos && <Votantes votos={votos} />}
+      {proposicoes.length > 0 && <Proposicoes proposicoes={proposicoes} />}
       <Atribuicao atribuicao={atribuicao} />
       {atribuicaoDosVotos && <Atribuicao atribuicao={atribuicaoDosVotos} />}
+      {atribuicaoDasProposicoes && <Atribuicao atribuicao={atribuicaoDasProposicoes} />}
     </>
   );
 }

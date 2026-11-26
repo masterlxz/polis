@@ -381,13 +381,7 @@ def camara_voting_detail(request, voting_id):
 
     votes = list(voting.votes.select_related("ingestion_run__dataset__source"))
     names = _deputy_names_by_pair({(v.legislature_id, v.camara_id) for v in votes})
-    votes.sort(
-        key=lambda v: (
-            _alphabetical_key(names.get((v.legislature_id, v.camara_id))),
-            v.legislature_id,
-            v.camara_id,
-        )
-    )
+    votes.sort(key=lambda v: _alphabetical_key(names.get((v.legislature_id, v.camara_id))))
     counts = Counter(_or_none(v.vote) for v in votes)
     # Os votos vêm de outro conjunto (`camara/votos-2026`) que a votação (`camara/votacoes-2026`):
     # a fonte dos votos é citada à parte, pela coleta mais recente entre eles (ADR 0008, decisão 3).

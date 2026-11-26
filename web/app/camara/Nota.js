@@ -7,7 +7,7 @@ export default function Nota({ aprovacao, siglas }) {
   if (texto === null) return null;
   return (
     <p className="nota">
-      {texto} Fonte: <a href={URL_DA_DOCUMENTACAO}>documentação da Câmara</a>.
+      {texto} Fonte: documentação da Câmara ({URL_DA_DOCUMENTACAO}).
     </p>
   );
 }

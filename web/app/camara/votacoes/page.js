@@ -52,7 +52,7 @@ export default async function VotacoesDaCamara({ searchParams }) {
             <li key={votacao.id}>
               <a href={`${CAMINHO}${votacao.id}/`}>{tituloDaVotacao(votacao)}</a>
               <span className="detalhe">
-                {votacao.tem_votos_nominais ? "Com votos nominais" : "Só os totais da fonte"}
+                {votacao.tem_votos_nominais ? "Com votos nominais" : "Sem votos nominais"}
               </span>
               {votacao.descricao && <p className="ementa">{votacao.descricao}</p>}
             </li>

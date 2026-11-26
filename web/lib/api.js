@@ -409,10 +409,18 @@ function totaisDaFonteValidos(totais) {
   );
 }
 
+// Texto não vazio ou nulo: onde o contrato diz "vazio sai `null`, nunca a string vazia" (ADR 0032,
+// decisão 6), uma string vazia é dado que a API não manda.
+function textoNaoVazioOuNulo(valor) {
+  return valor === null || (typeof valor === "string" && valor !== "");
+}
+
 // Os campos que a lista e o detalhe têm em comum. `aprovacao` é texto ou nulo (a chave sempre vem).
+// O id vira `href` na lista, então só o formato que a rota aceita passa.
 function votacaoDaCamaraValida(votacao) {
   return (
     typeof votacao?.id === "string" &&
+    idDeVotacaoDaCamaraValido(votacao.id) &&
     typeof votacao.data === "string" &&
     typeof votacao.orgao === "string" &&
     textoOuNulo(votacao.aprovacao) &&
@@ -445,15 +453,19 @@ export async function buscarVotacoesDaCamara(pagina) {
   return corpo;
 }
 
-// `voto` e `partido` nulos são ausência na fonte; a chave sempre vem. `nome` só vem com perfil.
+// `voto` e `partido` nulos são ausência na fonte (a chave sempre vem, nunca `""`). `nome` só vem com
+// perfil (ADR 0032, decisão 7): `tem_perfil` e `nome` têm de concordar, senão sairia um link sem
+// texto ou um nome sem link. O link do perfil só existe para o par que a rota do deputado aceita.
 function votoNominalValido(item) {
   return (
     Number.isInteger(item?.legislatura) &&
     Number.isInteger(item.id_camara) &&
-    textoOuNulo(item.partido) &&
-    textoOuNulo(item.voto) &&
+    textoNaoVazioOuNulo(item.partido) &&
+    textoNaoVazioOuNulo(item.voto) &&
     typeof item.tem_perfil === "boolean" &&
-    textoOuNulo(item.nome)
+    textoNaoVazioOuNulo(item.nome) &&
+    item.tem_perfil === (item.nome !== null) &&
+    (!item.tem_perfil || idDeDeputadoValido(`${item.legislatura}-${item.id_camara}`))
   );
 }
 
@@ -464,15 +476,20 @@ function contagemPorVotoValida(contagem) {
   );
 }
 
-// `atribuicao_dos_votos` nula quer dizer "não há votos"; ausente é recusado.
+// `atribuicao_dos_votos` nula quer dizer "não há votos" e só nesse caso (ADR 0032, decisão 5); a
+// contagem é calculada a partir dos votos, então só é vazia quando eles são. Ausente é recusado.
 function detalheDeVotacaoDaCamaraValido(corpo) {
+  const temVotos = Array.isArray(corpo?.votos) && corpo.votos.length > 0;
   return (
     votacaoDaCamaraValida(corpo?.votacao) &&
     Array.isArray(corpo.votos) &&
     corpo.votos.every(votoNominalValido) &&
     contagemPorVotoValida(corpo.contagem_por_voto) &&
+    corpo.contagem_por_voto.length > 0 === temVotos &&
     atribuicaoValida(corpo.atribuicao) &&
-    (corpo.atribuicao_dos_votos === null || atribuicaoValida(corpo.atribuicao_dos_votos))
+    (corpo.atribuicao_dos_votos === null
+      ? !temVotos
+      : temVotos && atribuicaoValida(corpo.atribuicao_dos_votos))
   );
 }
 

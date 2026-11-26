@@ -131,7 +131,7 @@ export default async function VotacaoDaCamara({ params }) {
       {(votacao.aprovacao !== null || temVotos) && <p className="nota">{NOTA_DO_CODIGO}</p>}
 
       {!temVotos && (
-        <p className="aviso">A Câmara não publicou os votos de cada deputado nesta votação.</p>
+        <p className="aviso">Esta votação não tem lista de votos nominais nos dados coletados.</p>
       )}
       {totais && <Totais linhas={totais} />}
       {temVotos && <Contagem contagem={contagem} />}

@@ -485,7 +485,7 @@ function detalheDeVotacaoDaCamaraValido(corpo) {
     Array.isArray(corpo.votos) &&
     corpo.votos.every(votoNominalValido) &&
     contagemPorVotoValida(corpo.contagem_por_voto) &&
-    (corpo.contagem_por_voto.length > 0) === temVotos &&
+    ((corpo.contagem_por_voto.length > 0) || temVotos) &&
     atribuicaoValida(corpo.atribuicao) &&
     (corpo.atribuicao_dos_votos === null
       ? !temVotos

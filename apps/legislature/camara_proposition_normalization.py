@@ -139,7 +139,7 @@ def _collect(run):
         if code not in propositions:
             propositions[code] = proposition
         elif propositions[code] != proposition:
-            conflicts += 1
+            propositions[code] = proposition
         links.add((voting_id, code))
     if invalid:
         raise InvalidRowsError(invalid)

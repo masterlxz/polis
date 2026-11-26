@@ -114,7 +114,7 @@ function Proposicoes({ proposicoes }) {
     <>
       <h2>Proposições</h2>
       <ul className="proposicoes">
-        {proposicoes.map((item, indice) => (
+        {[...proposicoes].sort((a, b) => a.titulo.localeCompare(b.titulo)).map((item, indice) => (
           // A key é o índice (lista fixa, sem reordenação): `origem` e o id vazariam no payload do React.
           <li key={indice}>
             <strong>{item.titulo}</strong>

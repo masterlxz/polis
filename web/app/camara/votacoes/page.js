@@ -52,7 +52,7 @@ export default async function VotacoesDaCamara({ searchParams }) {
             <li key={votacao.id}>
               <a
                 href={`${CAMINHO}${votacao.id}/`}
-                aria-describedby={votacao.descricao ? `ementa-${votacao.id}` : undefined}
+                aria-describedby={`ementa-${votacao.id}`}
               >
                 {tituloDaVotacao(votacao)}
               </a>

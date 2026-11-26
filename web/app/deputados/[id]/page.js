@@ -54,7 +54,13 @@ function SemVotos({ caminho, totalPaginas }) {
 // `aprovacao` e as siglas de voto saem cruas: o significado delas não foi verificado (ADR 0031 e
 // 0032). Partido é o do momento do voto, não o do perfil.
 function Votos({ caminho, historico }) {
-  const { votos, pagina, total_paginas: totalPaginas, atribuicao } = historico;
+  const {
+    votos,
+    pagina,
+    total_paginas: totalPaginas,
+    atribuicao_das_votacoes: atribuicaoDasVotacoes,
+    atribuicao_dos_votos: atribuicaoDosVotos,
+  } = historico;
   return (
     <section aria-labelledby="deputado-votos" className="candidatura">
       <h2 id="deputado-votos">Votos</h2>
@@ -94,7 +100,8 @@ function Votos({ caminho, historico }) {
         </p>
       )}
       <Navegacao caminho={caminho} pagina={pagina} totalPaginas={totalPaginas} />
-      {atribuicao && <Atribuicao atribuicao={atribuicao} />}
+      {atribuicaoDasVotacoes && <Atribuicao atribuicao={atribuicaoDasVotacoes} />}
+      {atribuicaoDosVotos && <Atribuicao atribuicao={atribuicaoDosVotos} />}
     </section>
   );
 }

@@ -372,6 +372,8 @@ function votoDeDeputadoValido(item) {
   );
 }
 
+// As duas atribuições (votos e votações) existem juntas e só numa página com votos: a API as tira
+// da mesma lista (ADR 0032, emenda 2). Uma só, ou alguma com a lista vazia, é resposta incoerente.
 function votosDoDeputadoValidos(corpo) {
   return (
     Number.isInteger(corpo?.deputado?.legislatura) &&
@@ -381,7 +383,11 @@ function votosDoDeputadoValidos(corpo) {
     corpo.votos.every(votoDeDeputadoValido) &&
     Number.isInteger(corpo.pagina) &&
     Number.isInteger(corpo.total_paginas) &&
-    (corpo.atribuicao === null || atribuicaoValida(corpo.atribuicao))
+    (corpo.votos.length > 0) === (corpo.atribuicao_dos_votos !== null) &&
+    (corpo.votos.length > 0) === (corpo.atribuicao_das_votacoes !== null) &&
+    (corpo.votos.length === 0 ||
+      (atribuicaoValida(corpo.atribuicao_dos_votos) &&
+        atribuicaoValida(corpo.atribuicao_das_votacoes)))
   );
 }
 

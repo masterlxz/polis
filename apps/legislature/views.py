@@ -408,8 +408,12 @@ def deputy_votes(request, legislature, camara_id):
     página do Senado (ADR 0030, decisão 4) e a mesma ordem da lista da Câmara (ADR 0032). O voto
     não tem chave para `Deputy` (ADR 0031): o histórico é o das linhas com o par (legislatura, id
     da Câmara), e deputado sem `Deputy` para o par dá 404, como o perfil, mesmo que tenha votado.
-    `voto` vazio sai `null` e `partido` é o do momento do voto. A atribuição é a da coleta de
-    VOTOS mais recente entre os itens da página (o conjunto de votos, não o de votações).
+    `voto` vazio sai `null` e `partido` é o do momento do voto. Duas atribuições, como o detalhe da
+    votação (ADR 0008, decisão 3; ADR 0032, emenda 2): `atribuicao_dos_votos` é a da coleta de
+    VOTOS mais recente entre os itens da página e `atribuicao_das_votacoes` a da coleta de
+    VOTAÇÕES mais recente entre as votações da página (de onde vêm data, órgão, descrição e
+    aprovação). Ambas são nulas numa página sem votos. O nome do deputado vem de outro conjunto,
+    citado no perfil.
     """
     page_text = request.GET.get("pagina", "1")
     if not _PAGE_PATTERN.fullmatch(page_text):
@@ -425,12 +429,12 @@ def deputy_votes(request, legislature, camara_id):
     votes_of_deputy = CamaraVote.objects.filter(legislature_id=legislature, camara_id=camara_id)
     total = votes_of_deputy.count()
     start = (page - 1) * VOTINGS_PER_PAGE
-    votes = list(
-        votes_of_deputy.select_related("voting", "ingestion_run__dataset__source").order_by(
-            "-voting__voted_on", "-voting__camara_voting_id"
-        )[start : start + VOTINGS_PER_PAGE]
-    )
-    newest_run = max((v.ingestion_run for v in votes), key=lambda r: r.started_at, default=None)
+    newest_first = votes_of_deputy.select_related(
+        "ingestion_run__dataset__source", "voting__ingestion_run__dataset__source"
+    ).order_by("-voting__voted_on", "-voting__camara_voting_id")
+    votes = list(newest_first[start : start + VOTINGS_PER_PAGE])
+    newest_votes_run = max((v.ingestion_run for v in votes), key=_started, default=None)
+    newest_votings_run = max((v.voting.ingestion_run for v in votes), key=_started, default=None)
     return JsonResponse(
         {
             "deputado": {
@@ -441,10 +445,17 @@ def deputy_votes(request, legislature, camara_id):
             "votos": [_deputy_vote_item(v) for v in votes],
             "pagina": page,
             "total_paginas": (total + VOTINGS_PER_PAGE - 1) // VOTINGS_PER_PAGE,
-            "atribuicao": _attribution(newest_run) if newest_run else None,
+            "atribuicao_das_votacoes": (
+                _attribution(newest_votings_run) if newest_votings_run else None
+            ),
+            "atribuicao_dos_votos": _attribution(newest_votes_run) if newest_votes_run else None,
         },
         json_dumps_params={"ensure_ascii": False},
     )
+
+
+def _started(run):
+    return run.started_at
 
 
 def _deputy_vote_item(vote):

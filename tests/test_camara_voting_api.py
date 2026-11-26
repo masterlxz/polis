@@ -282,16 +282,18 @@ def test_quem_nao_tem_perfil_vem_depois_de_quem_tem_nome_por_legislatura_e_id(cl
 
 def test_mesmo_nome_desempata_por_legislatura_e_id_mesmo_gravado_fora_de_ordem(client, run):
     votacao = _votacao(run, NOMINAL)
-    _deputado(run, 3, name="Ana")
-    _deputado(run, 2, name="Ana")
-    _deputado(run, 1, name="Zeca")
-    # Gravados do último para o primeiro: sem ordenar, o banco os devolveria assim.
-    for camara_id in (3, 2, 1):
-        _voto(votacao, camara_id, "Sim")
+    _deputado(run, 2, name="Ana", legislatura=57)
+    _deputado(run, 9, name="Ana", legislatura=56)
+    _deputado(run, 1, name="Zeca", legislatura=57)
+    # A legislatura 57 é gravada antes da 56: sem ordenar, o banco as devolveria nessa ordem.
+    _voto(votacao, 2, "Sim", legislatura=57)
+    _voto(votacao, 9, "Sim", legislatura=56)
+    _voto(votacao, 1, "Sim", legislatura=57)
 
     votos = _detalhe(client, NOMINAL)["votos"]
 
-    assert [(v["nome"], v["id_camara"]) for v in votos] == [("Ana", 2), ("Ana", 3), ("Zeca", 1)]
+    pares = [(v["nome"], v["legislatura"], v["id_camara"]) for v in votos]
+    assert pares == [("Ana", 56, 9), ("Ana", 57, 2), ("Zeca", 57, 1)]
 
 
 def test_voto_vazio_sai_null_nunca_string_vazia_nem_chave_ausente(client, run):

@@ -15,6 +15,7 @@ não a do fim do mandato.
 """
 
 import re
+import unicodedata
 from collections import Counter
 
 from django.db.models import Exists, OuterRef
@@ -344,6 +345,19 @@ def _vote_count_order(item):
     return (-quantity, vote is None, vote or "")
 
 
+def _alphabetical_key(name):
+    """Chave de ordem alfabética de um nome: sem acento e sem diferença de caixa; sem nome, no fim.
+
+    Comparar o texto cru poria "Átila" e "Érika" depois de "Zeca" (o acento vale mais que o Z). A
+    ordem não depende da collation do banco, que o ADR 0032 já registra como variável. Python
+    ordena de forma estável: quem empata fica na ordem que veio do banco (legislatura e id).
+    """
+    if name is None:
+        return (True, "")
+    decomposed = unicodedata.normalize("NFKD", name)
+    return (False, "".join(c for c in decomposed if not unicodedata.combining(c)).casefold())
+
+
 @require_safe
 def camara_voting_detail(request, voting_id):
     """Uma votação da Câmara com os votos nominais, se houver (ADR 0031 e 0032).
@@ -353,7 +367,9 @@ def camara_voting_detail(request, voting_id):
     nome, ADR 0005). `contagem_por_voto` é calculada pelo polis a partir dos itens, separada de
     `totais_da_fonte`, que ficam como a fonte os mandou (0/0/0 numa votação sem voto nominal não é
     uma contagem: a fonte não informou). `atribuicao` é a do conjunto de votações e
-    `atribuicao_dos_votos` a do conjunto de votos (nula se não há votos).
+    `atribuicao_dos_votos` a do conjunto de votos (nula se não há votos). Os votos saem em ordem
+    alfabética de nome (sem acento nem caixa), quem não tem perfil por último, e o empate fica por
+    legislatura e id (ADR 0032, emenda 4).
     """
     voting = (
         CamaraVoting.objects.select_related("ingestion_run__dataset__source")
@@ -369,6 +385,7 @@ def camara_voting_detail(request, voting_id):
         )
     )
     names = _deputy_names_by_pair({(v.legislature_id, v.camara_id) for v in votes})
+    votes.sort(key=lambda v: _alphabetical_key(names.get((v.legislature_id, v.camara_id))))
     counts = Counter(_or_none(v.vote) for v in votes)
     # Os votos vêm de outro conjunto (`camara/votos-2026`) que a votação (`camara/votacoes-2026`):
     # a fonte dos votos é citada à parte, pela coleta mais recente entre eles (ADR 0008, decisão 3).

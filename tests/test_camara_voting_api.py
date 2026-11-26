@@ -234,6 +234,68 @@ def test_votos_saem_ordenados_por_legislatura_e_id_da_camara(client, run):
     }
 
 
+def _nomes_na_ordem(corpo):
+    return [v["nome"] for v in corpo["votos"]]
+
+
+def test_votos_de_quem_tem_perfil_saem_em_ordem_alfabetica_de_nome(client, run):
+    votacao = _votacao(run, NOMINAL)
+    for camara_id, nome in ((1, "Carla"), (2, "Ana"), (3, "Bia")):
+        _deputado(run, camara_id, name=nome)
+        _voto(votacao, camara_id, "Sim")
+
+    assert _nomes_na_ordem(_detalhe(client, NOMINAL)) == ["Ana", "Bia", "Carla"]
+
+
+def test_ordem_de_nome_ignora_acento_e_caixa(client, run):
+    votacao = _votacao(run, NOMINAL)
+    for camara_id, nome in ((1, "Zeca"), (2, "Átila Lins"), (3, "bruno"), (4, "Érika")):
+        _deputado(run, camara_id, name=nome)
+        _voto(votacao, camara_id, "Sim")
+
+    # Comparar o texto cru poria "Átila" e "Érika" depois de "Zeca" (o acento vale mais que o Z).
+    assert _nomes_na_ordem(_detalhe(client, NOMINAL)) == ["Átila Lins", "bruno", "Érika", "Zeca"]
+
+
+def test_acento_dentro_do_nome_nao_desloca_a_ordem(client, run):
+    votacao = _votacao(run, NOMINAL)
+    for camara_id, nome in ((1, "Alzira"), (2, "Álvaro"), (3, "Alberto")):
+        _deputado(run, camara_id, name=nome)
+        _voto(votacao, camara_id, "Sim")
+
+    # O acento fica no meio do nome: "Álvaro" tem de cair entre "Alberto" e "Alzira", como "Alvaro".
+    assert _nomes_na_ordem(_detalhe(client, NOMINAL)) == ["Alberto", "Álvaro", "Alzira"]
+
+
+def test_quem_nao_tem_perfil_vem_depois_de_quem_tem_nome_por_legislatura_e_id(client, run):
+    votacao = _votacao(run, NOMINAL)
+    _deputado(run, 2, name="Zeca")
+    for camara_id, legislatura in ((3, 57), (2, 57), (1, 57), (9, 56)):
+        _voto(votacao, camara_id, "Sim", legislatura=legislatura)
+
+    votos = _detalhe(client, NOMINAL)["votos"]
+
+    pares = [(v["legislatura"], v["id_camara"]) for v in votos]
+    assert pares == [(57, 2), (56, 9), (57, 1), (57, 3)]
+    assert [v["tem_perfil"] for v in votos] == [True, False, False, False]
+
+
+def test_mesmo_nome_desempata_por_legislatura_e_id_mesmo_gravado_fora_de_ordem(client, run):
+    votacao = _votacao(run, NOMINAL)
+    _deputado(run, 2, name="Ana", legislatura=57)
+    _deputado(run, 9, name="Ana", legislatura=56)
+    _deputado(run, 1, name="Zeca", legislatura=57)
+    # A legislatura 57 é gravada antes da 56: sem ordenar, o banco as devolveria nessa ordem.
+    _voto(votacao, 2, "Sim", legislatura=57)
+    _voto(votacao, 9, "Sim", legislatura=56)
+    _voto(votacao, 1, "Sim", legislatura=57)
+
+    votos = _detalhe(client, NOMINAL)["votos"]
+
+    pares = [(v["nome"], v["legislatura"], v["id_camara"]) for v in votos]
+    assert pares == [("Ana", 56, 9), ("Ana", 57, 2), ("Zeca", 57, 1)]
+
+
 def test_voto_vazio_sai_null_nunca_string_vazia_nem_chave_ausente(client, run):
     votacao = _votacao(run, NOMINAL)
     _voto(votacao, 1, "Sim")

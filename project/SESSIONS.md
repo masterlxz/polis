@@ -2,6 +2,13 @@
 
 Mais recente no topo.
 
+### 2026-11-26 — Sessão 103 (votos do detalhe da votação da Câmara em ordem alfabética de nome; sessão individual)
+
+- **Pedido**: o achado da Sessão 101 no navegador: os 423 votos da votação `2394518-60` saíam por id da Câmara, sem ordem que um leitor reconheça (o Senado já ordena por nome). Decisões do dono: seguir a recomendação (ordenar em Python, depois da junção dos nomes).
+- **Feito**: `camara_voting_detail` (`apps/legislature/views.py`) ordena os votos por nome sem acento nem caixa (`_alphabetical_key`, NFKD sem os combinantes, `casefold`); quem não tem perfil vai por último; o empate fica pela ordem do banco (legislatura, id), que o `sort` estável do Python preserva. Sem schema, sem consulta a mais (o teste das 3 consultas segue verde). **ADR 0032, emenda 4** registra a regra e as descartadas (ordenar no banco, por voto, paginar). Não mudam: o histórico por deputado, o Senado e o front.
+- **Prova**: testes primeiro, no CI do commit só de testes: **4 falharam e 1.754 passaram**, os 4 eram os novos. Depois da implementação, 1.758 verdes. Cinco mutações, cada uma num PR rascunho (#245 a #249, #250 para a 5b; todos fechados): (1) sem normalizar o texto: 2 testes falharam; (2) acento solto não removido: 1 falhou, **o teste que adicionei antes de mutar** ("Álvaro" caía depois de "Alzira", e nenhum dos primeiros testes o pegaria: a decomposição NFKD sozinha já põe "Átila" entre os A); (3) sem `casefold`: 1; (4) sem nome no começo: 1; (5) sem `order_by` no banco: 3 testes antigos falharam. Final: 1.759 passando e 5 checks verdes em `5fe6c88`.
+- **Não verificado**: **o meu teste do desempate (`test_mesmo_nome_desempata_por_legislatura_e_id_...`) não falhou na mutação 5**, nem depois de reforçado com legislaturas gravadas fora de ordem (5b). Ele falhou antes da implementação (é teste de comportamento), mas não prova o `order_by`; quem prova são 3 testes antigos. Por que o PostgreSQL devolve essas linhas na ordem certa sem `order_by` não foi apurado (suspeita: plano de consulta com índice, não medida). Tornar o desempate explícito na chave de ordenação (`(nome, legislatura, id)`) tiraria a dependência da ordem do banco; ficou como sugestão, fora do escopo aprovado. A página nunca foi revista no navegador depois da mudança; `ruff` não rodou na VM (o CI rodou: `All checks passed!` no run dos testes).
+
 ### 2026-11-26 — Sessão 102 (o empate marcado como aprovado, apurado; só documentação; sessão individual)
 
 - **Pedido**: apurar o achado da Sessão 101: a votação de 20/05 com Sim 182 e Não 182 vem com `aprovacao` 1.

@@ -389,7 +389,7 @@ def _camara_proposition_item(link):
         "tipo": proposition.type_acronym,
         "numero": proposition.number,
         "ano": proposition.year,
-        "ementa": _or_none(proposition.ementa),
+        "ementa": proposition.ementa,
         "origem": link.origin,
     }
 

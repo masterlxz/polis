@@ -31,7 +31,7 @@ def _ementa(values):
 def _year(values):
     value = values.get("proposicao_ano")
     if value == "":
-        return None
+        return 0
     return _count(values, "proposicao_ano")
 
 

@@ -164,7 +164,9 @@ def _normalize(dataset, name, result, now):
     except NormalizationRefused as error:
         result.lines.append(f"{name}: normalização recusada: {error}")
         result.normalization_failed += 1
-        _record_normalization(dataset, now, str(error))
+        _record_normalization(
+            dataset, now, str(error), also=Dataset.objects.filter(source=dataset.source)
+        )
         return
     except Exception as error:
         failed = True

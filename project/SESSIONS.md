@@ -2,6 +2,13 @@
 
 Mais recente no topo.
 
+### 2026-11-26 — Sessão 104 (desempate explícito na chave de ordenação dos votos da Câmara; sessão individual)
+
+- **Pedido**: fechar o ponto da Sessão 103: o teste do desempate não provava o `order_by`. Decisão do dono: seguir a recomendação (desempate dentro da chave e `order_by` do banco fora).
+- **Feito**: em `camara_voting_detail`, a chave passa a ser `(nome sem acento nem caixa, legislatura, id)` e o `order_by` do banco sai. Mesma ordem final; uma consulta continua uma consulta. ADR 0032, emenda 4, ajustada.
+- **Prova (mutação planejada antes, com a tabela "mutação → teste que deve falhar")**: mutação "tirar legislatura e id da chave". **1ª rodada (PR #252):** falharam 3 testes (`votos_saem_ordenados_por_legislatura_e_id_da_camara`, `voto_vazio_sai_null...`, `partido_vazio_sai_null...`); **o teste do desempate, que a tabela previa, não falhou** (de novo). Causa vista nas mensagens de erro: sem `order_by` o banco devolveu os votos na ordem **inversa** da gravação (`['S/Partido', None]` onde se esperava `[None, 'S/Partido']`), e no meu teste a inversão acertou por sorte. **Reforço:** o teste passou a gravar a legislatura 56 antes da 57. **2ª rodada (PR #253):** falharam 4 testes, os dois previstos e os dois antigos; a base ficou com 1.759 passando e `ruff` ok. Os dois PRs de mutação foram fechados.
+- **Não verificado**: que o banco devolva sempre na ordem inversa da gravação (observei em 4 testes deste CI, não é regra do PostgreSQL): se mudar, o teste do desempate continua passando com a implementação certa, mas perde o poder de derrubar a mutação. A página não foi revista no navegador depois das Sessões 103 e 104.
+
 ### 2026-11-26 — Sessão 103 (votos do detalhe da votação da Câmara em ordem alfabética de nome; sessão individual)
 
 - **Pedido**: o achado da Sessão 101 no navegador: os 423 votos da votação `2394518-60` saíam por id da Câmara, sem ordem que um leitor reconheça (o Senado já ordena por nome). Decisões do dono: seguir a recomendação (ordenar em Python, depois da junção dos nomes).

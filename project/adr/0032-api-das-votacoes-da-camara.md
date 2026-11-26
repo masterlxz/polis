@@ -56,6 +56,13 @@ Espelho de `senator_votes` (ADR 0030, emenda 7), PRs #192 (API) e #194 (página 
 - Hoje não há retirada de deputado da Câmara (ADR 0026, decisão 1: ele "nunca apaga"). **Se um dia a retirada passar a apagar `Deputy`, ela tem de apagar também os `CamaraVote` pelo par (legislatura, id)**; sem isso o detalhe da votação (já existente) continua mostrando o id e o voto dele. É a pergunta do ADR 0031 ("Pergunta para o P-16") e segue aberta.
 - **Não validado:** o `CREATE INDEX` e o `EXPLAIN` com dado real (a tabela deve estar vazia: nenhuma votação foi coletada); a página contra a API real e no navegador; a collation do PostgreSQL de produção para a ordem do desempate.
 
+## Emenda 4 (2026-11-26): os votos do detalhe saem em ordem alfabética de nome (substitui a ordem do item 6)
+**Motivo:** visto no navegador com a votação `2394518-60` (423 votos): a ordem por `legislature_id, camara_id` não tem sentido para quem lê, e achar um deputado numa lista longa é o uso principal da página. O Senado já ordena por nome.
+- **Regra:** nome em ordem alfabética **sem acento e sem diferença de caixa** (comparar o texto cru poria "Átila" e "Érika" depois de "Zeca"); quem não tem perfil (`tem_perfil` falso, `nome` nulo) vai **depois** de todos, por legislatura e id; empate de nome também por legislatura e id.
+- **Onde:** na view, em Python, depois da junção que já traz os nomes. A ordem não depende da collation do banco, sem schema novo e sem consulta a mais (o detalhe continua em 3).
+- **Descartadas:** ordenar no banco (o nome não está na tabela de votos, e a collation varia); ordenar por voto e depois por nome (agrupa posições, mas é escolha de produto que o dono não pediu); paginar (resolve o tamanho, não o problema visto).
+- **Não muda:** a ordem do histórico por deputado (mais recente primeiro) e o formato de cada item.
+
 ## Emenda 3 (2026-11-26): o significado de `aprovacao` e das siglas foi conferido (decisão 4 da emenda 2)
 Lido em 2026-11-26 em [O que você precisa saber sobre votações no Dados Abertos](https://dadosabertos.camara.leg.br/howtouse/2020-02-07-dados-votacoes.html) (tutorial de 2020, a documentação oficial da Câmara; o dicionário formal de campos não foi encontrado).
 - **`aprovacao`:** indicador booleano. `1`: a votação resultou em aprovação da proposição. `0`: a proposição não foi aprovada, e o motivo pode ser rejeição ou falta de quórum. **Vazio:** não é possível afirmar o resultado sem leitura humana da descrição (votação detectada pelos efeitos sobre outra proposição, como supressão ou manutenção de um trecho).

@@ -181,8 +181,8 @@ test("lista: data e órgão no link, descrição e a marca de voto nominal de ca
   );
 
   assert.equal(status, 200);
-  assert.match(html, /<a href="\/camara\/votacoes\/2332174-59\/">24\/11\/2026 · PLEN<\/a>/);
-  assert.match(html, /<a href="\/camara\/votacoes\/2332175-1\/">23\/11\/2026 · CCJC<\/a>/);
+  assert.match(html, /<a href="\/camara\/votacoes\/2332174-59\/"[^>]*>24\/11\/2026 · PLEN<\/a>/);
+  assert.match(html, /<a href="\/camara\/votacoes\/2332175-1\/"[^>]*>23\/11\/2026 · CCJC<\/a>/);
   assert.ok(html.includes("Aprovado o requerimento de teste."));
   assert.ok(html.includes("Rejeitado o destaque de teste."));
   // Cada marca fica no item certo: contar as ocorrências não pegaria as duas trocadas de lugar.
@@ -196,6 +196,49 @@ test("lista: data e órgão no link, descrição e a marca de voto nominal de ca
   assert.ok(!itemComNominais.includes("Sem votos nominais"));
   assert.ok(!itemSemNominais.includes("Com votos nominais"));
   assert.ok(!html.includes("Só os totais da fonte"), "a lista não promete totais que o detalhe oculta");
+});
+
+// Dois links "24/11/2026 · PLEN" seguidos são indistinguíveis numa lista de links de leitor de tela;
+// o que os distingue é a ementa, que fica fora do link. `aria-describedby` a liga ao link sem mudar
+// o que se vê.
+test("lista: o link aponta (aria-describedby) para a ementa da própria votação", async () => {
+  const { status, html } = await listaOk(
+    lista({
+      votacoes: [
+        itemDaLista({ descricao: "Primeira ementa." }),
+        itemDaLista({ id: "2332175-1", descricao: "Segunda ementa." }),
+      ],
+    }),
+  );
+
+  assert.equal(status, 200);
+  const itens = html.split("<li").map((trecho) => trecho.split("</li>")[0]);
+  const descrito = (id, ementa) => {
+    const item = itens.find((trecho) => trecho.includes(`/camara/votacoes/${id}/`));
+    const alvo = item?.match(/<a [^>]*aria-describedby="([^"]+)"/)?.[1];
+    assert.ok(alvo, `o link de ${id} precisa de aria-describedby`);
+    assert.ok(
+      item.includes(`<p class="ementa" id="${alvo}">${ementa}</p>`),
+      `o id ${alvo} é o da ementa de ${id}`,
+    );
+    return alvo;
+  };
+  const primeiro = descrito("2332174-59", "Primeira ementa.");
+  const segundo = descrito("2332175-1", "Segunda ementa.");
+  assert.notEqual(primeiro, segundo, "cada votação tem o seu id de ementa");
+  assert.equal(html.split(`id="${primeiro}"`).length - 1, 1, "o id aparece uma vez só");
+});
+
+test("lista: sem ementa, o link não aponta para um id que não existe", async () => {
+  const { status, html } = await listaOk(lista({ votacoes: [itemDaLista({ descricao: "" })] }));
+
+  assert.equal(status, 200);
+  // Só a tag do link conta: o payload do React (`self.__next_f`) lista `aria-describedby` como
+  // `$undefined` mesmo quando o atributo não sai no HTML.
+  const link = html.match(/<a [^>]*href="\/camara\/votacoes\/2332174-59\/"[^>]*>/)?.[0];
+  assert.ok(link, "controle: o link existe");
+  assert.ok(!link.includes("aria-describedby"));
+  assert.ok(!html.includes('<p class="ementa"'));
 });
 
 test("lista: o id da proposição não aparece (0 é sentinela de 'sem proposição')", async () => {

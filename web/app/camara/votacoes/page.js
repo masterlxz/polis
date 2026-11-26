@@ -50,11 +50,20 @@ export default async function VotacoesDaCamara({ searchParams }) {
         <ol className="resultados">
           {votacoes.map((votacao) => (
             <li key={votacao.id}>
-              <a href={`${CAMINHO}${votacao.id}/`}>{tituloDaVotacao(votacao)}</a>
+              <a
+                href={`${CAMINHO}${votacao.id}/`}
+                aria-describedby={votacao.descricao ? `ementa-${votacao.id}` : undefined}
+              >
+                {tituloDaVotacao(votacao)}
+              </a>
               <span className="detalhe">
                 {votacao.tem_votos_nominais ? "Com votos nominais" : "Sem votos nominais"}
               </span>
-              {votacao.descricao && <p className="ementa">{votacao.descricao}</p>}
+              {votacao.descricao && (
+                <p className="ementa" id={`ementa-${votacao.id}`}>
+                  {votacao.descricao}
+                </p>
+              )}
             </li>
           ))}
         </ol>

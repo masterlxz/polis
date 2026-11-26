@@ -2,6 +2,13 @@
 
 Mais recente no topo.
 
+### 2026-11-26 — Sessão 96 (link da lista de votações da Câmara descrito pela ementa; sessão individual)
+
+- **Pedido**: decisão do dono sobre o texto do link da lista, que repete "data · órgão" em votações do mesmo dia (pendência da Sessão 95). Escolheu a opção D: `aria-describedby` apontando para a ementa, sem mudar o que se vê.
+- **Feito (#218)**: em `web/app/camara/votacoes/page.js`, o link ganha `aria-describedby="ementa-<id>"` e a ementa ganha `id="ementa-<id>"`; sem ementa (`descricao` vazia) o atributo não sai, para não apontar para um id que não existe. O id da votação só tem dígitos e hífen (`idDeVotacaoDaCamaraValido`), seguro como `id` de HTML. Testes: o da lista passou a aceitar atributos depois do `href`, e dois novos.
+- **Prova**: controle só-de-teste (#217, `07c470b`): o teste do `aria-describedby` falha; o de "sem ementa" **passa sem o código** (guarda). Na cabeça `a7ba751`, esse segundo falhou por defeito do teste: o payload do React lista `aria-describedby` como `$undefined`; corrigido para olhar só a tag do link.
+- **Não verificado**: leitor de tela (nenhum testado; alguns só leem a descrição quando o link recebe o foco); o resultado do CI da correção está no PR.
+
 ### 2026-11-26 — Sessão 95 (coleta real da Câmara no PC e página das votações da Câmara; sessão individual)
 
 - **Pedido**: depois do merge da Sessão 94, o dono quis a coleta real da Câmara (antes de qualquer página) e depois "código": a página das votações da Câmara, recomendada por a API do ADR 0032 já existir. Plan mode; `git commit -s`.

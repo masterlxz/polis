@@ -503,7 +503,7 @@ function proposicoesDaCamaraValidas(corpo) {
     return false;
   }
   return corpo.atribuicao_das_proposicoes === null
-    ? corpo.proposicoes.length === 0
+    ? true
     : corpo.proposicoes.length > 0 && atribuicaoValida(corpo.atribuicao_das_proposicoes);
 }
 

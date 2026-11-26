@@ -2,6 +2,14 @@
 
 Mais recente no topo.
 
+### 2026-11-26 — Sessão 102 (o empate marcado como aprovado, apurado; só documentação; sessão individual)
+
+- **Pedido**: apurar o achado da Sessão 101: a votação de 20/05 com Sim 182 e Não 182 vem com `aprovacao` 1.
+- **Medido (2026-11-26, uma requisição ao CSV público e duas à API da Câmara, analisadas fora do repo)**: o CSV tem 9.417 registros (o mesmo número da Sessão 98) e **uma** votação com Sim igual a Não e diferente de zero: `2613731-65`, PLEN, 20/05/2026, `aprovacao` 1, outros 2. A API (`/votacoes/2613731-65`) devolve o mesmo, com "Resultado. Sim: 182; Não: 182; Abstenção: 2; Total: 366." Os votos nominais (`/votacoes/2613731-65/votos`) são 366 (182 Sim, 182 Não, 2 Abstenção) e batem com os totais. A proposição ligada é o parecer às Emendas de Plenário (relator pela aprovação das emendas 1 a 4).
+- **Não apurado**: por que a Câmara marcou 1 num empate. Que o presidente decidiu o desempate é suposição minha; nenhum campo diz isso. Só a Câmara responde (Fale Conosco dos Dados Abertos, a ser enviado pelo dono, se ele quiser).
+- **Decisão**: nenhuma mudança de código; o polis mostra o código como a fonte o manda. Registro na emenda 3 do ADR 0032.
+- **Não verificado**: o significado do `1` nesse caso; se outros anos têm o mesmo padrão (só 2026 foi lido).
+
 ### 2026-11-26 — Sessão 101 (as páginas da Câmara vistas num navegador pela primeira vez; só documentação; sessão individual)
 
 - **Pedido**: o ponto em aberto das Sessões 97 a 100 era "a página nunca foi vista num navegador". Roteiro no PC do dono: Compose, coleta real, normalização e cinco conferências no front (`http://127.0.0.1:3000/`). Nenhum código mudou.

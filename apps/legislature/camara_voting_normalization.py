@@ -27,7 +27,7 @@ trava.
 """
 
 from collections import Counter
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import timedelta
 
 from django.db import transaction
@@ -108,6 +108,8 @@ class Result:
     """`rows_read`, `created` e `existing` seguem o contrato do agendador (ADR 0023).
 
     `rows_read` soma as linhas das duas cargas; `created` e `existing` contam os votos.
+    `datasets` são os conjuntos que a normalização leu (só `normalize_latest` os preenche): o
+    agendador grava o sucesso em todos, não só no que disparou o passo (P-21).
     """
 
     rows_read: int
@@ -115,6 +117,7 @@ class Result:
     created: int
     existing: int
     votings_created: int
+    datasets: tuple = ()
 
 
 def find_datasets():
@@ -164,11 +167,12 @@ def normalize_latest(dataset):
     ):
         return None
     try:
-        return normalize(votings_run, votes_run)
+        result = normalize(votings_run, votes_run)
     except MissingVotingError:
         if timedelta(0) < votes_run.started_at - votings_run.started_at <= MAX_WAIT:
             raise NormalizationWaiting from None
         raise
+    return replace(result, datasets=(votings_dataset, votes_dataset))
 
 
 def _rows(run):

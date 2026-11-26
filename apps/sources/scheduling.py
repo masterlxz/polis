@@ -124,13 +124,16 @@ def _handle(dataset, client, now, rng, result):
         _normalize(dataset, name, result, now)
 
 
-def _record_normalization(dataset, now, error=""):
+def _record_normalization(dataset, now, error="", also=()):
     """Grava o resultado da normalização no conjunto, para o painel das fontes.
 
     `update()` troca só estas duas colunas: um `save()` regravaria a linha inteira e desfaria uma
-    edição feita ao mesmo tempo no admin. `error` vazio quer dizer que deu certo.
+    edição feita ao mesmo tempo no admin. `error` vazio quer dizer que deu certo. `also` são os
+    outros conjuntos que a mesma normalização leu (só no sucesso: a recusa nasce da coleta que a
+    provocou e fica no conjunto dela).
     """
-    Dataset.objects.filter(pk=dataset.pk).update(
+    pks = {dataset.pk, *(other.pk for other in also)}
+    Dataset.objects.filter(pk__in=pks).update(
         last_normalization_at=now, last_normalization_error=error[:ERROR_MAX_LENGTH]
     )
 
@@ -171,7 +174,7 @@ def _normalize(dataset, name, result, now):
         result.normalization_failed += 1
         _record_normalization(dataset, now, UNEXPECTED_ERROR_TEXT)
         return
-    _record_normalization(dataset, now)
+    _record_normalization(dataset, now, also=getattr(summary, "datasets", ()))
     if summary is not None:
         result.lines.append(
             f"{name}: normalizado, linhas lidas {summary.rows_read}, "

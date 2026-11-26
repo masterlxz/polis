@@ -24,7 +24,7 @@ from apps.sources.models import IngestionRun, RawRecord
 from apps.sources.normalization import NormalizationRefused as SharedRefused
 
 from .camara_proposition_parsing import parse_row
-from .models import CamaraProposition, CamaraVotingProposition
+from .models import CamaraProposition, CamaraVoting, CamaraVotingProposition
 from .parsing import RowError
 
 SOURCE_SLUG = "camara"
@@ -176,6 +176,11 @@ def _write(run, origin, rows_read, propositions, links):
                 ingestion_run=run,
             )
             for voting_id, code in sorted(links)
+        ]
+        link_objects = [
+            link
+            for link in link_objects
+            if CamaraVoting.objects.filter(camara_voting_id=link.camara_voting_id).exists()
         ]
         links_before = CamaraVotingProposition.objects.count()
         for start in range(0, len(link_objects), BATCH_SIZE):

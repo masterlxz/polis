@@ -89,7 +89,7 @@ function Votantes({ votos }) {
         {votos.map((item) => (
           <tr key={`${item.legislatura}-${item.id_camara}`}>
             <td>
-              {item.tem_perfil ? (
+              {item.id_camara > 0 ? (
                 <Link href={`/deputados/${item.legislatura}-${item.id_camara}/`}>{item.nome}</Link>
               ) : (
                 `Deputado sem perfil (id ${item.id_camara})`

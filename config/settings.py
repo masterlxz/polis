@@ -103,9 +103,6 @@ NORMALIZERS = {
     "camara/votacoes-proposicoes-2026": (
         "apps.legislature.camara_proposition_normalization.normalize_latest"
     ),
-    "camara/votacoes-objetos-2026": (
-        "apps.legislature.camara_proposition_normalization.normalize_latest"
-    ),
     "senado/senadores": "apps.legislature.senate_normalization.normalize_latest",
     "senado/votacoes": "apps.legislature.senate_voting_normalization.normalize_latest",
 }

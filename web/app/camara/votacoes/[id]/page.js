@@ -134,7 +134,7 @@ export default async function VotacaoDaCamara({ params }) {
 
       {!temVotos && (
         <p className="aviso">
-          {totais === null ? `${SEM_LISTA_NOMINAL} ${TOTAIS_ZERADOS}` : SEM_LISTA_NOMINAL}
+          {`${SEM_LISTA_NOMINAL} ${TOTAIS_ZERADOS}`}
         </p>
       )}
       {totais && <Totais linhas={totais} />}

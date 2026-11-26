@@ -68,6 +68,32 @@ function atribuicaoDosVotos(extra = {}) {
   };
 }
 
+function atribuicaoDasProposicoes(extra = {}) {
+  return {
+    fonte: "Câmara dos Deputados: Dados Abertos",
+    conjunto: "Proposições das votações da Câmara (2026)",
+    coletado_em: "2026-11-25T18:10:00+00:00",
+    url_origem: "https://dados.example.org/arquivos/votacoesProposicoes/csv/votacoesProposicoes-2026.csv",
+    licenca: { id: null, url: null },
+    ...extra,
+  };
+}
+
+// Uma proposição do detalhe (ADR 0032, emenda 5). `id_camara` é um número que não aparece em
+// nenhuma outra parte da fixture: a página não o mostra (não há rota para a proposição).
+function proposicao(extra = {}) {
+  return {
+    id_camara: 4455667,
+    titulo: "PL 9001/2026",
+    tipo: "PL",
+    numero: 9001,
+    ano: 2026,
+    ementa: "Ementa A",
+    origem: "proposicoes",
+    ...extra,
+  };
+}
+
 function totais(sim = 0, nao = 0, outros = 0) {
   return { sim, nao, outros };
 }
@@ -132,6 +158,8 @@ function nominal(extra = {}) {
     ],
     atribuicao: atribuicaoDasVotacoes(),
     atribuicao_dos_votos: atribuicaoDosVotos(),
+    proposicoes: [],
+    atribuicao_das_proposicoes: null,
     ...extra,
   };
 }
@@ -143,6 +171,8 @@ function semVotos(extra = {}) {
     contagem_por_voto: [],
     atribuicao: atribuicaoDasVotacoes(),
     atribuicao_dos_votos: null,
+    proposicoes: [],
+    atribuicao_das_proposicoes: null,
     ...extra,
   };
 }
@@ -576,6 +606,197 @@ test("detalhe: cita a origem da votação e a dos votos, cada uma com o seu conj
   assert.ok(html.includes("Votações da Câmara (2026)"));
   assert.ok(html.includes("Votos nominais da Câmara (2026)"));
 });
+
+// --- Detalhe: proposições da votação (ADR 0032, emenda 5; ADR 0033) ------------------------------
+
+// Cada item da lista `<ul class="proposicoes">`: título em `<strong>` e ementa em `<p class="ementa">`
+// (ou `null`). Conta só na marcação, que é onde a página decide o que mostrar.
+function proposicoesNaPagina(html) {
+  const lista = html.match(/<ul class="proposicoes">(.*?)<\/ul>/s)?.[1];
+  if (lista === undefined) return null;
+  return Array.from(lista.matchAll(/<li[^>]*>(.*?)<\/li>/gs), ([, item]) => ({
+    titulo: item.match(/<strong>(.*?)<\/strong>/s)?.[1] ?? null,
+    ementa: item.match(/<p class="ementa">(.*?)<\/p>/s)?.[1] ?? null,
+  }));
+}
+
+function comProposicoes(itens, extra = {}) {
+  return nominal({
+    proposicoes: itens,
+    atribuicao_das_proposicoes: atribuicaoDasProposicoes(),
+    ...extra,
+  });
+}
+
+test("detalhe: cada proposição com título e ementa, na ordem que a API manda", async () => {
+  const { status, html } = await detalhe(
+    comProposicoes([
+      proposicao({ titulo: "PL 9001/2026", ementa: "Ementa A" }),
+      proposicao({ id_camara: 4455668, titulo: "PEC 7/2025", ementa: "Ementa B" }),
+    ]),
+  );
+
+  assert.equal(status, 200);
+  assert.match(html, /<h2>Proposições<\/h2>/);
+  assert.deepEqual(proposicoesNaPagina(html), [
+    { titulo: "PL 9001/2026", ementa: "Ementa A" },
+    { titulo: "PEC 7/2025", ementa: "Ementa B" },
+  ]);
+});
+
+test("detalhe: a origem das proposições ('proposicoes' ou 'objetos') não aparece como rótulo", async () => {
+  const { html } = await detalhe(
+    comProposicoes([
+      proposicao({ origem: "proposicoes" }),
+      proposicao({ id_camara: 4455668, titulo: "PL 5/2026", origem: "objetos" }),
+    ]),
+  );
+
+  assert.equal(proposicoesNaPagina(html).length, 2, "controle: a lista existe");
+  // "objetos" só existe na fixture como valor de `origem`; "proposicoes" também é o nome da classe
+  // da lista, então só o primeiro prova a ausência.
+  assert.ok(!html.includes("objetos"));
+});
+
+test("detalhe sem proposições: nenhuma seção, nenhum título e só as outras atribuições", async () => {
+  const { status, html } = await detalhe(nominal());
+
+  assert.equal(status, 200);
+  assert.equal(proposicoesNaPagina(html), null);
+  assert.ok(!html.includes("<h2>Proposições</h2>"));
+  assert.equal(contar(html, /aria-label="Origem dos dados"/g), 2);
+  assert.ok(!html.includes("Proposições das votações da Câmara (2026)"));
+});
+
+test("detalhe: ementa nula sai só com o título, sem parágrafo vazio nem 'null'", async () => {
+  const { html } = await detalhe(comProposicoes([proposicao({ ementa: null })]));
+
+  assert.deepEqual(proposicoesNaPagina(html), [{ titulo: "PL 9001/2026", ementa: null }]);
+});
+
+test("detalhe: ano nulo é aceito e o título sai como a fonte o manda", async () => {
+  const { status, html } = await detalhe(
+    comProposicoes([proposicao({ titulo: "PL 9001", ano: null })]),
+  );
+
+  assert.equal(status, 200);
+  assert.deepEqual(proposicoesNaPagina(html), [{ titulo: "PL 9001", ementa: "Ementa A" }]);
+});
+
+test("detalhe: título e ementa com HTML aparecem escapados", async () => {
+  const { html } = await detalhe(
+    comProposicoes([proposicao({ titulo: "<b>t</b>", ementa: "<script>e</script>" })]),
+  );
+
+  assert.deepEqual(proposicoesNaPagina(html), [
+    { titulo: "&lt;b&gt;t&lt;/b&gt;", ementa: "&lt;script&gt;e&lt;/script&gt;" },
+  ]);
+  assert.ok(!html.includes("<b>t</b>"));
+});
+
+test("detalhe: o id da proposição não aparece (a página não tem rota para ela)", async () => {
+  const { status, html } = await detalhe(comProposicoes([proposicao()]));
+
+  assert.equal(status, 200, "controle: a página precisa existir");
+  assert.equal(proposicoesNaPagina(html).length, 1, "controle: a proposição aparece");
+  assert.ok(!html.includes("4455667"));
+});
+
+test("detalhe: cita a origem das proposições com o conjunto próprio, à parte das outras duas", async () => {
+  const { html } = await detalhe(comProposicoes([proposicao()]));
+
+  assert.equal(contar(html, /aria-label="Origem dos dados"/g), 3);
+  assert.ok(html.includes("Proposições das votações da Câmara (2026)"));
+  assert.ok(html.includes("Votações da Câmara (2026)"));
+  assert.ok(html.includes("Votos nominais da Câmara (2026)"));
+});
+
+test("detalhe: uma votação sem voto nominal e com proposições cita a votação e as proposições", async () => {
+  const { html } = await detalhe(
+    semVotos({
+      proposicoes: [proposicao()],
+      atribuicao_das_proposicoes: atribuicaoDasProposicoes(),
+    }),
+  );
+
+  assert.equal(contar(html, /aria-label="Origem dos dados"/g), 2);
+  assert.ok(html.includes("Proposições das votações da Câmara (2026)"));
+  assert.ok(!html.includes("Votos nominais da Câmara (2026)"));
+});
+
+test("detalhe: as 213 proposições (o máximo medido) saem todas, na ordem recebida", async () => {
+  const itens = Array.from({ length: 213 }, (_, i) =>
+    proposicao({ id_camara: 7000000 + i, titulo: `PL ${i + 1}/2026`, ementa: `Ementa ${i + 1}` }),
+  );
+
+  const { status, html } = await detalhe(comProposicoes(itens));
+
+  assert.equal(status, 200);
+  assert.deepEqual(
+    proposicoesNaPagina(html).map((item) => item.titulo),
+    itens.map((item) => item.titulo),
+  );
+});
+
+const proposicoesFora = {
+  "proposicoes ausente": () => {
+    const corpo = comProposicoes([proposicao()]);
+    delete corpo.proposicoes;
+    return corpo;
+  },
+  "proposicoes que não é lista": () => comProposicoes({ a: 1 }),
+  "id_camara em texto": () => comProposicoes([proposicao({ id_camara: "4455667" })]),
+  "titulo vazio": () => comProposicoes([proposicao({ titulo: "" })]),
+  "titulo que não é texto": () => comProposicoes([proposicao({ titulo: 9001 })]),
+  "tipo ausente": () => {
+    const item = proposicao();
+    delete item.tipo;
+    return comProposicoes([item]);
+  },
+  "numero em texto": () => comProposicoes([proposicao({ numero: "9001" })]),
+  "ano em texto": () => comProposicoes([proposicao({ ano: "2026" })]),
+  "ano ausente (null é 'sem ano', ausente não)": () => {
+    const item = proposicao();
+    delete item.ano;
+    return comProposicoes([item]);
+  },
+  "ementa vazia em vez de null (decisão 6: nunca a string vazia)": () =>
+    comProposicoes([proposicao({ ementa: "" })]),
+  "ementa ausente": () => {
+    const item = proposicao();
+    delete item.ementa;
+    return comProposicoes([item]);
+  },
+  "origem ausente": () => {
+    const item = proposicao();
+    delete item.origem;
+    return comProposicoes([item]);
+  },
+  "atribuicao_das_proposicoes ausente": () => {
+    const corpo = comProposicoes([proposicao()]);
+    delete corpo.atribuicao_das_proposicoes;
+    return corpo;
+  },
+  "proposições sem a atribuição das proposições": () =>
+    comProposicoes([proposicao()], { atribuicao_das_proposicoes: null }),
+  "sem proposições mas com a atribuição das proposições": () =>
+    nominal({ atribuicao_das_proposicoes: atribuicaoDasProposicoes() }),
+  "atribuicao_das_proposicoes que não é objeto": () =>
+    comProposicoes([proposicao()], { atribuicao_das_proposicoes: "x" }),
+};
+
+for (const [nome, montar] of Object.entries(proposicoesFora)) {
+  test(`detalhe com proposições fora do formato é recusado inteiro: ${nome}`, async () => {
+    const controle = await detalhe(comProposicoes([proposicao()]));
+    assert.equal(controle.status, 200, "controle: com o formato certo a página existe");
+
+    const { status, html } = await detalhe(montar());
+
+    assert.equal(status, 500);
+    assert.ok(!html.includes("Ementa A"));
+    assert.ok(!html.includes("PL 9001/2026"));
+  });
+}
 
 // --- Detalhe: totais da fonte e votação sem voto nominal -----------------------------------------
 

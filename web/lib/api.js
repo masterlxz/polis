@@ -482,6 +482,31 @@ function contagemPorVotoValida(contagem) {
   );
 }
 
+// Uma proposição da votação (ADR 0032, emenda 5). `ano` e `ementa` vazios saem `null`, nunca `""`
+// nem chave ausente. `origem` é validada e não mostrada: o significado dela não foi verificado.
+function proposicaoDaCamaraValida(item) {
+  return (
+    Number.isInteger(item?.id_camara) &&
+    typeof item.titulo === "string" &&
+    item.titulo !== "" &&
+    typeof item.tipo === "string" &&
+    Number.isInteger(item.numero) &&
+    (item.ano === null || Number.isInteger(item.ano)) &&
+    textoNaoVazioOuNulo(item.ementa) &&
+    typeof item.origem === "string"
+  );
+}
+
+// `atribuicao_das_proposicoes` nula quer dizer "não há proposições" e só nesse caso (emenda 5, item 6).
+function proposicoesDaCamaraValidas(corpo) {
+  if (!Array.isArray(corpo.proposicoes) || !corpo.proposicoes.every(proposicaoDaCamaraValida)) {
+    return false;
+  }
+  return corpo.atribuicao_das_proposicoes === null
+    ? corpo.proposicoes.length === 0
+    : corpo.proposicoes.length > 0 && atribuicaoValida(corpo.atribuicao_das_proposicoes);
+}
+
 // `atribuicao_dos_votos` nula quer dizer "não há votos" e só nesse caso (ADR 0032, decisão 5); a
 // contagem é calculada a partir dos votos, então só é vazia quando eles são. Ausente é recusado.
 function detalheDeVotacaoDaCamaraValido(corpo) {
@@ -495,7 +520,8 @@ function detalheDeVotacaoDaCamaraValido(corpo) {
     atribuicaoValida(corpo.atribuicao) &&
     (corpo.atribuicao_dos_votos === null
       ? !temVotos
-      : temVotos && atribuicaoValida(corpo.atribuicao_dos_votos))
+      : temVotos && atribuicaoValida(corpo.atribuicao_dos_votos)) &&
+    proposicoesDaCamaraValidas(corpo)
   );
 }
 

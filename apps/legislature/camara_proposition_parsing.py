@@ -18,7 +18,7 @@ from .parsing import _int, _text
 
 _EMENTA_MAX = 20_000
 # Quebra de linha (inclui U+2028 e U+2029) e TAB: viram um espaço, como a `descricao` da votação.
-_BREAK_OR_TAB = re.compile(f"{_LINE_BREAK.pattern}|\t")
+_BREAK_OR_TAB = re.compile(_LINE_BREAK.pattern)
 
 
 def _ementa(values):

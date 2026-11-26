@@ -276,6 +276,7 @@ DATASETS = [
         "url": "https://dadosabertos.camara.leg.br/arquivos/votacoesProposicoes/csv/votacoesProposicoes-2026.csv",
         "format": "csv",
         "allowed_columns": [
+            "descricao",
             "idVotacao",
             "proposicao_id",
             "proposicao_titulo",

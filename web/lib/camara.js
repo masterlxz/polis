@@ -20,7 +20,6 @@ export function tituloDaVotacao(votacao) {
 // medidas a fonte manda zeros porque não publicou o placar, e zero ali não é uma contagem (ADR 0032,
 // decisão 3). Mostrar "Sim 0, Não 0" afirmaria um resultado que a fonte não deu.
 export function totaisInformados(totais) {
-  if (totais.sim + totais.nao + totais.outros === 0) return null;
   return [
     ["Sim", totais.sim],
     ["Não", totais.nao],

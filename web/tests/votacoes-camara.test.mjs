@@ -2,7 +2,7 @@
 // servidor de produção e uma API falsa. Dados todos sintéticos. O que mais importa: `0/0/0` nos
 // totais da fonte não é contagem e nunca aparece como resultado; `voto` nulo é "sem posição
 // registrada" (nunca vazio nem "null"); `aprovacao` e as siglas de voto saem como a fonte as manda,
-// com a nota de que o significado não foi verificado; o link do nome só existe com `tem_perfil`; as
+// com a legenda da documentação da Câmara; o link do nome só existe com `tem_perfil`; as
 // duas atribuições (votação e votos) são citadas à parte; e uma resposta fora do formato derruba a
 // página sem vazar o texto dela.
 import assert from "node:assert/strict";
@@ -11,7 +11,27 @@ import { after, before, test } from "node:test";
 import { iniciarApiFalsa, iniciarNext } from "./helpers.mjs";
 
 const CAMINHO_DA_LISTA = "/internal/v1/camara/votacoes/";
-const NOTA_DO_CODIGO = "o significado de 1/0 e das siglas de voto não foi verificado";
+// A legenda copia o que a documentação oficial diz, lida em 2026-11-26 em
+// https://dadosabertos.camara.leg.br/howtouse/2020-02-07-dados-votacoes.html: `aprovacao` 1 é
+// "resultou em aprovação", 0 é "não foi aprovada" (rejeitada ou sem quórum), vazio é "não é possível
+// afirmar"; `votosOutros` junta abstenções, obstrução e "Art. 17" (abstenção obrigatória do
+// presidente, em referência ao Regimento da Câmara).
+const LEGENDA_DA_APROVACAO =
+  "Aprovação, segundo a documentação da Câmara: 1 é votação que resultou em aprovação; 0, proposição não aprovada (rejeitada ou sem quórum); sem código, a Câmara não afirma o resultado.";
+const LEGENDA_DAS_SIGLAS =
+  "Votos: Abstenção, Obstrução (o parlamentar se abstém e não quer ser contado no quórum) e Artigo 17 (abstenção obrigatória do presidente, em referência ao Regimento da Câmara) entram em “outros” nos totais da Câmara.";
+const LINK_DA_DOCUMENTACAO =
+  '<a href="https://dadosabertos.camara.leg.br/howtouse/2020-02-07-dados-votacoes.html">documentação da Câmara</a>';
+const PREFIXO_DA_NOTA = "Códigos como a fonte os manda.";
+
+// A nota inteira (prefixo, as legendas que couberem e o link) ou nada: o que a página não mostra não
+// pode deixar nem o prefixo nem o link da documentação, e o "não foi verificado" antigo não volta.
+function semNota(html) {
+  assert.ok(!html.includes(PREFIXO_DA_NOTA), "prefixo da nota fora de hora");
+  assert.ok(!html.includes(LINK_DA_DOCUMENTACAO), "link da documentação fora de hora");
+  assert.ok(!html.includes(LEGENDA_DA_APROVACAO) && !html.includes(LEGENDA_DAS_SIGLAS));
+  assert.ok(!html.includes("não foi verificado"));
+}
 
 let api;
 let front;
@@ -430,8 +450,37 @@ test("detalhe: h1 com data e órgão, descrição, e a aprovação como código 
   assert.match(html, /<h1[^>]*>Votação de 24\/11\/2026 · PLEN<\/h1>/);
   assert.match(html, /<p class="ementa">Aprovado o requerimento de teste\.<\/p>/);
   assert.match(html, /<dt>Aprovação \(código da fonte\)<\/dt><dd>1<\/dd>/);
-  assert.ok(html.includes(NOTA_DO_CODIGO));
+  assert.ok(html.includes(LEGENDA_DA_APROVACAO));
   assert.ok(!html.includes("Resultado"), "o código da fonte não é um 'Resultado'");
+});
+
+test("detalhe: a legenda cita a documentação da Câmara com link, e o texto antigo some", async () => {
+  const { html } = await detalhe();
+
+  assert.ok(html.includes(PREFIXO_DA_NOTA));
+  assert.ok(html.includes(LINK_DA_DOCUMENTACAO));
+  assert.ok(!html.includes("não foi verificado"), "a nota antiga não pode ficar ao lado da legenda");
+});
+
+test("detalhe com voto nominal e aprovação: a nota traz a legenda da aprovação e a das siglas", async () => {
+  const { html } = await detalhe();
+
+  assert.ok(html.includes(LEGENDA_DA_APROVACAO));
+  assert.ok(html.includes(LEGENDA_DAS_SIGLAS));
+});
+
+test("detalhe sem voto nominal e com aprovação: só a legenda da aprovação (não há siglas na página)", async () => {
+  const { html } = await detalhe(semVotos());
+
+  assert.ok(html.includes(LEGENDA_DA_APROVACAO));
+  assert.ok(!html.includes(LEGENDA_DAS_SIGLAS));
+});
+
+test("detalhe com voto nominal e sem aprovação: só a legenda das siglas (não há código de aprovação)", async () => {
+  const { html } = await detalhe(nominal({ votacao: votacaoDoDetalhe({ aprovacao: null }) }));
+
+  assert.ok(html.includes(LEGENDA_DAS_SIGLAS));
+  assert.ok(!html.includes(LEGENDA_DA_APROVACAO));
 });
 
 test("detalhe: o id da proposição não aparece", async () => {
@@ -493,11 +542,11 @@ test("detalhe: contagem por voto, rotulada como do polis, com 'Sem posição reg
   ]);
 });
 
-test("detalhe: sigla de voto sai crua, e a nota de que o significado não foi verificado aparece", async () => {
+test("detalhe: sigla de voto sai crua, e a legenda das siglas aparece mesmo sem aprovação", async () => {
   const { html } = await detalhe(nominal({ votacao: votacaoDoDetalhe({ aprovacao: null }) }));
 
   assert.match(html, /<td>Artigo 17<\/td>/);
-  assert.ok(html.includes(NOTA_DO_CODIGO), "com voto nominal a nota aparece, mesmo sem aprovação");
+  assert.ok(html.includes(LEGENDA_DAS_SIGLAS), "com voto nominal a legenda aparece");
 });
 
 test("detalhe: nome com HTML aparece escapado", async () => {
@@ -630,18 +679,19 @@ test("detalhe: aprovação '0' sai como o código '0'", async () => {
   const { html } = await detalhe(semVotos({ votacao: votacaoDoDetalhe({ aprovacao: "0" }) }));
 
   assert.match(html, /<dt>Aprovação \(código da fonte\)<\/dt><dd>0<\/dd>/);
-  assert.ok(html.includes(NOTA_DO_CODIGO));
+  assert.ok(html.includes(LEGENDA_DA_APROVACAO));
 });
 
 test("detalhe: aprovação nula e sem votos não mostra o campo nem a nota", async () => {
   const controle = await detalhe(semVotos());
   assert.ok(controle.html.includes("Aprovação (código da fonte)"), "controle: com código o campo aparece");
+  assert.ok(controle.html.includes(PREFIXO_DA_NOTA), "controle: com código a nota aparece");
 
   const { status, html } = await detalhe(semVotos({ votacao: votacaoDoDetalhe({ aprovacao: null }) }));
 
   assert.equal(status, 200);
   assert.ok(!html.includes("Aprovação (código da fonte)"));
-  assert.ok(!html.includes(NOTA_DO_CODIGO));
+  semNota(html);
   assert.ok(!html.includes(">null<"));
 });
 

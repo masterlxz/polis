@@ -96,7 +96,7 @@ function Votantes({ votos }) {
               )}
             </td>
             <td>{item.partido}</td>
-            <td>{item.voto ?? SEM_POSICAO}</td>
+            <td>{item.voto}</td>
           </tr>
         ))}
       </tbody>

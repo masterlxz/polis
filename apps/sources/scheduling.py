@@ -174,7 +174,7 @@ def _normalize(dataset, name, result, now):
         result.normalization_failed += 1
         _record_normalization(dataset, now, UNEXPECTED_ERROR_TEXT)
         return
-    _record_normalization(dataset, now, also=getattr(summary, "datasets", ()))
+    _record_normalization(dataset, now, also=())
     if summary is not None:
         result.lines.append(
             f"{name}: normalizado, linhas lidas {summary.rows_read}, "

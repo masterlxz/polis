@@ -384,10 +384,7 @@ function votosDoDeputadoValidos(corpo) {
     Number.isInteger(corpo.pagina) &&
     Number.isInteger(corpo.total_paginas) &&
     (corpo.votos.length > 0) === (corpo.atribuicao_dos_votos !== null) &&
-    (corpo.votos.length > 0) === (corpo.atribuicao_das_votacoes !== null) &&
-    (corpo.votos.length === 0 ||
-      (atribuicaoValida(corpo.atribuicao_dos_votos) &&
-        atribuicaoValida(corpo.atribuicao_das_votacoes)))
+    (corpo.votos.length === 0 || atribuicaoValida(corpo.atribuicao_dos_votos))
   );
 }
 

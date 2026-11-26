@@ -185,8 +185,14 @@ test("lista: data e órgão no link, descrição e a marca de voto nominal de ca
   assert.match(html, /<a href="\/camara\/votacoes\/2332175-1\/">23\/11\/2026 · CCJC<\/a>/);
   assert.ok(html.includes("Aprovado o requerimento de teste."));
   assert.ok(html.includes("Rejeitado o destaque de teste."));
-  assert.equal(contar(html, /<span class="detalhe">Com votos nominais<\/span>/g), 1);
-  assert.equal(contar(html, /<span class="detalhe">Só os totais da fonte<\/span>/g), 1);
+  // Cada marca fica no item certo: contar as ocorrências não pegaria as duas trocadas de lugar.
+  const itemComNominais = html.split("<li").find((trecho) => trecho.includes("/2332174-59/"));
+  const itemSemNominais = html.split("<li").find((trecho) => trecho.includes("/2332175-1/"));
+  assert.ok(itemComNominais?.includes('<span class="detalhe">Com votos nominais</span>'));
+  assert.ok(itemSemNominais?.includes('<span class="detalhe">Sem votos nominais</span>'));
+  assert.ok(!itemComNominais.includes("Sem votos nominais"));
+  assert.ok(!itemSemNominais.includes("Com votos nominais"));
+  assert.ok(!html.includes("Só os totais da fonte"), "a lista não promete totais que o detalhe oculta");
 });
 
 test("lista: o id da proposição não aparece (0 é sentinela de 'sem proposição')", async () => {
@@ -334,7 +340,12 @@ const listasFora = {
     lista({ votacoes: [itemDaLista({ totais_da_fonte: totais("1", 0, 0) })] }),
   "id_proposicao que não é inteiro": () =>
     lista({ votacoes: [itemDaLista({ id_proposicao: "0" })] }),
+  "id com formato que a rota não aceita (vira href)": () =>
+    lista({ votacoes: [itemDaLista({ id: "../x" })] }),
+  "id com parâmetro de consulta (vira href)": () =>
+    lista({ votacoes: [itemDaLista({ id: "1-2?a=b" })] }),
   "total_paginas que não é inteiro": () => lista({ total_paginas: "2" }),
+  "pagina que não é inteiro": () => lista({ pagina: "1" }),
   "votacoes que não é lista": () => ({ ...lista(), votacoes: { a: 1 } }),
   "atribuicao que não é objeto": () => lista({ atribuicao: "x" }),
 };
@@ -403,7 +414,6 @@ test("detalhe: voto nulo aparece como 'Sem posição registrada', nunca vazio ne
 
   assert.ok(html.includes("Sem posição registrada"));
   assert.ok(!html.includes(">null<"));
-  assert.ok(!html.includes("<td></td><td></td>"));
 });
 
 test("detalhe: o link do nome só existe quando a API diz que há perfil", async () => {
@@ -474,11 +484,16 @@ test("detalhe: cita a origem da votação e a dos votos, cada uma com o seu conj
 
 // --- Detalhe: totais da fonte e votação sem voto nominal -----------------------------------------
 
-test("detalhe sem voto nominal e totais 0/0/0: diz que a Câmara não publicou, sem números", async () => {
+// "Não temos a lista nos dados coletados", e não "a Câmara não publicou": os votos vêm de outro
+// conjunto (`votos-2026`), e uma coleta que falhou ou ainda não rodou daria a mesma lista vazia.
+const SEM_LISTA = "Esta votação não tem lista de votos nominais nos dados coletados";
+
+test("detalhe sem voto nominal e totais 0/0/0: diz que não há lista nos dados, sem números", async () => {
   const { status, html } = await detalhe(semVotos());
 
   assert.equal(status, 200);
-  assert.ok(html.includes("A Câmara não publicou os votos de cada deputado nesta votação"));
+  assert.ok(html.includes(SEM_LISTA));
+  assert.ok(!html.includes("A Câmara não publicou"));
   assert.equal(tabela(html, "Totais informados pela Câmara"), null);
   assert.equal(tabela(html, "Votos"), null);
   assert.equal(tabela(html, "Contagem por voto, contado pelo polis a partir dos votos"), null);
@@ -497,8 +512,30 @@ test("detalhe sem voto nominal e totais 10/5/1: os totais saem como informados p
     ["Não", "5"],
     ["Outros", "1"],
   ]);
-  assert.ok(html.includes("A Câmara não publicou os votos de cada deputado nesta votação"));
+  assert.ok(html.includes(SEM_LISTA));
 });
+
+// Qualquer total diferente de zero basta para mostrar a tabela, e cada valor cai na sua linha: um só
+// total (e em cada posição) pega a regra que olhasse só o primeiro, ou que ignorasse um deles.
+for (const [nome, [sim, nao, outros]] of Object.entries({
+  "só 'sim'": [4, 0, 0],
+  "só 'não'": [0, 7, 0],
+  "só 'outros'": [0, 0, 3],
+})) {
+  test(`detalhe sem voto nominal e totais com ${nome}: a tabela aparece com o valor na linha certa`, async () => {
+    const { html } = await detalhe(
+      semVotos({ votacao: votacaoDoDetalhe({ totais_da_fonte: totais(sim, nao, outros) }) }),
+    );
+
+    const informados = tabela(html, "Totais informados pela Câmara");
+    assert.ok(informados, "não achei a tabela de totais");
+    assert.deepEqual(informados.linhas, [
+      ["Sim", String(sim)],
+      ["Não", String(nao)],
+      ["Outros", String(outros)],
+    ]);
+  });
+}
 
 test("detalhe com voto nominal e totais 0/0/0: sem a tabela de totais, com os votos", async () => {
   const { html } = await detalhe(
@@ -507,7 +544,7 @@ test("detalhe com voto nominal e totais 0/0/0: sem a tabela de totais, com os vo
 
   assert.equal(tabela(html, "Totais informados pela Câmara"), null);
   assert.ok(tabela(html, "Votos"));
-  assert.ok(!html.includes("A Câmara não publicou os votos"));
+  assert.ok(!html.includes(SEM_LISTA));
 });
 
 test("detalhe com voto nominal e totais 2/1/1: a tabela de totais aparece ao lado da contagem do polis", async () => {
@@ -569,6 +606,8 @@ for (const invalido of [
   "9999999999-9999999999",
   "1_2",
   "1.2-3",
+  "-22",
+  "22-",
   "٣-1",
 ]) {
   test(`id malformado dá 404 sem chamar a API: ${invalido}`, async () => {
@@ -585,7 +624,13 @@ for (const invalido of [
 
 // O id é texto: o zero à esquerda é um registro distinto, e o de 20 caracteres é o maior que a rota
 // aceita. Nenhum id que a rota aceita pode ser recusado aqui.
-for (const canonico of ["1-2", "01-2", "2332174-59", "9999999999-999999999"]) {
+for (const canonico of [
+  "1-2",
+  "01-2",
+  "2332174-59",
+  "9999999999-999999999",
+  "999999999-9999999999",
+]) {
   test(`id que a rota aceita segue para a API: ${canonico}`, async () => {
     api.chamadas.length = 0;
 
@@ -616,7 +661,7 @@ test("API responde 404: página 404 em português", async () => {
 
   assert.equal(status, 404);
   assert.match(html, /não encontrad/i);
-  assert.deepEqual(api.chamadas, [`GET ${CAMINHO_DA_LISTA}2332174-59/`], "a API não foi chamada");
+  assert.deepEqual(api.chamadas, [`GET ${CAMINHO_DA_LISTA}2332174-59/`], "a API foi chamada uma vez");
 });
 
 test("API responde 500: erro genérico, sem o endereço da API", async () => {
@@ -668,6 +713,27 @@ const detalhesFora = {
     nominal({ contagem_por_voto: [{ voto: "Sim", quantidade: "2" }] }),
   "contagem_por_voto sem a chave voto": () => nominal({ contagem_por_voto: [{ quantidade: 2 }] }),
   "votos que não é lista": () => nominal({ votos: { a: 1 } }),
+  // Invariantes do contrato (ADR 0032): o que a API nunca manda é recusado, em vez de mostrado.
+  "voto vazio em vez de null (decisão 6: nunca a string vazia)": () =>
+    nominal({ votos: [voto(1, "Ana Souza", "ABC", "")] }),
+  "partido vazio em vez de null": () => nominal({ votos: [voto(1, "Ana Souza", "", "Sim")] }),
+  "tem_perfil verdadeiro com nome nulo (link sem texto)": () =>
+    nominal({ votos: [voto(1, null, "ABC", "Sim", { tem_perfil: true })] }),
+  "tem_perfil verdadeiro com nome vazio": () => nominal({ votos: [voto(1, "", "ABC", "Sim")] }),
+  "tem_perfil falso com nome preenchido": () =>
+    nominal({ votos: [voto(1, "Ana Souza", "ABC", "Sim", { tem_perfil: false })] }),
+  "link para legislatura que a rota do deputado recusaria": () =>
+    nominal({ votos: [voto(1, "Ana Souza", "ABC", "Sim", { legislatura: 0 })] }),
+  "link para id da Câmara que a rota do deputado recusaria": () =>
+    nominal({ votos: [voto(0, "Ana Souza", "ABC", "Sim")] }),
+  "votos sem a atribuição dos votos": () => nominal({ atribuicao_dos_votos: null }),
+  "sem votos mas com a atribuição dos votos": () =>
+    semVotos({ atribuicao_dos_votos: atribuicaoDosVotos() }),
+  "votos sem contagem por voto": () => nominal({ contagem_por_voto: [] }),
+  "sem votos mas com contagem por voto": () =>
+    semVotos({ contagem_por_voto: [{ voto: "Sim", quantidade: 1 }] }),
+  "aprovacao de tipo errado": () => nominal({ votacao: votacaoDoDetalhe({ aprovacao: 1 }) }),
+  "id_proposicao em texto": () => nominal({ votacao: votacaoDoDetalhe({ id_proposicao: "0" }) }),
   "sem atribuicao": () => {
     const corpo = nominal();
     delete corpo.atribuicao;

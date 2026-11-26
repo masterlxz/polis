@@ -232,11 +232,10 @@ test("votos: sem link para proposição e sem mostrar o id da proposição", asy
   assert.equal(status, 200);
   assert.ok(html.includes("Aprovada a Medida Provisória nº 1/2026."), "controle: o voto aparece");
   assert.ok(!html.includes("9876543"), "mostrou id_proposicao");
-  // Só nas tabelas: o menu do layout tem o link `/camara/votacoes/` desde a página das votações da
-  // Câmara, e ele não é um link por proposição.
-  const tabelas = (html.match(/<table[^>]*>.*?<\/table>/gs) ?? []).join("");
-  assert.ok(tabelas.includes("Aprovada a Medida Provisória nº 1/2026."), "controle: há a tabela");
-  assert.ok(!tabelas.includes('href="/camara'), "criou link para /camara");
+  // Na página inteira, menos o link do menu (`/camara/votacoes/`, que o layout tem desde a página
+  // das votações da Câmara e que não é um link por proposição): qualquer outro `/camara` é recusado.
+  assert.ok(html.includes('href="/camara/votacoes/"'), "controle: o menu tem o link das votações");
+  assert.ok(!/href="\/camara(?!\/votacoes\/")/.test(html), "criou link para /camara");
 });
 
 test("votos: a API recebe o perfil e depois GET .../votos/?pagina=1", async () => {

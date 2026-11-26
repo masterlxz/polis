@@ -172,7 +172,7 @@ def normalize_latest(dataset):
         if timedelta(0) < votes_run.started_at - votings_run.started_at <= MAX_WAIT:
             raise NormalizationWaiting from None
         raise
-    return replace(result, datasets=(votings_dataset, votes_dataset))
+    return replace(result, datasets=())
 
 
 def _rows(run):

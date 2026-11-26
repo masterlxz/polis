@@ -52,7 +52,8 @@ const SEM_VOTOS = {
     votos: [],
     pagina: 1,
     total_paginas: 0,
-    atribuicao: null,
+    atribuicao_das_votacoes: null,
+    atribuicao_dos_votos: null,
   },
 };
 

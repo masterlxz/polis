@@ -257,6 +257,16 @@ def test_ordem_de_nome_ignora_acento_e_caixa(client, run):
     assert _nomes_na_ordem(_detalhe(client, NOMINAL)) == ["Átila Lins", "bruno", "Érika", "Zeca"]
 
 
+def test_acento_dentro_do_nome_nao_desloca_a_ordem(client, run):
+    votacao = _votacao(run, NOMINAL)
+    for camara_id, nome in ((1, "Alzira"), (2, "Álvaro"), (3, "Alberto")):
+        _deputado(run, camara_id, name=nome)
+        _voto(votacao, camara_id, "Sim")
+
+    # O acento fica no meio do nome: "Álvaro" tem de cair entre "Alberto" e "Alzira", como "Alvaro".
+    assert _nomes_na_ordem(_detalhe(client, NOMINAL)) == ["Alberto", "Álvaro", "Alzira"]
+
+
 def test_quem_nao_tem_perfil_vem_depois_de_quem_tem_nome_por_legislatura_e_id(client, run):
     votacao = _votacao(run, NOMINAL)
     _deputado(run, 2, name="Zeca")

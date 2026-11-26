@@ -492,7 +492,7 @@ function proposicaoDaCamaraValida(item) {
     typeof item.tipo === "string" &&
     Number.isInteger(item.numero) &&
     (item.ano === null || Number.isInteger(item.ano)) &&
-    textoNaoVazioOuNulo(item.ementa) &&
+    textoOuNulo(item.ementa) &&
     typeof item.origem === "string"
   );
 }

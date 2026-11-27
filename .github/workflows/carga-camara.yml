@@ -1,0 +1,123 @@
+name: Carga da Câmara
+
+# Medição de latência das páginas e das APIs das tramitações da Câmara nos piores casos (ADR 0010,
+# 0035; P-14): dados SINTÉTICOS no volume medido em 2026 (ADR 0033 e 0034), taxa fixa de 10 e de
+# 50 req/s, 3 repetições por alvo. O Django sobe como a imagem de produção o sobe (`gunicorn` sem
+# `--workers`, ou seja, 1 worker síncrono, DEBUG desligado) e o Next.js em modo de produção. Roda num
+# runner de CI (2 vCPU compartilhados, não é o VPS do ADR 0011): dá a ordem de grandeza e serve para
+# comparar antes e depois, não para provar o p95 de produção. Só mede, sem limite. Build e carga só
+# no CI (ADR 0009 do workspace). Não é exigido no ruleset.
+on:
+  pull_request:
+    paths:
+      - scripts/carga_camara/**
+      - .github/ci/semear_camara.py
+      - .github/workflows/carga-camara.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  carga:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        rps: [10, 50]
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_DB: polis
+          POSTGRES_USER: polis
+          POSTGRES_PASSWORD: ci-descartavel
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U polis -d polis"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DJANGO_SECRET_KEY: ci-chave-descartavel-sem-valor
+      DJANGO_ALLOWED_HOSTS: localhost,127.0.0.1
+      POSTGRES_DB: polis
+      POSTGRES_USER: polis
+      POSTGRES_PASSWORD: ci-descartavel
+      POSTGRES_HOST: localhost
+      POSTGRES_PORT: "5432"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Instala o uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          version: "0.13.6"
+
+      - name: Instala as dependências do Python (lock respeitado)
+        run: uv sync --locked
+
+      - name: Instala o Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Instala e constrói o front (lockfile respeitado, sem scripts de instalação)
+        working-directory: web
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"
+        run: |
+          npm ci --ignore-scripts
+          npm run build
+
+      - name: Migra
+        run: uv run --locked python manage.py migrate --noinput
+
+      - name: Semeia os piores casos e o volume medido
+        run: |
+          uv run --locked python manage.py shell < .github/ci/semear_camara.py
+          uv run --locked python manage.py shell < scripts/carga_camara/semear_volume.py
+
+      - name: Planos de execução (EXPLAIN ANALYZE) das consultas reais das views
+        if: matrix.rps == 10
+        env:
+          PYTHONPATH: .
+        run: uv run --locked python scripts/carga_camara/plano.py | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Sobe o Django (gunicorn, como a imagem de produção) e o Next.js
+        run: |
+          uv run --locked gunicorn config.wsgi:application --bind 127.0.0.1:8000 > "$RUNNER_TEMP/api.log" 2>&1 &
+          API_URL=http://127.0.0.1:8000 HOSTNAME=127.0.0.1 PORT=3000 NODE_ENV=production \
+            node web/.next/standalone/server.js > "$RUNNER_TEMP/front.log" 2>&1 &
+          for _ in $(seq 1 30); do
+            curl -fs http://127.0.0.1:8000/internal/v1/camara/proposicoes/14666/ > /dev/null \
+              && curl -fs http://127.0.0.1:3000/saude/ > /dev/null && exit 0
+            sleep 1
+          done
+          cat "$RUNNER_TEMP/api.log" "$RUNNER_TEMP/front.log"
+          exit 1
+
+      - name: Checagem prévia (cada caminho com o status e o trecho esperados) e carga, 3 repetições
+        run: |
+          for alvo in front api; do
+            if [ "$alvo" = front ]; then base=http://127.0.0.1:3000; else base=http://127.0.0.1:8000; fi
+            for r in 1 2 3; do
+              echo "### $alvo, ${{ matrix.rps }} req/s, repetição $r" | tee -a "$GITHUB_STEP_SUMMARY"
+              echo '```json' >> "$GITHUB_STEP_SUMMARY"
+              python3 scripts/carga_camara/medir.py "$alvo" "$base" ${{ matrix.rps }} 60 10 "$r" | tee -a "$GITHUB_STEP_SUMMARY"
+              echo '```' >> "$GITHUB_STEP_SUMMARY"
+            done
+          done
+
+      - name: Logs do Django e do front
+        if: always()
+        run: |
+          echo "erros do Django (primeiras 60 linhas):"
+          grep -E -A6 'Traceback|Error' "$RUNNER_TEMP/api.log" | head -60 || true
+          echo "front (últimas 40 linhas):"
+          tail -40 "$RUNNER_TEMP/front.log" || true

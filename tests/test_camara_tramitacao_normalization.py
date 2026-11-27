@@ -213,7 +213,9 @@ def test_cada_parte_da_chave_separa_duas_linhas(conjunto, mudanca):
 @pytest.mark.parametrize(
     ("coluna", "valor"),
     [
-        ("uriProposicao", "https://dadosabertos.camara.leg.br/api/v2/orgaos/4/{S}"),
+        ("uriProposicao", "https://dadosabertos.camara.leg.br/api/v2/orgaos/4"),
+        ("uriProposicao", "https://dadosabertos.camara.leg.br/api/v2/proposicoes/{S}"),
+        ("uriProposicao", "https://dadosabertos.camara.leg.br/api/v2/proposicoes/0"),
         ("uriProposicao", ""),
         ("sequencia", "abc{S}"),
         ("sequencia", "-1"),

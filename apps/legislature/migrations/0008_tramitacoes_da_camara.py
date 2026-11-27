@@ -24,7 +24,7 @@ class Migration(migrations.Migration):
             options={
                 'verbose_name': 'tramitação de proposição da Câmara',
                 'verbose_name_plural': 'tramitações de proposições da Câmara',
-                'constraints': [models.UniqueConstraint(fields=('camara_proposition_id', 'sequence', 'occurred_at', 'organ_code', 'description'), name='camara_proposition_step_unique', nulls_distinct=False)],
+                'constraints': [models.UniqueConstraint(fields=('camara_proposition_id', 'sequence', 'occurred_at', 'organ_code', 'description'), name='camara_proposition_step_unique')],
             },
         ),
     ]

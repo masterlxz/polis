@@ -380,7 +380,6 @@ class CamaraPropositionStep(models.Model):
                     "description",
                 ],
                 name="camara_proposition_step_unique",
-                nulls_distinct=False,
             ),
         ]
 

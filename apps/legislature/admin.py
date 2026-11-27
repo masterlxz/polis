@@ -2,6 +2,7 @@ from django.contrib import admin
 
 from .models import (
     CamaraProposition,
+    CamaraPropositionStep,
     CamaraVote,
     CamaraVoting,
     CamaraVotingProposition,
@@ -93,6 +94,16 @@ class CamaraPropositionAdmin(DeputyAdmin):
     list_display = ["camara_id", "title", "type_acronym", "number", "year"]
     list_filter = ["type_acronym", "year"]
     search_fields = ["title", "ementa"]
+    raw_id_fields = ["ingestion_run"]
+
+
+@admin.register(CamaraPropositionStep)
+class CamaraPropositionStepAdmin(DeputyAdmin):
+    """Idem: só leitura (ADR 0034). A proposição é só o texto do id, sem chave."""
+
+    list_display = ["camara_proposition_id", "sequence", "occurred_at", "organ_code", "description"]
+    list_filter = ["organ_code"]
+    search_fields = ["camara_proposition_id", "description"]
     raw_id_fields = ["ingestion_run"]
 
 

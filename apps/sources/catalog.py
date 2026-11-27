@@ -319,4 +319,34 @@ DATASETS = [
         "schedule_interval_hours": 24,
         "earliest_hour_utc": 8,
     },
+    {
+        # Tramitações das proposições da Câmara em 2026 (ADR 0034): 14 colunas, 118.724 linhas,
+        # 38,5 MB, medido em 2026-11-27 (Rodada 5 de `fontes/camara.md`). Allowlist de 5: a URI da
+        # proposição (só para extrair o id), a sequência, a data e hora, o órgão e a descrição.
+        # Fora, por minimização (ADR 0005): `despacho` (texto livre que cita agentes públicos pelo
+        # nome; decisão do dono), `idTramitacao` (não é chave: 400 valores em 118.724 linhas) e o
+        # que a proposição e o órgão já têm.
+        "source": "camara",
+        "slug": "proposicoes-tramitacoes-2026",
+        "name": "Tramitações das proposições da Câmara (2026)",
+        "url": (
+            "https://dadosabertos.camara.leg.br/arquivos/proposicoesTramitacoes/csv/"
+            "proposicoesTramitacoes-2026.csv"
+        ),
+        "format": "csv",
+        "allowed_columns": [
+            "uriProposicao",
+            "sequencia",
+            "dataHora",
+            "siglaOrgao",
+            "descricaoTramitacao",
+        ],
+        "internal_columns": [],
+        "license_basis": "owner_decision",
+        "license_id": "",
+        "license_url": "",
+        "license_check_url": "",
+        "schedule_interval_hours": 24,
+        "earliest_hour_utc": 8,
+    },
 ]

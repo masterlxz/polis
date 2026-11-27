@@ -114,6 +114,7 @@ def test_seed_cria_as_tres_fontes_e_os_conjuntos_do_tse_da_camara_e_do_senado():
         "camara/votos-2026",
         "camara/votacoes-proposicoes-2026",
         "camara/votacoes-objetos-2026",
+        "camara/proposicoes-tramitacoes-2026",
         "senado/senadores",
         "senado/votacoes",
     }
@@ -123,7 +124,7 @@ def test_seed_cria_as_tres_fontes_e_os_conjuntos_do_tse_da_camara_e_do_senado():
 def test_os_conjuntos_sem_licenca_declarada_nascem_desabilitados_e_sem_justificativa():
     seed()
     conjuntos = Dataset.objects.filter(source__slug__in=("camara", "senado"))
-    assert conjuntos.count() == 7
+    assert conjuntos.count() == 8
     for conjunto in conjuntos:
         assert conjunto.enabled is False
         assert conjunto.license_basis == Dataset.LicenseBasis.OWNER_DECISION
@@ -277,6 +278,50 @@ def test_proposicoes_das_votacoes_da_camara_leem_so_a_allowlist_e_nascem_desabil
     assert conjunto.earliest_hour_utc == 8
 
 
+def test_tramitacoes_das_proposicoes_da_camara_leem_so_a_allowlist_e_nascem_desabilitadas():
+    seed()
+    conjunto = Dataset.objects.get(source__slug="camara", slug="proposicoes-tramitacoes-2026")
+    assert conjunto.format == Dataset.Format.CSV
+    # Medido em 2026-11-27 (`fontes/camara.md`, Rodada 5): 14 colunas, 118.724 linhas, 38,5 MB.
+    assert conjunto.url == (
+        "https://dadosabertos.camara.leg.br/arquivos/proposicoesTramitacoes/csv/"
+        "proposicoesTramitacoes-2026.csv"
+    )
+    assert conjunto.allowed_columns == [
+        "uriProposicao",
+        "sequencia",
+        "dataHora",
+        "siglaOrgao",
+        "descricaoTramitacao",
+    ]
+    # Minimização (ADR 0005 e 0034): `despacho` cita agentes públicos pelo nome; `idTramitacao`
+    # não é chave; o resto a proposição e o órgão já têm.
+    for fora in (
+        "despacho",
+        "idTramitacao",
+        "siglaTipo",
+        "numero",
+        "ano",
+        "uriOrgao",
+        "regime",
+        "codSituacao",
+        "url",
+    ):
+        assert fora not in conjunto.allowed_columns
+    assert conjunto.internal_columns == []
+    assert conjunto.license_basis == Dataset.LicenseBasis.OWNER_DECISION
+    assert conjunto.enabled is False
+    assert conjunto.schedule_interval_hours == 24
+    assert conjunto.earliest_hour_utc == 8
+
+
+def test_o_agendador_normaliza_as_tramitacoes_das_proposicoes_da_camara_depois_da_coleta():
+    assert (
+        settings.NORMALIZERS["camara/proposicoes-tramitacoes-2026"]
+        == "apps.legislature.camara_tramitacao_normalization.normalize_latest"
+    )
+
+
 @pytest.mark.parametrize("slug", ["votacoes-proposicoes-2026", "votacoes-objetos-2026"])
 def test_o_agendador_normaliza_as_proposicoes_das_votacoes_da_camara_depois_da_coleta(slug):
     assert (
@@ -345,7 +390,7 @@ def test_segunda_execucao_nao_duplica_nem_cria():
     seed()
     texto = seed()
     assert Source.objects.count() == 3
-    assert Dataset.objects.count() == 8
+    assert Dataset.objects.count() == 9
     assert "0 criad" in texto
 
 

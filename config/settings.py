@@ -106,6 +106,10 @@ NORMALIZERS = {
     "camara/votacoes-objetos-2026": (
         "apps.legislature.camara_proposition_normalization.normalize_latest"
     ),
+    # As tramitações das proposições da Câmara têm normalização própria (ADR 0034).
+    "camara/proposicoes-tramitacoes-2026": (
+        "apps.legislature.camara_tramitacao_normalization.normalize_latest"
+    ),
     "senado/senadores": "apps.legislature.senate_normalization.normalize_latest",
     "senado/votacoes": "apps.legislature.senate_voting_normalization.normalize_latest",
 }

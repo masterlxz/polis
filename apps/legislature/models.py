@@ -337,3 +337,52 @@ class CamaraVotingProposition(models.Model):
 
     def __str__(self):
         return f"{self.camara_voting_id}: {self.proposition_id}"
+
+
+class CamaraPropositionStep(models.Model):
+    """Tramitação de uma proposição da Câmara, do arquivo anual em massa
+    `proposicoesTramitacoes` (ADR 0034, Rodada 5 de `fontes/camara.md`).
+
+    Sem chave para `CamaraProposition`: a maioria das proposições do arquivo (cerca de 36 mil de
+    46 mil) não existe lá, então o id fica em texto e a junção é na leitura. `idTramitacao` não é
+    lido (400 valores em 118.724 linhas) e `despacho` não é ingerido (cita agentes públicos).
+
+    A chave é (proposição, `sequence`, `occurred_at`, `organ_code`, `description`): sem a
+    `sequence` perderiam-se 1.290 linhas em 2026, e só com ela e a proposição há 13 eventos
+    diferentes no mesmo par. `sequence` é nula quando a fonte a deixa vazia (1 linha em 2026), e a
+    unicidade trata NULL como igual (`nulls_distinct=False`), senão essa linha duplicaria a cada
+    carga. `occurred_at` vem sem fuso na fonte e é gravado como horário de Brasília (não
+    verificado).
+    """
+
+    camara_proposition_id = models.CharField("id da proposição na Câmara", max_length=10)
+    sequence = models.PositiveIntegerField("sequência", null=True, blank=True)
+    occurred_at = models.DateTimeField("data e hora")
+    organ_code = models.CharField("sigla do órgão", max_length=30)
+    description = models.CharField("descrição da tramitação", max_length=200)
+    ingestion_run = models.ForeignKey(
+        IngestionRun,
+        on_delete=models.PROTECT,
+        related_name="camara_proposition_steps",
+        verbose_name="última execução de coleta que a viu",
+    )
+
+    class Meta:
+        verbose_name = "tramitação de proposição da Câmara"
+        verbose_name_plural = "tramitações de proposições da Câmara"
+        constraints = [
+            models.UniqueConstraint(
+                fields=[
+                    "camara_proposition_id",
+                    "sequence",
+                    "occurred_at",
+                    "organ_code",
+                    "description",
+                ],
+                name="camara_proposition_step_unique",
+                nulls_distinct=False,
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.camara_proposition_id}: {self.description}"

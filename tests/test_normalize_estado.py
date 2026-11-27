@@ -42,6 +42,10 @@ COMANDOS = {
         "apps.legislature.camara_proposition_normalization",
         [("camara", "votacoes-proposicoes-2026"), ("camara", "votacoes-objetos-2026")],
     ),
+    "normalize_camara_tramitacoes": (
+        "apps.legislature.camara_tramitacao_normalization",
+        [("camara", "proposicoes-tramitacoes-2026")],
+    ),
 }
 
 

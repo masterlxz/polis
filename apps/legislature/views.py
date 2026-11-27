@@ -579,7 +579,7 @@ def _camara_step_order(step):
 def _camara_step_item(step):
     return {
         "sequencia": step.sequence,
-        "data_hora": step.occurred_at.astimezone(_BRASILIA).isoformat(),
+        "data_hora": step.occurred_at.isoformat(),
         "orgao": step.organ_code,
         "descricao": step.description,
     }

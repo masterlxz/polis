@@ -809,7 +809,7 @@ test("detalhe sem votos: as proposições vêm depois do aviso de que não há l
   assert.ok(aviso < proposicoes);
 });
 
-test("detalhe: o id da proposição não aparece (a página não tem rota para ela)", async () => {
+test("detalhe: o id da proposição não aparece quando ela não tem tramitação (nem link)", async () => {
   const { status, html } = await detalhe(comProposicoes([proposicao()]));
 
   assert.equal(status, 200, "controle: a página precisa existir");

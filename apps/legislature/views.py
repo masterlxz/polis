@@ -495,7 +495,7 @@ def camara_voting_detail(request, voting_id):
                 {"voto": vote, "quantidade": quantity}
                 for vote, quantity in sorted(counts.items(), key=_vote_count_order)
             ],
-            "proposicoes": [_camara_proposition_item(link, step_totals) for link in links],
+            "proposicoes": [_camara_proposition_item(link, step_totals) for link in links[:50]],
             "atribuicao": _attribution(voting.ingestion_run),
             "atribuicao_dos_votos": _attribution(newest_votes_run) if newest_votes_run else None,
             "atribuicao_das_proposicoes": (

@@ -419,7 +419,7 @@ def _step_totals(proposition_ids):
     if not ids:
         return {}
     rows = (
-        CamaraPropositionStep.objects.filter(camara_proposition_id__in=ids)
+        CamaraPropositionStep.objects.filter(camara_proposition_id__startswith=ids[0])
         .values("camara_proposition_id")
         .annotate(total=Count("id"))
         .order_by()

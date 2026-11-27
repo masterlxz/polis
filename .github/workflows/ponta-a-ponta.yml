@@ -47,6 +47,32 @@ jobs:
           FRONT_BASE: http://127.0.0.1:3000
         run: node --test "web/e2e/**/*.e2e.test.mjs"
 
+      # Foto das telas no Chrome que já vem no runner (sem Playwright nem Puppeteer): só dado
+      # sintético, no Chrome da imagem de hoje. Prova que o CSS e o HTML renderizam, não o PC do dono.
+      - name: Screenshot das páginas (Chrome headless do runner)
+        env:
+          FRONT_BASE: http://127.0.0.1:3000
+        run: |
+          google-chrome --version
+          mkdir -p "$RUNNER_TEMP/telas"
+          for caminho in camara/proposicoes/14666 camara/proposicoes/14667 camara/votacoes/9000001-1; do
+            arquivo="$RUNNER_TEMP/telas/$(echo "$caminho" | tr / -).png"
+            curl -fsS -o /dev/null "$FRONT_BASE/$caminho/"
+            google-chrome --headless=new --no-sandbox --disable-gpu --hide-scrollbars \
+              --window-size=1280,2000 --screenshot="$arquivo" "$FRONT_BASE/$caminho/"
+            test -s "$arquivo"
+            ls -l "$arquivo"
+          done
+
+      - name: Guarda as fotos como artefato
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: telas
+          path: ${{ runner.temp }}/telas/*.png
+          if-no-files-found: warn
+          retention-days: 7
+
       - name: Logs em caso de falha
         if: failure()
         run: docker compose logs --no-color --tail=100

@@ -48,7 +48,7 @@ export const LIMITE_DA_EMENTA = 300;
 // caractere fora do BMP ao meio.
 export function resumoDaEmenta(ementa) {
   const caracteres = [...ementa];
-  if (caracteres.length <= LIMITE_DA_EMENTA) return null;
+  if (caracteres.length < LIMITE_DA_EMENTA) return null;
   return `${caracteres.slice(0, LIMITE_DA_EMENTA).join("").trimEnd()}…`;
 }
 

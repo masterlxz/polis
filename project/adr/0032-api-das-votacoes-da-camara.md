@@ -56,6 +56,13 @@ Espelho de `senator_votes` (ADR 0030, emenda 7), PRs #192 (API) e #194 (página 
 - Hoje não há retirada de deputado da Câmara (ADR 0026, decisão 1: ele "nunca apaga"). **Se um dia a retirada passar a apagar `Deputy`, ela tem de apagar também os `CamaraVote` pelo par (legislatura, id)**; sem isso o detalhe da votação (já existente) continua mostrando o id e o voto dele. É a pergunta do ADR 0031 ("Pergunta para o P-16") e segue aberta.
 - **Não validado:** o `CREATE INDEX` e o `EXPLAIN` com dado real (a tabela deve estar vazia: nenhuma votação foi coletada); a página contra a API real e no navegador; a collation do PostgreSQL de produção para a ordem do desempate.
 
+## Emenda 6 (2026-11-27): cada proposição do detalhe traz `total_tramitacoes` (ADR 0035)
+Mudança só no detalhe (`GET /internal/v1/camara/votacoes/<id>/`); a lista não muda.
+1. **Uma chave nova em cada item de `proposicoes`:** `total_tramitacoes`, inteiro `>= 0`: o número de tramitações de 2026 daquela proposição (ADR 0034). Zero quer dizer "nenhuma em 2026", não "nenhuma na Câmara". Nenhuma chave sai.
+2. **Para que serve:** a página só linka a proposição (`/camara/proposicoes/<id>`, ADR 0035) quando o total é maior que zero; sem isso 63% dos links levariam a uma página vazia.
+3. **Uma consulta a mais:** contagem agrupada por `camara_proposition_id`, com `IN` pelos ids das proposições da votação. **Não roda** se a votação não tem proposição: o detalhe com proposições passa de 4 para 5 consultas (de 3 para 4 sem votos) e o sem proposições fica como estava.
+4. **Descartada:** devolver as tramitações no detalhe (até 213 proposições por votação, cada uma com até 98 itens); devolver só um booleano (a contagem custa o mesmo e a página pode mostrar o número).
+
 ## Emenda 5 (2026-11-26): o detalhe traz as proposições da votação (ADR 0033)
 Mudança só no detalhe (`GET /internal/v1/camara/votacoes/<id>/`); a lista não muda.
 1. **Duas chaves novas:** `proposicoes` e `atribuicao_das_proposicoes`. Uma consulta a mais (o detalhe passa de 3 para 4 consultas; sem votos, de 2 para 3), com a proposição e a atribuição num JOIN. A ligação guarda o id da votação em texto, sem chave (ADR 0033); votação inexistente continua 404, sem consultar as proposições.

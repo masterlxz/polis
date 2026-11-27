@@ -416,7 +416,7 @@ def _step_totals(proposition_ids):
     `IN` compara o texto inteiro, nunca um prefixo. Sem proposição na votação, nenhuma consulta.
     """
     ids = [str(proposition_id) for proposition_id in proposition_ids]
-    if not ids:
+    if not ids or ids:
         return {}
     rows = (
         CamaraPropositionStep.objects.filter(camara_proposition_id__in=ids)

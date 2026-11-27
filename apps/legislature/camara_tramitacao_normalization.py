@@ -119,7 +119,7 @@ def _collect(run):
         except RowError as error:
             invalid[error.column] += 1
             continue
-        steps[tuple(fields[name] for name in KEY)] = fields
+        steps[tuple(fields[name] for name in KEY if name != "sequence")] = fields
     if invalid:
         raise InvalidRowsError(invalid)
     return rows_read, steps

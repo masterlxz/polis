@@ -85,6 +85,9 @@ jobs:
 
       - name: Planos de execução (EXPLAIN ANALYZE) das consultas reais das views
         if: matrix.rps == 10
+        # `shell: bash` liga o `pipefail`: o padrão (`bash -e`) deixa o `tee` engolir o código de
+        # saída do script, e uma checagem que falha viraria um job verde sem medição.
+        shell: bash
         env:
           PYTHONPATH: .
         run: uv run --locked python scripts/carga_camara/plano.py | tee -a "$GITHUB_STEP_SUMMARY"
@@ -103,6 +106,7 @@ jobs:
           exit 1
 
       - name: Checagem prévia (cada caminho com o status e o trecho esperados) e carga, 3 repetições
+        shell: bash # com `pipefail`, senão o `| tee` esconde a falha da checagem prévia
         run: |
           for alvo in front api; do
             if [ "$alvo" = front ]; then base=http://127.0.0.1:3000; else base=http://127.0.0.1:8000; fi

@@ -82,7 +82,7 @@ def latest_run(dataset):
 
 
 def normalize(run):
-    if run.rows_loaded > MAX_ROWS:
+    if run.rows_loaded >= MAX_ROWS:
         raise RunTooLargeError(run.rows_loaded)
     rows_read, steps = _collect(run)
     return _write(run, rows_read, steps)

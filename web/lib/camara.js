@@ -41,7 +41,7 @@ export const TOTAIS_ZERADOS = "Os totais da fonte estão zerados e não são mos
 
 // Ementa com mais de 300 caracteres sai recolhida (decisão do dono, 2026-11-27): a medição do ADR 0033
 // chega a 5.259 caracteres, e uma votação com dezenas de proposições viraria um muro de texto.
-export const LIMITE_DA_EMENTA = 300;
+export const LIMITE_DA_EMENTA = 3000;
 
 // O resumo de uma ementa longa (os 300 primeiros caracteres, sem espaço no fim, e "…"), ou `null` se
 // ela cabe inteira. Conta por ponto de código: `slice` contaria unidades UTF-16 e poderia partir um

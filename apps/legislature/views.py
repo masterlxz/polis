@@ -569,7 +569,6 @@ def _camara_step_order(step):
     depender da collation do banco (ADR 0035, decisão 5)."""
     return (
         step.occurred_at,
-        step.sequence is None,
         step.sequence or 0,
         step.organ_code,
         step.description,

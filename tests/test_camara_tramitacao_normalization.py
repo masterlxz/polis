@@ -232,7 +232,7 @@ def test_linha_invalida_recusa_tudo_e_a_mensagem_cita_a_coluna_e_nunca_o_valor(
     conjunto, coluna, valor
 ):
     valor = valor.replace("{S}", SEGREDO)
-    run = carga(conjunto, [linha("1", "1"), linha("2", "2", **{coluna: valor})])
+    run = carga(conjunto, [linha("1", "1"), {**linha("2", "2"), coluna: valor}])
     mensagem = recusa(run)
     assert f"{coluna} (1)" in mensagem
     assert "Nada foi gravado" in mensagem

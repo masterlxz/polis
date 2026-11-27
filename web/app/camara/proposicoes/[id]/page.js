@@ -48,7 +48,7 @@ function Tramitacoes({ tramitacoes }) {
           <tr key={indice}>
             <td>{dataHoraBrasilia(item.data_hora)}</td>
             <td>{item.orgao}</td>
-            <td>{item.descricao}</td>
+            <td dangerouslySetInnerHTML={{ __html: item.descricao }} />
           </tr>
         ))}
       </tbody>

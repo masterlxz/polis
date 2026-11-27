@@ -217,6 +217,13 @@ dd {
   overflow-wrap: anywhere;
 }
 
+/* Na página da proposição a nota vem logo depois da ementa (curta, ou longa com o `<details>`) e
+   ficava colada nela; nas outras páginas `.nota` não segue a ementa e não muda. */
+.ementa + .nota,
+details + .nota {
+  margin-top: 0.75rem;
+}
+
 .aviso {
   padding: 0.75rem 1rem;
   background: var(--fundo-suave);

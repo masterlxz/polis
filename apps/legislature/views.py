@@ -611,7 +611,7 @@ def camara_proposition_detail(request, proposition_id):
         ),
         key=_camara_step_order,
     )
-    newest_run = max((step.ingestion_run for step in steps), key=_started, default=None)
+    newest_run = min((step.ingestion_run for step in steps), key=_started, default=None)
     return JsonResponse(
         {
             "proposicao": _camara_proposition_fields(proposition),

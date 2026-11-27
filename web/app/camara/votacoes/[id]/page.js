@@ -178,8 +178,8 @@ export default async function VotacaoDaCamara({ params }) {
         </p>
       )}
       {totais && <Totais linhas={totais} />}
-      {temVotos && <Contagem contagem={contagem} />}
       {proposicoes.length > 0 && <Proposicoes proposicoes={proposicoes} />}
+      {temVotos && <Contagem contagem={contagem} />}
       {temVotos && <Votantes votos={votos} />}
       <Atribuicao atribuicao={atribuicao} />
       {atribuicaoDosVotos && <Atribuicao atribuicao={atribuicaoDosVotos} />}

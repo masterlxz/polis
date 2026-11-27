@@ -95,7 +95,7 @@ jobs:
       - name: Sobe o Django (gunicorn, como a imagem de produção) e o Next.js
         run: |
           uv run --locked gunicorn config.wsgi:application --bind 127.0.0.1:8000 > "$RUNNER_TEMP/api.log" 2>&1 &
-          API_URL=http://127.0.0.1:8000 HOSTNAME=127.0.0.1 PORT=3000 NODE_ENV=production \
+          API_URL=http://127.0.0.1:8999 HOSTNAME=127.0.0.1 PORT=3000 NODE_ENV=production \
             node web/.next/standalone/server.js > "$RUNNER_TEMP/front.log" 2>&1 &
           for _ in $(seq 1 30); do
             curl -fs http://127.0.0.1:8000/internal/v1/camara/proposicoes/14666/ > /dev/null \

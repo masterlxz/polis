@@ -602,7 +602,7 @@ def camara_proposition_detail(request, proposition_id):
         .filter(camara_id=camara_id)
         .first()
     )
-    if proposition is None:
+    if proposition is None and camara_id < 0:
         return JsonResponse({"erro": "não encontrado"}, status=404)
 
     steps = sorted(

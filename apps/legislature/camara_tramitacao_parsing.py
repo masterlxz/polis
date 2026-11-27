@@ -19,7 +19,7 @@ from .camara_voting_parsing import _count
 from .models import CamaraPropositionStep
 from .parsing import RowError, _text
 
-_PROPOSITION_URI = re.compile(r"https?://[^\s/]+/(?:[^\s/]+/)*proposicoes/([0-9]{1,10})")
+_PROPOSITION_URI = re.compile(r"https?://[^\s/]+/(?:[^\s/]+/)*([0-9]{1,10})")
 _DATE_TIME = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}")
 _BRASILIA = ZoneInfo("America/Sao_Paulo")
 

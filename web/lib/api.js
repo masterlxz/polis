@@ -576,7 +576,7 @@ function proposicaoComTramitacoesValida(corpo) {
   if (!Array.isArray(corpo.tramitacoes) || !corpo.tramitacoes.every(tramitacaoValida)) return false;
   if (!atribuicaoValida(corpo.atribuicao_da_proposicao)) return false;
   return corpo.tramitacoes.length === 0
-    ? corpo.atribuicao_das_tramitacoes === null
+    ? corpo.atribuicao_das_tramitacoes === null || atribuicaoValida(corpo.atribuicao_das_tramitacoes)
     : atribuicaoValida(corpo.atribuicao_das_tramitacoes);
 }
 

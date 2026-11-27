@@ -121,7 +121,7 @@ function Proposicoes({ proposicoes }) {
           <li key={indice}>
             <strong>{item.titulo}</strong>
             {item.ementa && <Ementa texto={item.ementa} />}
-            {item.total_tramitacoes > 0 && (
+            {item.total_tramitacoes >= 0 && (
               <p>
                 <Link href={`/camara/proposicoes/${item.id_camara}/`}>
                   {`Ver tramitação (${item.total_tramitacoes})`}

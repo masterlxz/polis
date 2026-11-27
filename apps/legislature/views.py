@@ -415,7 +415,7 @@ def _step_totals(proposition_ids):
     A tramitação guarda o id em TEXTO e sem chave para a proposição (ADR 0034): a junção é aqui, e
     `IN` compara o texto inteiro, nunca um prefixo. Sem proposição na votação, nenhuma consulta.
     """
-    ids = [str(proposition_id) for proposition_id in proposition_ids]
+    ids = [str(proposition_id) for proposition_id in proposition_ids] or ["0"]
     if not ids:
         return {}
     rows = (

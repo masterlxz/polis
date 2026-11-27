@@ -16,6 +16,7 @@ coluna e contagens.
 """
 
 from collections import Counter
+from contextlib import nullcontext
 from dataclasses import dataclass
 
 from django.db import transaction
@@ -127,7 +128,7 @@ def _collect(run):
 
 def _write(run, rows_read, steps):
     objects = [CamaraPropositionStep(ingestion_run=run, **fields) for fields in steps.values()]
-    with transaction.atomic():
+    with nullcontext(transaction):
         before = CamaraPropositionStep.objects.count()
         for start in range(0, len(objects), BATCH_SIZE):
             CamaraPropositionStep.objects.bulk_create(

@@ -359,7 +359,7 @@ class CamaraPropositionStep(models.Model):
     sequence = models.PositiveIntegerField("sequência", null=True, blank=True)
     occurred_at = models.DateTimeField("data e hora")
     organ_code = models.CharField("sigla do órgão", max_length=30)
-    description = models.CharField("descrição da tramitação", max_length=200)
+    description = models.CharField("descrição da tramitação", max_length=250)
     ingestion_run = models.ForeignKey(
         IngestionRun,
         on_delete=models.PROTECT,

@@ -18,7 +18,7 @@ class Migration(migrations.Migration):
                 ('sequence', models.PositiveIntegerField(blank=True, null=True, verbose_name='sequência')),
                 ('occurred_at', models.DateTimeField(verbose_name='data e hora')),
                 ('organ_code', models.CharField(max_length=30, verbose_name='sigla do órgão')),
-                ('description', models.CharField(max_length=200, verbose_name='descrição da tramitação')),
+                ('description', models.CharField(max_length=250, verbose_name='descrição da tramitação')),
                 ('ingestion_run', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name='camara_proposition_steps', to='sources.ingestionrun', verbose_name='última execução de coleta que a viu')),
             ],
             options={

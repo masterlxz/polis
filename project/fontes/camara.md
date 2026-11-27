@@ -195,6 +195,27 @@ Medido com `curl` (uma requisição por arquivo, `User-Agent` genérico) e anál
 | Política de texto livre (`ementa`) | Decidir antes de codar: normalizar quebra de linha para espaço (como `descricao`) e recusar ou descartar controle | Recusar a carga inteira, como em `descricao` |
 | Plebiscito | Não é fatia própria: ~5 proposições por ano por texto; atender por busca de texto quando a busca cobrir proposições | Fatia dedicada (não recomendo) |
 
+## Rodada 5: tramitações das proposições (2026-11-27, Sessão 113)
+
+Medido com `curl` (uma requisição por arquivo, `User-Agent` genérico) e análise em Python fora do repo, sobre `proposicoesTramitacoes-2026` (38.524.001 bytes, `Last-Modified` 2026-11-27 05:32 GMT) e os dois arquivos de votações de 2026 da mesma data. **Nada foi integrado.**
+
+| Fato | Valor |
+|---|---|
+| Linhas | 118.724 (todas de 2026 pela `dataHora`, sem data inválida) |
+| Colunas (14, por nome) | `idTramitacao`, `dataHora`, `sequencia`, `uriProposicao`, `siglaTipo`, `numero`, `ano`, `siglaOrgao`, `uriOrgao`, `regime`, `descricaoTramitacao`, `codSituacao`, `despacho`, `url` |
+| **`idTramitacao`** | **Não é chave**: 400 valores distintos em 118.724 linhas (o `1` aparece 11.093 vezes); é a posição dentro da proposição, e 285 dos 400 valores aparecem em mais de uma proposição |
+| Proposições distintas | 46.295 (id extraído de `uriProposicao`, que sempre termina em `/proposicoes/<id>`) |
+| Cobertura das proposições das votações | 9.869 das 26.754 ids dos dois arquivos de votações têm tramitação em 2026 (28.807 linhas); o resto está em anos anteriores (**não medido**) |
+| (proposição, `sequencia`) repetido | 51 pares: 38 iguais em `dataHora`, `siglaOrgao` e `descricaoTramitacao` (19 só diferem em `codSituacao`, que não é ingerido), e **13 eventos diferentes com o mesmo número de sequência** (data, órgão ou descrição mudam) |
+| `sequencia` vazia | 1 linha (proposição 2603645, `CSAUDE`, "Notificações"); as demais são numéricas, até 1.096 |
+| Tamanhos | `siglaOrgao` até 10, `descricaoTramitacao` até 57 (112 valores distintos, 74 órgãos), `regime` até 36, `despacho` até 3.426 (3 vazios) |
+| Caracteres de controle | nenhum nas colunas candidatas (`idTramitacao`, `dataHora`, `sequencia`, `siglaOrgao`, `descricaoTramitacao`) |
+
+- **Consequência para o modelo:** a chave de uma tramitação não é o `idTramitacao` nem (proposição, `sequencia`) (recusar nos 13 conflitos e na linha vazia pararia a coleta todo dia). Decisão do dono em 2026-11-27: chave por (proposição, `dataHora`, `siglaOrgao`, `descricaoTramitacao`), com `sequencia` só como dado e nula quando vazia.
+- **Decisões do dono (2026-11-27):** `despacho` não é ingerido (ADR 0005); só 2026 nesta fatia.
+- **Divergência a explicar:** a união dos ids de `proposicao_id` nos dois arquivos de 2026 deu 26.754 hoje; o ADR 0033 e a coleta real da Sessão 112 contaram 26.745. Pode ser arquivo mais novo (mudou entre 2026-11-26 e 27) ou outra contagem; **não verificado**.
+- **Não medido:** anos anteriores a 2026 (cobertura das 16.885 proposições sem tramitação em 2026); o significado de `codSituacao` e `regime`; estabilidade do arquivo entre cargas; a API `/proposicoes/{id}/tramitacoes` como alternativa.
+
 ## Reproduzir as medições
 Use um `User-Agent` genérico e espere alguns segundos entre as requisições.
 ```bash

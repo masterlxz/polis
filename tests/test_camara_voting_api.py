@@ -18,6 +18,7 @@ import pytest
 
 from apps.legislature.models import (
     CamaraProposition,
+    CamaraPropositionStep,
     CamaraVote,
     CamaraVoting,
     CamaraVotingProposition,
@@ -56,7 +57,16 @@ CHAVES_DETALHE = {
     "atribuicao_dos_votos",
     "atribuicao_das_proposicoes",
 }
-CHAVES_PROPOSICAO = {"id_camara", "titulo", "tipo", "numero", "ano", "ementa", "origem"}
+CHAVES_PROPOSICAO = {
+    "id_camara",
+    "titulo",
+    "tipo",
+    "numero",
+    "ano",
+    "ementa",
+    "origem",
+    "total_tramitacoes",
+}
 CHAVES_VOTACAO = CHAVES_ITEM_DA_LISTA - {"tem_votos_nominais"}
 CHAVES_TOTAIS = {"sim", "nao", "outros"}
 CHAVES_VOTO = {"legislatura", "id_camara", "partido", "voto", "tem_perfil", "nome"}
@@ -640,6 +650,7 @@ def test_proposicao_com_os_campos_da_fonte(client, nominal):
             "ano": 2003,
             "ementa": EMENTA_REAL,
             "origem": "proposicoes",
+            "total_tramitacoes": 0,
         }
     ]
 
@@ -738,8 +749,9 @@ def test_todas_as_213_proposicoes_saem_com_custo_constante_de_consultas(
     corpo = _detalhe(client, NOMINAL)  # controle
     assert len(corpo["proposicoes"]) == 213
 
-    # votação, votos, deputados dos pares e as 213 proposições numa consulta só (sem N+1)
-    with django_assert_num_queries(4):
+    # votação, votos, deputados dos pares, as 213 proposições numa consulta só e a contagem das
+    # tramitações delas em outra (ADR 0035; sem N+1)
+    with django_assert_num_queries(5):
         client.get(f"{LISTA}{NOMINAL}/")
 
 
@@ -749,6 +761,91 @@ def test_votacao_inexistente_nao_consulta_proposicoes(client, nominal, django_as
 
     with django_assert_num_queries(1):  # só a busca da votação
         assert client.get(f"{LISTA}999-1/").status_code == 404
+
+
+# --- Tramitações por proposição (ADR 0035; emenda 6 do ADR 0032) ---------------------------------
+
+
+def _tramitar(proposicao, quantidade, id_texto=None):
+    """`quantidade` tramitações de 2026 para a proposição (a ligação é pelo id em texto)."""
+    run = _criar_run(
+        slug="proposicoes-tramitacoes-2026",
+        nome="Tramitações das proposições da Câmara (2026)",
+        url="https://example.org/proposicoesTramitacoes-2026.csv",
+    )
+    for sequencia in range(1, quantidade + 1):
+        CamaraPropositionStep.objects.create(
+            camara_proposition_id=id_texto or str(proposicao.camara_id),
+            sequence=sequencia,
+            occurred_at=COLETADO_EM,
+            organ_code="MESA",
+            description="Apresentação de Requerimento",
+            ingestion_run=run,
+        )
+
+
+def _totais_de_tramitacao(corpo):
+    return {item["id_camara"]: item["total_tramitacoes"] for item in corpo["proposicoes"]}
+
+
+def test_total_tramitacoes_conta_as_de_cada_proposicao(client, nominal):
+    run_proposicoes = _criar_run_das_proposicoes()
+    com_tres = _proposicao(run_proposicoes, 14666)
+    com_uma = _proposicao(run_proposicoes, 2)
+    sem = _proposicao(run_proposicoes, 3)
+    for proposicao in (com_tres, com_uma, sem):
+        _ligar(NOMINAL, proposicao)
+    _tramitar(com_tres, 3)
+    _tramitar(com_uma, 1)
+
+    assert _totais_de_tramitacao(_detalhe(client, NOMINAL)) == {14666: 3, 2: 1, 3: 0}
+
+
+def test_total_tramitacoes_nao_confunde_ids_que_so_se_parecem_no_texto(client, nominal):
+    """O id da tramitação é texto: `146660` e `1466` não são `14666` (nem por prefixo)."""
+    run_proposicoes = _criar_run_das_proposicoes()
+    alvo = _proposicao(run_proposicoes, 14666)
+    _ligar(NOMINAL, alvo)
+    _tramitar(alvo, 2)
+    _tramitar(alvo, 5, id_texto="146660")
+    _tramitar(alvo, 4, id_texto="1466")
+
+    assert _totais_de_tramitacao(_detalhe(client, NOMINAL)) == {14666: 2}
+
+
+def test_tramitacao_de_proposicao_de_fora_da_votacao_nao_conta(client, nominal):
+    run_proposicoes = _criar_run_das_proposicoes()
+    da_votacao = _proposicao(run_proposicoes, 1)
+    de_fora = _proposicao(run_proposicoes, 2)
+    _ligar(NOMINAL, da_votacao)
+    _tramitar(de_fora, 9)
+
+    assert _totais_de_tramitacao(_detalhe(client, NOMINAL)) == {1: 0}
+
+
+def test_a_contagem_das_tramitacoes_custa_uma_consulta_so(
+    client, nominal, django_assert_num_queries
+):
+    run_proposicoes = _criar_run_das_proposicoes()
+    for camara_id in range(1, 6):
+        proposicao = _proposicao(run_proposicoes, camara_id)
+        _ligar(NOMINAL, proposicao)
+        _tramitar(proposicao, camara_id)
+    _detalhe(client, NOMINAL)  # controle
+
+    # votação, votos, deputados, proposições e a contagem agrupada (não uma por proposição)
+    with django_assert_num_queries(5):
+        client.get(f"{LISTA}{NOMINAL}/")
+
+
+def test_votacao_sem_proposicao_nao_faz_a_consulta_da_contagem(
+    client, nominal, django_assert_num_queries
+):
+    assert _detalhe(client, NOMINAL)["proposicoes"] == []  # controle
+
+    # votação, votos, deputados e as proposições (vazias): sem a contagem
+    with django_assert_num_queries(4):
+        client.get(f"{LISTA}{NOMINAL}/")
 
 
 # --- Junção com o perfil do deputado (`tem_perfil` e `nome`) -------------------------------------

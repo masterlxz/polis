@@ -79,8 +79,9 @@ function atribuicaoDasProposicoes(extra = {}) {
   };
 }
 
-// Uma proposição do detalhe (ADR 0032, emenda 5). `id_camara` é um número que não aparece em
-// nenhuma outra parte da fixture: a página não o mostra (não há rota para a proposição).
+// Uma proposição do detalhe (ADR 0032, emendas 5 e 6). `id_camara` é um número que não aparece em
+// nenhuma outra parte da fixture: a página só o usa no link da tramitação, e só quando
+// `total_tramitacoes` é maior que zero (ADR 0035). O padrão é zero: sem link.
 function proposicao(extra = {}) {
   return {
     id_camara: 4455667,
@@ -90,6 +91,7 @@ function proposicao(extra = {}) {
     ano: 2026,
     ementa: "Ementa A",
     origem: "proposicoes",
+    total_tramitacoes: 0,
     ...extra,
   };
 }
@@ -885,6 +887,16 @@ const proposicoesFora = {
     delete item.origem;
     return comProposicoes([item]);
   },
+  "total_tramitacoes ausente (ADR 0035)": () => {
+    const item = proposicao();
+    delete item.total_tramitacoes;
+    return comProposicoes([item]);
+  },
+  "total_tramitacoes em texto": () => comProposicoes([proposicao({ total_tramitacoes: "3" })]),
+  "total_tramitacoes negativo": () => comProposicoes([proposicao({ total_tramitacoes: -1 })]),
+  "total_tramitacoes fracionário": () => comProposicoes([proposicao({ total_tramitacoes: 1.5 })]),
+  "total_tramitacoes nulo (zero é zero, não 'sem valor')": () =>
+    comProposicoes([proposicao({ total_tramitacoes: null })]),
   "atribuicao_das_proposicoes ausente": () => {
     const corpo = comProposicoes([proposicao()]);
     delete corpo.atribuicao_das_proposicoes;
@@ -910,6 +922,56 @@ for (const [nome, montar] of Object.entries(proposicoesFora)) {
     assert.ok(!html.includes("PL 9001/2026"));
   });
 }
+
+// --- Detalhe: link para a tramitação da proposição (ADR 0035) -----------------------------------
+
+// Os links `<a href="/camara/proposicoes/<id>/">` dentro da lista de proposições, na ordem.
+function linksDeTramitacao(html) {
+  const lista = html.match(/<ul class="proposicoes">(.*?)<\/ul>/s)?.[1] ?? "";
+  return Array.from(
+    lista.matchAll(/<a href="(\/camara\/proposicoes\/[^"]*)"[^>]*>(.*?)<\/a>/gs),
+    ([, href, texto]) => [href, texto],
+  );
+}
+
+test("detalhe: proposição com tramitação ganha o link com o total, para a rota dela", async () => {
+  const { html } = await detalhe(comProposicoes([proposicao({ total_tramitacoes: 3 })]));
+
+  assert.deepEqual(linksDeTramitacao(html), [
+    ["/camara/proposicoes/4455667/", "Ver tramitação (3)"],
+  ]);
+});
+
+test("detalhe: sem tramitação em 2026 não há link nem o id da proposição na página", async () => {
+  const { status, html } = await detalhe(comProposicoes([proposicao({ total_tramitacoes: 0 })]));
+
+  assert.equal(status, 200, "controle: a página existe");
+  assert.equal((proposicoesNaPagina(html) ?? []).length, 1, "controle: a proposição aparece");
+  assert.deepEqual(linksDeTramitacao(html), []);
+  assert.ok(!html.includes("4455667"));
+});
+
+test("detalhe: só as proposições com tramitação ganham link, cada uma na sua linha", async () => {
+  const { html } = await detalhe(
+    comProposicoes([
+      proposicao({ id_camara: 111, titulo: "PL 1/2026", total_tramitacoes: 0 }),
+      proposicao({ id_camara: 222, titulo: "PL 2/2026", total_tramitacoes: 12 }),
+      proposicao({ id_camara: 333, titulo: "PL 3/2026", total_tramitacoes: 1 }),
+    ]),
+  );
+
+  assert.deepEqual(linksDeTramitacao(html), [
+    ["/camara/proposicoes/222/", "Ver tramitação (12)"],
+    ["/camara/proposicoes/333/", "Ver tramitação (1)"],
+  ]);
+  const itens = proposicoesNaPagina(html);
+  assert.deepEqual(
+    itens.map((item) => item.titulo),
+    ["PL 1/2026", "PL 2/2026", "PL 3/2026"],
+    "o link não muda o título nem a ordem",
+  );
+  assert.ok(!html.includes("/camara/proposicoes/111/"));
+});
 
 // --- Detalhe: totais da fonte e votação sem voto nominal -----------------------------------------
 

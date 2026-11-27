@@ -2,6 +2,17 @@
 
 Mais recente no topo.
 
+### 2026-11-27 — Sessão 117 (medição de latência das páginas das tramitações da Câmara no CI; sessão individual)
+
+- **Pedido**: seguir "em código". A recomendação foi medir a latência dos piores casos (ADR 0010, P-14), que só tinha tamanho de resposta medido. Plano aprovado em plan mode (rotina nova de CI).
+- **Feito (PR #355)**: `.github/workflows/carga-camara.yml` (matriz de 10 e 50 req/s; Postgres 18 como `services`, `gunicorn` sem `--workers` como o `Dockerfile.prod`, Next.js de produção, DEBUG desligado), `scripts/carga_camara/semear_volume.py` (volume de 2026: 26.745 proposições, 9.153 votações, 46.781 ligações, 115.826 tramitações, com `ANALYZE`), `medir.py` (taxa fixa, 6 classes por alvo, front e API, `resumo` importado do `carga_busca`) e `plano.py` (captura o SQL real das views e roda `EXPLAIN (ANALYZE, BUFFERS)`). Sem dependência nova.
+- **Primeira rodada verde, e as mutações acharam um defeito meu**: H1 (caminho não semeado) e H2 (front apontando para a API errada) **sobreviveram**: a checagem prévia do `medir.py` falhava ("esperava 200, veio 404/500", visto no log) mas o job ficava verde, porque o passo usava `| tee` e o shell padrão do GitHub é `bash -e` **sem `pipefail`**: o `tee` engolia o código de saída. O mesmo valia para o `plano.py`. Conserto: `shell: bash` nos dois passos. Repetidas como H1b e H2b (PRs #358 e #359, fechados): as duas **caíram no passo previsto**, "Checagem prévia (cada caminho com o status e o trecho esperados) e carga, 3 repetições", nos dois jobs da matriz. Só o log mostrou, a previsão da tabela ("o passo falha") estava certa mas o job não falhava.
+- **Resultados** (12 medições em cada uma das 2 execuções do job, 3 repetições × front e API × 10 e 50 req/s; 0 erros e atraso do gerador 0 em todas): 
+  - **10 req/s**: front p95 total 29 a 33 ms, API 22 a 25 ms; pior classe (votação com 213 proposições) 32 a 40 ms no front.
+  - **50 req/s**, 1ª execução: front p50 71 a 247 ms, p95 total 210 a 665 ms; a 1ª repetição foi 3 vezes pior que as outras (sem causa conhecida). **2ª execução**: front p50 19 a 20 ms, p95 38 a 43 ms, p99 52 a 56 ms; API p95 26 a 27 ms. **Mesmo código, mesma taxa, diferença de até 15 vezes entre execuções**: a variação do runner é maior que qualquer sinal; eu tinha lido a 1ª execução como fila do worker único e **a 2ª desmentiu**, então não afirmo isso. Em todas, p95 ≤ 800 ms e 50 req/s sustentados sem erro, mas só neste runner e com este mix.
+  - **Consultas** (plano com o volume): todas com índice (`camara_proposition_step_unique` para as tramitações e para a contagem por `ANY`, `camara_voting_proposition_unique` para as ligações); a votação com 213 proposições leva 2,6 ms no total do banco e faz **varredura sequencial** na tabela de proposições (26.745 linhas, 1 ms, o planner preferiu hash join a 213 acessos por índice); a pior consulta de tramitações, 0,12 ms.
+- **Não verificado**: votação com voto nominal (a consulta dos votos veio vazia: a semente não tem votos; 1,9% das votações têm); o VPS do ADR 0011 (o runner é compartilhado com o gerador, o Postgres, o Django e o Next); acima de 50 req/s; a busca e as outras páginas; carga sustentada por mais de 60 s; a distribuição real dos ids (o volume é sintético, 2,4% menos tramitações que o real); o job não é exigido no ruleset.
+
 ### 2026-11-27 — Sessão 116 (piores casos das telas das tramitações no CI; sessão individual)
 
 - **Pedido**: continuar "em código", sem rodar nada no PC do dono. Plano aprovado em plan mode (mexe no CI).

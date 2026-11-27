@@ -214,8 +214,10 @@ test("proposição: ano e ementa nulos não viram 'null' nem texto vazio", async
   const { status, html } = await pagina(corpo);
 
   assert.equal(status, 200);
-  assert.ok(!html.includes("null"));
-  assert.ok(!/<p class="ementa">\s*<\/p>/.test(html));
+  // Só na marcação: o payload do React (`<script>`) tem `null` de sobra.
+  const marcacao = html.replace(/<script[\s\S]*?<\/script>/g, "");
+  assert.ok(!marcacao.includes("null"));
+  assert.ok(!/<p class="ementa">\s*<\/p>/.test(marcacao));
 });
 
 test("proposição: título, ementa, órgão e descrição com HTML aparecem escapados", async () => {

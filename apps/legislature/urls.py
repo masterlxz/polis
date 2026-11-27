@@ -48,4 +48,11 @@ urlpatterns = [
         views.camara_voting_detail,
         name="camara-voting-detail",
     ),
+    # O id da proposição é o da Câmara: forma canônica, sem zero à esquerda e só dígitos ASCII, até
+    # 10 dígitos; acima de int32 a view responde 404 sem consultar o banco (ADR 0035).
+    re_path(
+        r"^camara/proposicoes/(?P<proposition_id>[1-9][0-9]{0,9})/$",
+        views.camara_proposition_detail,
+        name="camara-proposition-detail",
+    ),
 ]

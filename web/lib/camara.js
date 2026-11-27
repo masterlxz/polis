@@ -52,6 +52,11 @@ export function resumoDaEmenta(ementa) {
   return `${caracteres.slice(0, LIMITE_DA_EMENTA).join("").trimEnd()}…`;
 }
 
+// Tramitações (ADR 0035). Só 2026 (ADR 0034), e a hora é um palpite: a fonte não declara o fuso.
+export const NOTA_DAS_TRAMITACOES =
+  "Tramitações de 2026. A hora é a da fonte, gravada como horário de Brasília (não verificado).";
+export const SEM_TRAMITACAO = "Sem tramitação de 2026 para esta proposição.";
+
 // "24/11/2026 · PLEN": a Câmara não tem uma identificação curta como a do Senado.
 export function tituloDaVotacao(votacao) {
   return `${dataBr(votacao.data) ?? votacao.data} · ${votacao.orgao}`;

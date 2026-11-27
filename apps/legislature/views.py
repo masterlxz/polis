@@ -17,12 +17,15 @@ não a do fim do mandato.
 import re
 import unicodedata
 from collections import Counter
+from zoneinfo import ZoneInfo
 
-from django.db.models import Exists, OuterRef
+from django.db.models import Count, Exists, OuterRef
 from django.http import JsonResponse
 from django.views.decorators.http import require_safe
 
 from .models import (
+    CamaraProposition,
+    CamaraPropositionStep,
     CamaraVote,
     CamaraVoting,
     CamaraVotingProposition,
@@ -37,6 +40,10 @@ VOTINGS_PER_PAGE = 50
 # `votacoesObjetos` (a ordem dos arquivos no catálogo; o significado de cada um não foi verificado,
 # ADR 0033). Feita em Python: o banco ordenaria o texto de `origin` pela collation.
 _PROPOSITION_ORIGIN_ORDER = ("proposicoes", "objetos")
+# A fonte das tramitações não declara o fuso (ADR 0034, decisão 7): Brasília é o palpite, e a API
+# diz a hora com o deslocamento (`-03:00`). Maior id que o banco guarda (`PositiveIntegerField`).
+_BRASILIA = ZoneInfo("America/Sao_Paulo")
+_INT32_MAX = 2**31 - 1
 # Só a forma canônica, de 1 a 9999: sem zero à esquerda (nem `0`) e só dígitos ASCII (`\d`
 # aceitaria dígitos de outras escritas). Mesma regra das rotas (`[1-9][0-9]{0,N}`).
 _PAGE_PATTERN = re.compile(r"[1-9][0-9]{0,3}")
@@ -380,9 +387,8 @@ def _camara_proposition_order(link):
     return (rank, link.proposition.camara_id)
 
 
-def _camara_proposition_item(link):
-    """Uma proposição da votação, campo a campo (ADR 0033): sem `uri` nem id interno."""
-    proposition = link.proposition
+def _camara_proposition_fields(proposition):
+    """Os campos da proposição que a API mostra, um a um (ADR 0033): sem `uri` nem id interno."""
     return {
         "id_camara": proposition.camara_id,
         "titulo": proposition.title,
@@ -390,8 +396,35 @@ def _camara_proposition_item(link):
         "numero": proposition.number,
         "ano": proposition.year,
         "ementa": _or_none(proposition.ementa),
-        "origem": link.origin,
     }
+
+
+def _camara_proposition_item(link, step_totals):
+    """Uma proposição da votação (ADR 0033), com quantas tramitações de 2026 ela tem (ADR 0035)."""
+    proposition = link.proposition
+    return {
+        **_camara_proposition_fields(proposition),
+        "origem": link.origin,
+        "total_tramitacoes": step_totals.get(str(proposition.camara_id), 0),
+    }
+
+
+def _step_totals(proposition_ids):
+    """Tramitações por id de proposição, numa consulta só (ADR 0035, decisão 8).
+
+    A tramitação guarda o id em TEXTO e sem chave para a proposição (ADR 0034): a junção é aqui, e
+    `IN` compara o texto inteiro, nunca um prefixo. Sem proposição na votação, nenhuma consulta.
+    """
+    ids = [str(proposition_id) for proposition_id in proposition_ids]
+    if not ids:
+        return {}
+    rows = (
+        CamaraPropositionStep.objects.filter(camara_proposition_id__in=ids)
+        .values("camara_proposition_id")
+        .annotate(total=Count("id"))
+        .order_by()
+    )
+    return {row["camara_proposition_id"]: row["total"] for row in rows}
 
 
 @require_safe
@@ -443,6 +476,7 @@ def camara_voting_detail(request, voting_id):
     newest_propositions_run = max(
         (link.ingestion_run for link in links), key=_started, default=None
     )
+    step_totals = _step_totals(link.proposition.camara_id for link in links)
     return JsonResponse(
         {
             "votacao": _camara_voting_fields(voting),
@@ -461,7 +495,7 @@ def camara_voting_detail(request, voting_id):
                 {"voto": vote, "quantidade": quantity}
                 for vote, quantity in sorted(counts.items(), key=_vote_count_order)
             ],
-            "proposicoes": [_camara_proposition_item(link) for link in links],
+            "proposicoes": [_camara_proposition_item(link, step_totals) for link in links],
             "atribuicao": _attribution(voting.ingestion_run),
             "atribuicao_dos_votos": _attribution(newest_votes_run) if newest_votes_run else None,
             "atribuicao_das_proposicoes": (
@@ -528,6 +562,65 @@ def deputy_votes(request, legislature, camara_id):
 
 def _started(run):
     return run.started_at
+
+
+def _camara_step_order(step):
+    """Hora, depois `sequencia` (nula por último), órgão e descrição: tudo em Python, para não
+    depender da collation do banco (ADR 0035, decisão 5)."""
+    return (
+        step.occurred_at,
+        step.sequence is None,
+        step.sequence or 0,
+        step.organ_code,
+        step.description,
+    )
+
+
+def _camara_step_item(step):
+    return {
+        "sequencia": step.sequence,
+        "data_hora": step.occurred_at.astimezone(_BRASILIA).isoformat(),
+        "orgao": step.organ_code,
+        "descricao": step.description,
+    }
+
+
+@require_safe
+def camara_proposition_detail(request, proposition_id):
+    """Uma proposição da Câmara com as tramitações de 2026 (ADR 0035).
+
+    404 se o polis não conhece a proposição, mesmo havendo tramitações: a tramitação não tem chave
+    para ela (ADR 0034) e a rota é quem decide o que existe. Proposição conhecida sem tramitação é
+    200 com `tramitacoes: []` e `atribuicao_das_tramitacoes: null`. `data_hora` sai com `-03:00`.
+    São todas as tramitações (até 98 medidas), sem paginação; duas consultas no 200.
+    """
+    camara_id = int(proposition_id)
+    if camara_id > _INT32_MAX:
+        return JsonResponse({"erro": "não encontrado"}, status=404)
+    proposition = (
+        CamaraProposition.objects.select_related("ingestion_run__dataset__source")
+        .filter(camara_id=camara_id)
+        .first()
+    )
+    if proposition is None:
+        return JsonResponse({"erro": "não encontrado"}, status=404)
+
+    steps = sorted(
+        CamaraPropositionStep.objects.filter(camara_proposition_id=str(camara_id)).select_related(
+            "ingestion_run__dataset__source"
+        ),
+        key=_camara_step_order,
+    )
+    newest_run = max((step.ingestion_run for step in steps), key=_started, default=None)
+    return JsonResponse(
+        {
+            "proposicao": _camara_proposition_fields(proposition),
+            "tramitacoes": [_camara_step_item(step) for step in steps],
+            "atribuicao_da_proposicao": _attribution(proposition.ingestion_run),
+            "atribuicao_das_tramitacoes": _attribution(newest_run) if newest_run else None,
+        },
+        json_dumps_params={"ensure_ascii": False},
+    )
 
 
 def _deputy_vote_item(vote):

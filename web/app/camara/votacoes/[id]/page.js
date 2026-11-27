@@ -118,7 +118,7 @@ function Ementa({ texto }) {
       <p className="ementa">{resumo}</p>
       <details>
         <summary>Ler a ementa inteira</summary>
-        <p className="ementa">{texto}</p>
+        <p className="ementa">{resumo}</p>
       </details>
     </>
   );

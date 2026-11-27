@@ -147,7 +147,16 @@ def test_so_as_chaves_das_listas_explicitas_e_nada_interno(client, com_tramitaca
     assert [set(item) for item in corpo["tramitacoes"]] == [CHAVES_TRAMITACAO]
     assert set(corpo["atribuicao_da_proposicao"]) == CHAVES_ATRIBUICAO
     assert set(corpo["atribuicao_das_tramitacoes"]) == CHAVES_ATRIBUICAO
-    proibidas = {"pk", "id", "camara_proposition_id", "ingestion_run", "origem", "despacho"}
+    # `id` fica de fora da lista: `licenca` tem `{"id": null, "url": null}` por contrato (ADR 0008).
+    proibidas = {
+        "pk",
+        "camara_proposition_id",
+        "ingestion_run",
+        "origem",
+        "despacho",
+        "idTramitacao",
+        "id_tramitacao",
+    }
     assert not set(_todas_as_chaves(corpo)) & proibidas
 
 

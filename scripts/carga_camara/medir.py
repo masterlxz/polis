@@ -30,7 +30,7 @@ from carga import resumo  # noqa: E402
 # (classe, caminho, status esperado, trecho esperado no corpo ou None)
 CLASSES_DO_FRONT = (
     ("proposicao_pequena", "/camara/proposicoes/14666/", 200, "PL 11/2003"),
-    ("proposicao_98", "/camara/proposicoes/14669/", 200, "Tramitação 98 do pior caso"),
+    ("proposicao_98", "/camara/proposicoes/14670/", 200, "Tramitação 98 do pior caso"),
     ("ementa_longa", "/camara/proposicoes/14668/", 200, "Ler a ementa inteira"),
     ("votacao_pequena", "/camara/votacoes/9000001-1/", 200, "Ver tramitação (4)"),
     ("votacao_213", "/camara/votacoes/9000002-1/", 200, "Ver tramitação (98)"),

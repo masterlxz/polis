@@ -5,6 +5,7 @@ import { buscarVotacaoDaCamara } from "../../../../lib/api.js";
 import {
   ROTULO_DA_APROVACAO,
   SEM_LISTA_NOMINAL,
+  resumoDaEmenta,
   SEM_POSICAO,
   tituloDaVotacao,
   TOTAIS_ZERADOS,
@@ -106,6 +107,23 @@ function Votantes({ votos }) {
   );
 }
 
+// Ementa curta sai inteira. Longa: o resumo fica visível e o texto inteiro vai num `<details>`
+// nativo (abre sem JavaScript, acessível por teclado). O texto aparece nos dois por escolha: o
+// resumo fora do botão mantém a lista legível.
+function Ementa({ texto }) {
+  const resumo = resumoDaEmenta(texto);
+  if (resumo === null) return <p className="ementa">{texto}</p>;
+  return (
+    <>
+      <p className="ementa">{resumo}</p>
+      <details>
+        <summary>Ler a ementa inteira</summary>
+        <p className="ementa">{texto}</p>
+      </details>
+    </>
+  );
+}
+
 // Todas as proposições, na ordem que a API manda (ADR 0032, emenda 5). Título e ementa são texto
 // livre da fonte: o React os escapa. Nem `origem` nem o id da Câmara aparecem (sem significado
 // verificado e sem rota para a proposição).
@@ -118,7 +136,7 @@ function Proposicoes({ proposicoes }) {
           // A key é o índice (lista fixa, sem reordenação): `origem` e o id vazariam no payload do React.
           <li key={indice}>
             <strong>{item.titulo}</strong>
-            {item.ementa && <p className="ementa">{item.ementa}</p>}
+            {item.ementa && <Ementa texto={item.ementa} />}
           </li>
         ))}
       </ul>
@@ -161,8 +179,8 @@ export default async function VotacaoDaCamara({ params }) {
       )}
       {totais && <Totais linhas={totais} />}
       {temVotos && <Contagem contagem={contagem} />}
-      {temVotos && <Votantes votos={votos} />}
       {proposicoes.length > 0 && <Proposicoes proposicoes={proposicoes} />}
+      {temVotos && <Votantes votos={votos} />}
       <Atribuicao atribuicao={atribuicao} />
       {atribuicaoDosVotos && <Atribuicao atribuicao={atribuicaoDosVotos} />}
       {atribuicaoDasProposicoes && <Atribuicao atribuicao={atribuicaoDasProposicoes} />}

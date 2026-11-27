@@ -39,6 +39,19 @@ export const SEM_LISTA_NOMINAL =
 // Frase de fato, sem causa: o significado do zero na fonte não foi verificado (ADR 0031 e 0032).
 export const TOTAIS_ZERADOS = "Os totais da fonte estão zerados e não são mostrados.";
 
+// Ementa com mais de 300 caracteres sai recolhida (decisão do dono, 2026-11-27): a medição do ADR 0033
+// chega a 5.259 caracteres, e uma votação com dezenas de proposições viraria um muro de texto.
+export const LIMITE_DA_EMENTA = 300;
+
+// O resumo de uma ementa longa (os 300 primeiros caracteres, sem espaço no fim, e "…"), ou `null` se
+// ela cabe inteira. Conta por ponto de código: `slice` contaria unidades UTF-16 e poderia partir um
+// caractere fora do BMP ao meio.
+export function resumoDaEmenta(ementa) {
+  const caracteres = [...ementa];
+  if (caracteres.length <= LIMITE_DA_EMENTA) return null;
+  return `${caracteres.slice(0, LIMITE_DA_EMENTA).join("").trimEnd()}…`;
+}
+
 // "24/11/2026 · PLEN": a Câmara não tem uma identificação curta como a do Senado.
 export function tituloDaVotacao(votacao) {
   return `${dataBr(votacao.data) ?? votacao.data} · ${votacao.orgao}`;

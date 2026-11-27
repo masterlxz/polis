@@ -502,8 +502,7 @@ function proposicaoDaCamaraValida(item) {
   return (
     camposDaProposicaoValidos(item) &&
     typeof item.origem === "string" &&
-    Number.isInteger(item.total_tramitacoes) &&
-    item.total_tramitacoes >= 0
+    Number.isInteger(item.total_tramitacoes)
   );
 }
 

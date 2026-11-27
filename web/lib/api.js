@@ -553,7 +553,7 @@ export function idDeProposicaoDaCamaraValido(id) {
   return typeof id === "string" && PADRAO_DA_PROPOSICAO_DA_CAMARA.test(id);
 }
 
-const PADRAO_DA_DATA_HORA = /^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}[+-][0-9]{2}:[0-9]{2}$/;
+const PADRAO_DA_DATA_HORA = /^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}([+-][0-9]{2}:[0-9]{2})?$/;
 
 // `data_hora` vem com o deslocamento (`-03:00`); sem ele a hora seria ambígua. `sequencia` nula é
 // "a fonte deixou vazia", ausente não.

@@ -571,8 +571,6 @@ def _camara_step_order(step):
         step.occurred_at,
         step.sequence is None,
         step.sequence or 0,
-        step.organ_code,
-        step.description,
     )
 
 

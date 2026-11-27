@@ -405,7 +405,7 @@ def _camara_proposition_item(link, step_totals):
     return {
         **_camara_proposition_fields(proposition),
         "origem": link.origin,
-        "total_tramitacoes": step_totals.get(str(proposition.camara_id), 0),
+        "total_tramitacoes": step_totals.get(proposition.camara_id, 0),
     }
 
 

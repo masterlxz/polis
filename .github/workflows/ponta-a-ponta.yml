@@ -55,13 +55,33 @@ jobs:
         run: |
           google-chrome --version
           mkdir -p "$RUNNER_TEMP/telas"
-          for caminho in camara/proposicoes/14666 camara/proposicoes/14667 camara/votacoes/9000001-1; do
+          # caminho:altura da janela em pixels. A foto pega só a altura da janela: a da votação com
+          # 213 proposições é uma amostra do topo (a contagem inteira é provada pelo teste de texto).
+          for item in camara/proposicoes/14666:2000 camara/proposicoes/14667:2000 \
+                      camara/votacoes/9000001-1:2000 camara/proposicoes/14668:2000 \
+                      camara/proposicoes/14669:5000 camara/votacoes/9000002-1:8000; do
+            caminho="${item%%:*}"; altura="${item##*:}"
             arquivo="$RUNNER_TEMP/telas/$(echo "$caminho" | tr / -).png"
             curl -fsS -o /dev/null "$FRONT_BASE/$caminho/"
             google-chrome --headless=new --no-sandbox --disable-gpu --hide-scrollbars \
-              --window-size=1280,2000 --screenshot="$arquivo" "$FRONT_BASE/$caminho/"
+              --window-size=1280,"$altura" --screenshot="$arquivo" "$FRONT_BASE/$caminho/"
             test -s "$arquivo"
             ls -l "$arquivo"
+          done
+
+      # Só mede (sem asserção): o tamanho em bytes do que o front e a API entregam nos piores casos.
+      - name: Tamanho das respostas nos piores casos
+        env:
+          API_BASE: http://127.0.0.1:8000
+          FRONT_BASE: http://127.0.0.1:3000
+        run: |
+          for url in "$API_BASE/internal/v1/camara/proposicoes/14669/" \
+                     "$API_BASE/internal/v1/camara/proposicoes/14668/" \
+                     "$API_BASE/internal/v1/camara/votacoes/9000002-1/" \
+                     "$FRONT_BASE/camara/proposicoes/14669/" \
+                     "$FRONT_BASE/camara/proposicoes/14668/" \
+                     "$FRONT_BASE/camara/votacoes/9000002-1/"; do
+            curl -fsS -o /dev/null -w "%{size_download} bytes  $url\n" "$url"
           done
 
       - name: Guarda as fotos como artefato

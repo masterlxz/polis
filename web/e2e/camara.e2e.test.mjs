@@ -105,3 +105,69 @@ test("página da votação: link 'Ver tramitação (4)' só para a proposição 
   assert.equal(lido.split("Ver tramitação").length - 1, 1, "só um link");
   assert.ok(!corpo.includes('href="/camara/proposicoes/14667/"'), "sem link para a 14667");
 });
+
+// --- Piores casos medidos na fonte (ADR 0033 e 0034), semeados por `semear_camara.py` ---
+// A mesma ementa da semente (5.259 caracteres, o máximo medido). O resumo esperado é calculado aqui
+// (300 caracteres, sem espaço no fim, e "…"), não pela função do app: se o teste usasse a do app,
+// trocar o limite mudaria a resposta e o teste juntos, e nada cairia.
+const EMENTA_LONGA =
+  "Dispõe sobre a organização administrativa do sistema nacional, e dá outras providências. "
+    .repeat(60)
+    .slice(0, 5259)
+    .trim();
+const RESUMO_ESPERADO = `${EMENTA_LONGA.slice(0, 300).trimEnd()}…`;
+
+function descricaoDoPiorCaso(posicao) {
+  return `Tramitação ${String(posicao).padStart(2, "0")} do pior caso`;
+}
+
+test("pior caso: a API devolve as 98 tramitações da 14669 em ordem crescente", async () => {
+  const { status, corpo } = await pedir(API_BASE, "/internal/v1/camara/proposicoes/14669/");
+  assert.equal(status, 200);
+  const { tramitacoes } = JSON.parse(corpo);
+  assert.equal(tramitacoes.length, 98);
+  assert.deepEqual(
+    tramitacoes.map((t) => [t.sequencia, t.descricao]),
+    Array.from({ length: 98 }, (_, i) => [i + 1, descricaoDoPiorCaso(i + 1)]),
+  );
+});
+
+test("pior caso: a página da 14669 mostra as 98 linhas, na ordem", async () => {
+  const { status, corpo } = await pedir(FRONT_BASE, "/camara/proposicoes/14669/");
+  assert.equal(status, 200);
+  const tabela = corpo.match(/<tbody>(.*?)<\/tbody>/s)?.[1] ?? "";
+  assert.equal((tabela.match(/<tr[ >]/g) ?? []).length, 98, "linhas da tabela");
+  assert.deepEqual(
+    [...tabela.matchAll(/Tramitação (\d\d) do pior caso/g)].map((m) => Number(m[1])),
+    Array.from({ length: 98 }, (_, i) => i + 1),
+    "ordem das descrições",
+  );
+});
+
+test("pior caso: a ementa de 5.259 caracteres sai recolhida e a nota vem depois do <details>", async () => {
+  const { status, corpo } = await pedir(FRONT_BASE, "/camara/proposicoes/14668/");
+  assert.equal(status, 200);
+  const resumo = corpo.indexOf(RESUMO_ESPERADO);
+  const detalhes = corpo.indexOf("<details");
+  const fimDosDetalhes = corpo.indexOf("</details>");
+  const nota = corpo.indexOf(NOTA_DAS_TRAMITACOES);
+  assert.ok(resumo >= 0, "resumo de 300 caracteres com reticências");
+  assert.ok(corpo.includes("Ler a ementa inteira"), "o botão da ementa inteira");
+  assert.ok(corpo.includes(EMENTA_LONGA), "o texto inteiro está na página (dentro do <details>)");
+  assert.ok(resumo < detalhes, "o resumo vem antes do <details>");
+  assert.ok(detalhes >= 0 && fimDosDetalhes > detalhes, "há um <details> fechado");
+  assert.ok(nota > fimDosDetalhes, "a nota vem depois do <details>");
+});
+
+test("pior caso: a votação com 213 proposições lista todas e só linka as que têm tramitação", async () => {
+  const { status, corpo } = await pedir(FRONT_BASE, "/camara/votacoes/9000002-1/");
+  assert.equal(status, 200);
+  assert.equal((corpo.match(/<strong>PL /g) ?? []).length, 213, "proposições na lista");
+  const lido = texto(corpo);
+  assert.equal(lido.split("Ver tramitação").length - 1, 2, "só dois links");
+  assert.ok(lido.includes("Ver tramitação (98)"), "link da 14669");
+  assert.ok(lido.includes("Ver tramitação (1)"), "link da 14668");
+  assert.ok(corpo.includes('href="/camara/proposicoes/14669/"'), "href da 14669");
+  assert.ok(corpo.includes('href="/camara/proposicoes/14668/"'), "href da 14668");
+  assert.ok(!corpo.includes('href="/camara/proposicoes/20001/"'), "sem link para o enchimento");
+});

@@ -2,6 +2,17 @@
 
 Mais recente no topo.
 
+### 2026-11-27 — Sessão 116 (piores casos das telas das tramitações no CI; sessão individual)
+
+- **Pedido**: continuar "em código", sem rodar nada no PC do dono. Plano aprovado em plan mode (mexe no CI).
+- **Feito (PR #350)**: a semente do job `ponta-a-ponta` ganhou os três piores casos medidos na fonte: proposição 14668 com **ementa de 5.259 caracteres** (ADR 0033) e 1 tramitação; 14669 com **98 tramitações** (ADR 0034), gravadas de trás para frente; votação `9000002-1` com **213 proposições** (14668, 14669 e 211 de enchimento). 4 testes novos em `web/e2e/camara.e2e.test.mjs` (11 no total) e 3 fotos novas (altura por página: 2000, 5000 e 8000 px).
+- **Primeira rodada verde** (sem prova de falha antes; a prova são as mutações). Nenhum pior caso quebrou a página.
+- **Tamanhos medidos** (dados sintéticos no formato do pior caso): API da 14669 (98 tramitações) **12.891 bytes** (minha estimativa era 12 KB); API da 14668 (ementa longa) 6.463; **API da votação com 213 proposições 45.536**; páginas: 14669 42.371, 14668 24.312, **votação com 213 proposições 89.266**. Só medido, sem limite decidido.
+- **Mutações** (PRs #351 a #354, fechados; previsão → resultado pelo **nome** do teste, as quatro como previstas): G1 limite da ementa 300→3000 caiu só "a ementa de 5.259 caracteres sai recolhida…"; G2 página com `slice(0, 50)` caiu só "a página da 14669 mostra as 98 linhas, na ordem" (a API seguiu com 98); G3 API cortando em 50 caiu "a API devolve as 98 tramitações…" e "a página da 14669…"; G4 API da votação cortando em 50 caiu só "a votação com 213 proposições lista todas…".
+- **O que as fotos mostram** (baixadas e abertas): com 98 tramitações a página tem ~4,5 mil px e cabe na foto de 5000; a ementa longa sai com 300 caracteres e "…" (**corta no meio da palavra**: "admini…", é o que o ADR 0033 decidiu, anoto como observação) e o botão "Ler a ementa inteira"; o respiro de `details + .nota` do #349 aparece (antes não visto); a votação com 213 proposições passa de **12 mil px** de página rolável, sem paginação (decisão do ADR 0033: todas), e a foto de 8000 px mostra só até a PL 137 (amostra do topo; a contagem inteira é provada pelo teste de texto). Os links "Ver tramitação (1)" e "(98)" aparecem nas duas primeiras.
+- **Não coberto por teste**: o CSS (G5 do plano: `details + .nota` só é visto na foto, sem mutação possível).
+- **Não verificado**: o navegador do PC do dono, dados reais, celular, desempenho de renderização da lista de 213 num aparelho lento, e a resposta real da Câmara (os tamanhos são do formato semeado, não da fonte).
+
 ### 2026-11-27 — Sessão 115, parte 2 (respiro entre a ementa e a nota; sessão individual)
 
 - **Feito (PR #349)**: `web/app/globals.css`, regra `.ementa + .nota, details + .nota { margin-top: 0.75rem }`, para a nota "Tramitações de 2026…" não ficar colada na ementa (reparo visto nas fotos do #347).

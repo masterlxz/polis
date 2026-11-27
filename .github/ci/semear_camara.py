@@ -14,7 +14,7 @@ O que cada linha prepara para o teste `web/e2e/camara.e2e.test.mjs`:
 - votação 9000001-1 ligada às duas proposições, para o link "Ver tramitação (N)".
 """
 
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 
 from apps.legislature.models import (
     CamaraProposition,
@@ -135,4 +135,84 @@ for proposicao in (com_tramitacao, sem_tramitacao):
         ingestion_run=run_proposicao,
     )
 
-print("semente ok: 2 proposições, 5 tramitações, 1 votação")
+# --- Piores casos medidos na fonte (para ver a tela no limite, não só com 4 linhas) ---
+# Ementa de 5.259 caracteres (o máximo medido, ADR 0033), igual à de `web/e2e/camara.e2e.test.mjs`.
+EMENTA_LONGA = (
+    "Dispõe sobre a organização administrativa do sistema nacional, e dá outras providências. " * 60
+)[:5259].strip()
+ementa_longa = CamaraProposition.objects.create(
+    camara_id=14668,
+    title="PL 13/2003",
+    type_acronym="PL",
+    number=13,
+    year=2003,
+    ementa=EMENTA_LONGA,
+    ingestion_run=run_proposicao,
+)
+com_98 = CamaraProposition.objects.create(
+    camara_id=14669,
+    title="PL 14/2003",
+    type_acronym="PL",
+    number=14,
+    year=2003,
+    ementa="Proposição com o máximo de tramitações medido em 2026 (98).",
+    ingestion_run=run_proposicao,
+)
+# A de ementa longa tem uma tramitação, para a nota vir depois do `<details>`; a de 98 é gravada de
+# trás para frente, para a ordem de gravação não ser a de saída.
+CamaraPropositionStep.objects.create(
+    camara_proposition_id="14668",
+    sequence=1,
+    occurred_at=PRIMEIRO_INSTANTE,
+    organ_code="MESA",
+    description="Apresentação de Projeto de Lei",
+    ingestion_run=run_tramitacao,
+)
+CamaraPropositionStep.objects.bulk_create(
+    CamaraPropositionStep(
+        camara_proposition_id="14669",
+        sequence=i,
+        occurred_at=PRIMEIRO_INSTANTE + timedelta(hours=i - 1),
+        organ_code="PLEN",
+        description=f"Tramitação {i:02d} do pior caso",
+        ingestion_run=run_tramitacao,
+    )
+    for i in range(98, 0, -1)
+)
+# Votação com 213 proposições (o máximo medido, ADR 0033): as duas acima e 211 de enchimento, sem
+# tramitação, com ementa curta.
+enchimento = CamaraProposition.objects.bulk_create(
+    CamaraProposition(
+        camara_id=20000 + i,
+        title=f"PL {i}/2026",
+        type_acronym="PL",
+        number=i,
+        year=2026,
+        ementa=f"Ementa de enchimento número {i}.",
+        ingestion_run=run_proposicao,
+    )
+    for i in range(1, 212)
+)
+CamaraVoting.objects.create(
+    camara_voting_id="9000002-1",
+    voted_on=date(2026, 5, 9),
+    organ_acronym="PLEN",
+    approval="1",
+    total_yes=0,
+    total_no=0,
+    total_other=0,
+    description="Votação sintética do CI com 213 proposições.",
+    proposition_id=14669,
+    ingestion_run=run_votacao,
+)
+CamaraVotingProposition.objects.bulk_create(
+    CamaraVotingProposition(
+        camara_voting_id="9000002-1",
+        proposition=proposicao,
+        origin="proposicoes",
+        ingestion_run=run_proposicao,
+    )
+    for proposicao in [ementa_longa, com_98, *enchimento]
+)
+
+print("semente ok: 215 proposições, 104 tramitações, 2 votações")

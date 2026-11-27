@@ -97,8 +97,6 @@ def normalize_latest(dataset):
     run = latest_run(dataset)
     if run is None:
         return None
-    if CamaraPropositionStep.objects.filter(ingestion_run=run).exists():
-        return None
     return normalize(run)
 
 

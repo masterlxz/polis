@@ -44,7 +44,7 @@ services:
     depends_on:
       - web
     environment:
-      API_URL: http://web:8000
+      API_URL: http://web:9
     ports:
       - "127.0.0.1:3000:3000"
     healthcheck:

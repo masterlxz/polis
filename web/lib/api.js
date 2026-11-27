@@ -482,9 +482,9 @@ function contagemPorVotoValida(contagem) {
   );
 }
 
-// Uma proposição da votação (ADR 0032, emenda 5). `ano` e `ementa` vazios saem `null`, nunca `""`
-// nem chave ausente. `origem` é validada e não mostrada: o significado dela não foi verificado.
-function proposicaoDaCamaraValida(item) {
+// Os campos de uma proposição da Câmara (ADR 0032, emenda 5; ADR 0035). `ano` e `ementa` vazios
+// saem `null`, nunca `""` nem chave ausente.
+function camposDaProposicaoValidos(item) {
   return (
     Number.isInteger(item?.id_camara) &&
     typeof item.titulo === "string" &&
@@ -492,8 +492,18 @@ function proposicaoDaCamaraValida(item) {
     typeof item.tipo === "string" &&
     Number.isInteger(item.numero) &&
     (item.ano === null || Number.isInteger(item.ano)) &&
-    textoNaoVazioOuNulo(item.ementa) &&
-    typeof item.origem === "string"
+    textoNaoVazioOuNulo(item.ementa)
+  );
+}
+
+// Uma proposição da votação. `origem` é validada e não mostrada: o significado dela não foi
+// verificado. `total_tramitacoes` (emenda 6, ADR 0035) é um inteiro, e zero é zero, não "sem valor".
+function proposicaoDaCamaraValida(item) {
+  return (
+    camposDaProposicaoValidos(item) &&
+    typeof item.origem === "string" &&
+    Number.isInteger(item.total_tramitacoes) &&
+    item.total_tramitacoes >= 0
   );
 }
 
@@ -532,6 +542,51 @@ export const buscarVotacaoDaCamara = cache(async (id) => {
   if (corpo === null) return null;
   if (!detalheDeVotacaoDaCamaraValido(corpo)) {
     throw new ErroDaApi("a API devolveu uma votação da Câmara fora do formato esperado");
+  }
+  return corpo;
+});
+
+// O id da proposição da Câmara (ADR 0035): forma canônica, sem zero à esquerda e só dígitos ASCII.
+const PADRAO_DA_PROPOSICAO_DA_CAMARA = /^[1-9][0-9]{0,9}$/;
+
+export function idDeProposicaoDaCamaraValido(id) {
+  return typeof id === "string" && PADRAO_DA_PROPOSICAO_DA_CAMARA.test(id);
+}
+
+const PADRAO_DA_DATA_HORA = /^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}[+-][0-9]{2}:[0-9]{2}$/;
+
+// `data_hora` vem com o deslocamento (`-03:00`); sem ele a hora seria ambígua. `sequencia` nula é
+// "a fonte deixou vazia", ausente não.
+function tramitacaoValida(item) {
+  return (
+    typeof item?.data_hora === "string" &&
+    PADRAO_DA_DATA_HORA.test(item.data_hora) &&
+    !Number.isNaN(new Date(item.data_hora).getTime()) &&
+    (item.sequencia === null || Number.isInteger(item.sequencia)) &&
+    typeof item.orgao === "string" &&
+    item.orgao !== "" &&
+    typeof item.descricao === "string" &&
+    item.descricao !== ""
+  );
+}
+
+// `atribuicao_das_tramitacoes` nula quer dizer "não há tramitações" e só nesse caso (ADR 0035, decisão 6).
+function proposicaoComTramitacoesValida(corpo) {
+  if (!camposDaProposicaoValidos(corpo?.proposicao)) return false;
+  if (!Array.isArray(corpo.tramitacoes) || !corpo.tramitacoes.every(tramitacaoValida)) return false;
+  if (!atribuicaoValida(corpo.atribuicao_da_proposicao)) return false;
+  return corpo.tramitacoes.length === 0
+    ? corpo.atribuicao_das_tramitacoes === null
+    : atribuicaoValida(corpo.atribuicao_das_tramitacoes);
+}
+
+// Mesmo desenho de `buscarVotacaoDaCamara`: uma chamada por requisição, nunca em cache de dado.
+export const buscarProposicaoDaCamara = cache(async (id) => {
+  if (!idDeProposicaoDaCamaraValido(id)) return null;
+  const corpo = await lerDaApi(`/internal/v1/camara/proposicoes/${id}/`);
+  if (corpo === null) return null;
+  if (!proposicaoComTramitacoesValida(corpo)) {
+    throw new ErroDaApi("a API devolveu uma proposição da Câmara fora do formato esperado");
   }
   return corpo;
 });

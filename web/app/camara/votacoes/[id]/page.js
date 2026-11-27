@@ -5,7 +5,6 @@ import { buscarVotacaoDaCamara } from "../../../../lib/api.js";
 import {
   ROTULO_DA_APROVACAO,
   SEM_LISTA_NOMINAL,
-  resumoDaEmenta,
   SEM_POSICAO,
   tituloDaVotacao,
   TOTAIS_ZERADOS,
@@ -13,6 +12,7 @@ import {
 } from "../../../../lib/camara.js";
 import { dataBr } from "../../../../lib/formatar.js";
 import Atribuicao from "../../../pessoas/[id]/Atribuicao.js";
+import Ementa from "../../Ementa.js";
 import Nota from "../../Nota.js";
 
 // Sem cache: o que a fonte corrigir precisa aparecer na hora.
@@ -107,26 +107,10 @@ function Votantes({ votos }) {
   );
 }
 
-// Ementa curta sai inteira. Longa: o resumo fica visível e o texto inteiro vai num `<details>`
-// nativo (abre sem JavaScript, acessível por teclado). O texto aparece nos dois por escolha: o
-// resumo fora do botão mantém a lista legível.
-function Ementa({ texto }) {
-  const resumo = resumoDaEmenta(texto);
-  if (resumo === null) return <p className="ementa">{texto}</p>;
-  return (
-    <>
-      <p className="ementa">{resumo}</p>
-      <details>
-        <summary>Ler a ementa inteira</summary>
-        <p className="ementa">{texto}</p>
-      </details>
-    </>
-  );
-}
-
 // Todas as proposições, na ordem que a API manda (ADR 0032, emenda 5). Título e ementa são texto
-// livre da fonte: o React os escapa. Nem `origem` nem o id da Câmara aparecem (sem significado
-// verificado e sem rota para a proposição).
+// livre da fonte: o React os escapa. `origem` não aparece (sem significado verificado). O id da
+// Câmara só aparece no endereço do link da tramitação, e só quando a proposição tem alguma em 2026
+// (`total_tramitacoes`, emenda 6; ADR 0035): sem isso o link levaria a uma página vazia.
 function Proposicoes({ proposicoes }) {
   return (
     <>
@@ -137,6 +121,13 @@ function Proposicoes({ proposicoes }) {
           <li key={indice}>
             <strong>{item.titulo}</strong>
             {item.ementa && <Ementa texto={item.ementa} />}
+            {item.total_tramitacoes > 0 && (
+              <p>
+                <Link href={`/camara/proposicoes/${item.id_camara}/`}>
+                  {`Ver tramitação (${item.total_tramitacoes})`}
+                </Link>
+              </p>
+            )}
           </li>
         ))}
       </ul>

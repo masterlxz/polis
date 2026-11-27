@@ -6,8 +6,9 @@ Dados todos sintéticos, no formato do `tests/test_camara_proposition_api.py` (d
 valores). Grava com o ORM, sem passar pelo normalizador (esse é provado pelos testes dele).
 
 O que cada linha prepara para o teste `web/e2e/camara.e2e.test.mjs`:
-- proposição 14666 com 3 tramitações gravadas fora de ordem: duas no mesmo instante (uma com
-  `sequencia` e uma sem, que deve sair depois) e uma posterior com HTML na descrição;
+- proposição 14666 com 4 tramitações gravadas fora de ordem: três no mesmo instante (duas com
+  `sequencia` 152 que só se separam pelo órgão, e uma sem `sequencia`, que sai depois) e uma
+  posterior com HTML na descrição;
 - proposição 14667 sem tramitação;
 - tramitação da proposição 99999, que o polis não conhece como proposição (a rota deve dar 404);
 - votação 9000001-1 ligada às duas proposições, para o link "Ver tramitação (N)".
@@ -92,10 +93,16 @@ sem_tramitacao = CamaraProposition.objects.create(
 # 2026-05-07 16:58 em Brasília = 19:58 UTC; 2026-05-08 09:00 em Brasília = 12:00 UTC.
 PRIMEIRO_INSTANTE = datetime(2026, 5, 7, 19, 58, tzinfo=UTC)
 SEGUNDO_INSTANTE = datetime(2026, 5, 8, 12, 0, tzinfo=UTC)
-# Gravadas fora da ordem em que devem sair.
+# Gravadas fora da ordem em que devem sair. A ordem é a do Python (ADR 0035, decisão 5): hora,
+# `sequencia` (nula por último), órgão, descrição. As duas de `sequencia` 152 empatam na hora e na
+# sequência e só se separam pelo órgão: "MESA" vem antes de "mesa" em Python (maiúscula primeiro),
+# mas depois dela na collation `en_US` do PostgreSQL, então nem o índice único nem a ordem de
+# gravação devolvem a ordem certa (sem isso, uma ordenação só por hora passou: o índice por
+# acaso já entregava as linhas na ordem esperada).
 for proposicao, sequencia, quando, orgao, descricao in [
     ("14666", 153, SEGUNDO_INSTANTE, "PLEN", "Despacho <b>negrito</b> da Mesa"),
     ("14666", None, PRIMEIRO_INSTANTE, "MESA", "Registro sem sequência na fonte"),
+    ("14666", 152, PRIMEIRO_INSTANTE, "mesa", "Mesma hora e sequência, órgão em minúsculas"),
     ("14666", 152, PRIMEIRO_INSTANTE, "MESA", "Apresentação de Requerimento"),
     ("99999", 1, PRIMEIRO_INSTANTE, "MESA", "Tramitação de proposição desconhecida"),
 ]:
@@ -128,4 +135,4 @@ for proposicao in (com_tramitacao, sem_tramitacao):
         ingestion_run=run_proposicao,
     )
 
-print("semente ok: 2 proposições, 4 tramitações, 1 votação")
+print("semente ok: 2 proposições, 5 tramitações, 1 votação")

@@ -615,7 +615,7 @@ def camara_proposition_detail(request, proposition_id):
     return JsonResponse(
         {
             "proposicao": _camara_proposition_fields(proposition),
-            "tramitacoes": [_camara_step_item(step) for step in steps],
+            "tramitacoes": [_camara_step_item(step) for step in steps[:50]],
             "atribuicao_da_proposicao": _attribution(proposition.ingestion_run),
             "atribuicao_das_tramitacoes": _attribution(newest_run) if newest_run else None,
         },

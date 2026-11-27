@@ -49,6 +49,7 @@ function Tramitacoes({ tramitacoes }) {
             <td>{dataHoraBrasilia(item.data_hora)}</td>
             <td>{item.orgao}</td>
             <td>{item.descricao}</td>
+            <td>{item.sequencia}</td>
           </tr>
         ))}
       </tbody>

@@ -609,14 +609,16 @@ test("detalhe: cita a origem da votação e a dos votos, cada uma com o seu conj
 
 // --- Detalhe: proposições da votação (ADR 0032, emenda 5; ADR 0033) ------------------------------
 
-// Cada item da lista `<ul class="proposicoes">`: título em `<strong>` e ementa em `<p class="ementa">`
-// (ou `null`). Conta só na marcação, que é onde a página decide o que mostrar.
+// Cada item da lista `<ul class="proposicoes">`: título em `<strong>`, ementa visível no primeiro
+// `<p class="ementa">` (ou `null`) e, quando a ementa é longa, o texto inteiro dentro do `<details>`
+// (`completa`, senão `null`). Conta só na marcação, que é onde a página decide o que mostrar.
 function proposicoesNaPagina(html) {
   const lista = html.match(/<ul class="proposicoes">(.*?)<\/ul>/s)?.[1];
   if (lista === undefined) return null;
   return Array.from(lista.matchAll(/<li[^>]*>(.*?)<\/li>/gs), ([, item]) => ({
     titulo: item.match(/<strong>(.*?)<\/strong>/s)?.[1] ?? null,
     ementa: item.match(/<p class="ementa">(.*?)<\/p>/s)?.[1] ?? null,
+    completa: item.match(/<details[^>]*>.*?<p class="ementa">(.*?)<\/p>/s)?.[1] ?? null,
   }));
 }
 
@@ -639,8 +641,8 @@ test("detalhe: cada proposição com título e ementa, na ordem que a API manda"
   assert.equal(status, 200);
   assert.match(html, /<h2>Proposições<\/h2>/);
   assert.deepEqual(proposicoesNaPagina(html), [
-    { titulo: "PL 9001/2026", ementa: "Ementa A" },
-    { titulo: "PEC 7/2025", ementa: "Ementa B" },
+    { titulo: "PL 9001/2026", ementa: "Ementa A", completa: null },
+    { titulo: "PEC 7/2025", ementa: "Ementa B", completa: null },
   ]);
 });
 
@@ -671,7 +673,9 @@ test("detalhe sem proposições: nenhuma seção, nenhum título e só as outras
 test("detalhe: ementa nula sai só com o título, sem parágrafo vazio nem 'null'", async () => {
   const { html } = await detalhe(comProposicoes([proposicao({ ementa: null })]));
 
-  assert.deepEqual(proposicoesNaPagina(html), [{ titulo: "PL 9001/2026", ementa: null }]);
+  assert.deepEqual(proposicoesNaPagina(html), [
+    { titulo: "PL 9001/2026", ementa: null, completa: null },
+  ]);
 });
 
 test("detalhe: ano nulo é aceito e o título sai como a fonte o manda", async () => {
@@ -680,7 +684,9 @@ test("detalhe: ano nulo é aceito e o título sai como a fonte o manda", async (
   );
 
   assert.equal(status, 200);
-  assert.deepEqual(proposicoesNaPagina(html), [{ titulo: "PL 9001", ementa: "Ementa A" }]);
+  assert.deepEqual(proposicoesNaPagina(html), [
+    { titulo: "PL 9001", ementa: "Ementa A", completa: null },
+  ]);
 });
 
 test("detalhe: título e ementa com HTML aparecem escapados", async () => {
@@ -689,9 +695,116 @@ test("detalhe: título e ementa com HTML aparecem escapados", async () => {
   );
 
   assert.deepEqual(proposicoesNaPagina(html), [
-    { titulo: "&lt;b&gt;t&lt;/b&gt;", ementa: "&lt;script&gt;e&lt;/script&gt;" },
+    { titulo: "&lt;b&gt;t&lt;/b&gt;", ementa: "&lt;script&gt;e&lt;/script&gt;", completa: null },
   ]);
   assert.ok(!html.includes("<b>t</b>"));
+});
+
+// --- Detalhe: ementa longa recolhida e lugar da seção (decisão do dono, 2026-11-27) --------------
+
+// Mais de 300 caracteres: o resumo (300 primeiros, sem espaço no fim, mais "…") fica visível e o
+// texto inteiro vai num `<details>` nativo, sem JavaScript. Até 300, a ementa sai inteira.
+const LIMITE_DA_EMENTA = 300;
+
+// Uma ementa de `tamanho` caracteres, sem espaço e sem acento, para o corte cair onde se espera.
+const ementaDe = (tamanho) => "a".repeat(tamanho);
+
+test("detalhe: ementa de exatamente 300 caracteres sai inteira, sem details", async () => {
+  const ementa = ementaDe(LIMITE_DA_EMENTA);
+
+  const { html } = await detalhe(comProposicoes([proposicao({ ementa })]));
+
+  assert.deepEqual(proposicoesNaPagina(html), [{ titulo: "PL 9001/2026", ementa, completa: null }]);
+  assert.ok(!html.includes("<details"));
+});
+
+test("detalhe: ementa de 301 caracteres mostra os 300 primeiros e '…', e a inteira no details", async () => {
+  const ementa = ementaDe(LIMITE_DA_EMENTA + 1);
+
+  const { html } = await detalhe(comProposicoes([proposicao({ ementa })]));
+
+  assert.deepEqual(proposicoesNaPagina(html), [
+    { titulo: "PL 9001/2026", ementa: `${ementaDe(LIMITE_DA_EMENTA)}…`, completa: ementa },
+  ]);
+  assert.match(html, /<summary>Ler a ementa inteira<\/summary>/);
+});
+
+test("detalhe: ementa de 2.500 caracteres vai inteira, íntegra, dentro do details", async () => {
+  const ementa = Array.from({ length: 250 }, (_, i) => `palavra${i % 10}`.padEnd(9, "x")).join(" ");
+  assert.ok(ementa.length > 2000, "controle: a fixture é longa");
+
+  const { html } = await detalhe(comProposicoes([proposicao({ ementa })]));
+
+  const [item] = proposicoesNaPagina(html);
+  assert.equal(item.completa, ementa);
+  assert.equal(item.ementa, `${ementa.slice(0, LIMITE_DA_EMENTA).trimEnd()}…`);
+});
+
+test("detalhe: o resumo da ementa longa não termina em espaço antes do '…'", async () => {
+  // O 300º caractere é um espaço: o resumo termina no 299º, não em "a …".
+  const ementa = `${ementaDe(LIMITE_DA_EMENTA - 1)} ${ementaDe(20)}`;
+
+  const { html } = await detalhe(comProposicoes([proposicao({ ementa })]));
+
+  const [item] = proposicoesNaPagina(html);
+  assert.equal(item.ementa, `${ementaDe(LIMITE_DA_EMENTA - 1)}…`);
+  assert.equal(item.completa, ementa);
+});
+
+test("detalhe: o corte da ementa não parte um caractere fora do BMP (emoji)", async () => {
+  const ementa = "😀".repeat(LIMITE_DA_EMENTA + 1);
+
+  const { html } = await detalhe(comProposicoes([proposicao({ ementa })]));
+
+  const [item] = proposicoesNaPagina(html);
+  assert.equal(item.ementa, `${"😀".repeat(LIMITE_DA_EMENTA)}…`);
+  assert.equal(item.completa, ementa);
+});
+
+test("detalhe: ementa longa com HTML aparece escapada no resumo e no details", async () => {
+  const ementa = `<b>x</b>${ementaDe(LIMITE_DA_EMENTA)}<script>y</script>`;
+
+  const { html } = await detalhe(comProposicoes([proposicao({ ementa })]));
+
+  const [item] = proposicoesNaPagina(html);
+  assert.ok(item.ementa.startsWith("&lt;b&gt;x&lt;/b&gt;"));
+  assert.ok(item.completa.endsWith("&lt;script&gt;y&lt;/script&gt;"));
+  assert.ok(!html.includes("<b>x</b>") && !html.includes("<script>y"));
+});
+
+test("detalhe sem ementa longa: nenhum details na página", async () => {
+  const { html } = await detalhe(
+    comProposicoes([proposicao({ ementa: null }), proposicao({ titulo: "PL 2/2026", ementa: "Curta" })]),
+  );
+
+  assert.ok(!html.includes("<details"));
+});
+
+// A tabela de votos é a parte mais longa da página (até centenas de linhas): as proposições dizem o
+// que se votou e vêm antes dela, depois da contagem.
+test("detalhe com votos: as proposições vêm depois da contagem e antes da tabela de votos", async () => {
+  const { html } = await detalhe(comProposicoes([proposicao()]));
+
+  const contagem = html.indexOf("<caption>Contagem por voto");
+  const proposicoes = html.indexOf("<h2>Proposições</h2>");
+  const votos = html.indexOf("<caption>Votos</caption>");
+  assert.ok(contagem !== -1 && proposicoes !== -1 && votos !== -1, "controle: as três existem");
+  assert.ok(contagem < proposicoes, "proposições depois da contagem");
+  assert.ok(proposicoes < votos, "proposições antes dos votos");
+});
+
+test("detalhe sem votos: as proposições vêm depois do aviso de que não há lista nominal", async () => {
+  const { html } = await detalhe(
+    semVotos({
+      proposicoes: [proposicao()],
+      atribuicao_das_proposicoes: atribuicaoDasProposicoes(),
+    }),
+  );
+
+  const aviso = html.indexOf("Esta votação não tem lista de votos nominais");
+  const proposicoes = html.indexOf("<h2>Proposições</h2>");
+  assert.ok(aviso !== -1 && proposicoes !== -1, "controle: as duas existem");
+  assert.ok(aviso < proposicoes);
 });
 
 test("detalhe: o id da proposição não aparece (a página não tem rota para ela)", async () => {

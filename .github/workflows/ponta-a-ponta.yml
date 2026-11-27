@@ -51,7 +51,7 @@ jobs:
       # sintético, no Chrome da imagem de hoje. Prova que o CSS e o HTML renderizam, não o PC do dono.
       - name: Screenshot das páginas (Chrome headless do runner)
         env:
-          FRONT_BASE: http://127.0.0.1:3000
+          FRONT_BASE: http://127.0.0.1:3999
         run: |
           google-chrome --version
           mkdir -p "$RUNNER_TEMP/telas"

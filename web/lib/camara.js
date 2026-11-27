@@ -47,9 +47,8 @@ export const LIMITE_DA_EMENTA = 300;
 // ela cabe inteira. Conta por ponto de código: `slice` contaria unidades UTF-16 e poderia partir um
 // caractere fora do BMP ao meio.
 export function resumoDaEmenta(ementa) {
-  const caracteres = [...ementa];
-  if (caracteres.length <= LIMITE_DA_EMENTA) return null;
-  return `${caracteres.slice(0, LIMITE_DA_EMENTA).join("").trimEnd()}…`;
+  if (ementa.length <= LIMITE_DA_EMENTA) return null;
+  return `${ementa.slice(0, LIMITE_DA_EMENTA).trimEnd()}…`;
 }
 
 // "24/11/2026 · PLEN": a Câmara não tem uma identificação curta como a do Senado.

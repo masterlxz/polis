@@ -595,8 +595,6 @@ def camara_proposition_detail(request, proposition_id):
     São todas as tramitações (até 98 medidas), sem paginação; duas consultas no 200.
     """
     camara_id = int(proposition_id)
-    if camara_id > _INT32_MAX:
-        return JsonResponse({"erro": "não encontrado"}, status=404)
     proposition = (
         CamaraProposition.objects.select_related("ingestion_run__dataset__source")
         .filter(camara_id=camara_id)

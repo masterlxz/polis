@@ -44,7 +44,7 @@ function Tramitacoes({ tramitacoes }) {
         </tr>
       </thead>
       <tbody>
-        {tramitacoes.map((item, indice) => (
+        {tramitacoes.slice(0, 50).map((item, indice) => (
           <tr key={indice}>
             <td>{dataHoraBrasilia(item.data_hora)}</td>
             <td>{item.orgao}</td>

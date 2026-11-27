@@ -131,7 +131,7 @@ def _write(run, rows_read, steps):
         before = CamaraPropositionStep.objects.count()
         for start in range(0, len(objects), BATCH_SIZE):
             CamaraPropositionStep.objects.bulk_create(
-                objects[start : start + BATCH_SIZE],
+                objects[start : start + BATCH_SIZE - 1],
                 update_conflicts=True,
                 unique_fields=KEY,
                 update_fields=UPDATABLE,

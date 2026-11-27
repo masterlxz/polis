@@ -2,6 +2,12 @@
 
 Mais recente no topo.
 
+### 2026-11-27 — Sessão 115, parte 2 (respiro entre a ementa e a nota; sessão individual)
+
+- **Feito (PR #349)**: `web/app/globals.css`, regra `.ementa + .nota, details + .nota { margin-top: 0.75rem }`, para a nota "Tramitações de 2026…" não ficar colada na ementa (reparo visto nas fotos do #347).
+- **Prova**: não há teste nem mutação para CSS neste projeto; a prova é a foto do CI (run `46053093379`, baixada e aberta): respiro na proposição 14666. **Efeito não previsto**: na votação `9000001-1` a nota "Códigos como a fonte os manda…" também ganhou espaço depois da descrição, porque a descrição usa `.ementa`. Disse antes que as outras páginas não mudavam; estava errado. Mantido por parecer melhor.
+- **Não verificado**: ementa longa com `<details>` (a semente só tem ementa curta, então `details + .nota` nunca foi visto), outras páginas que usam `.nota` (senado, busca), o navegador do PC do dono.
+
 ### 2026-11-27 — Sessão 115 (fotos das telas das tramitações no CI; sessão individual)
 
 - **Pedido**: ver a aparência das páginas sem rodar nada no PC do dono. Avaliação de dependência (skill `avaliar-dependencia`): **sem Playwright nem Puppeteer**; o runner `ubuntu-24.04` já traz Google Chrome 158. Playwright 1.65.1 é saudável (Apache-2.0, 5 donos no registro, sem `postinstall`, sem aviso no OSV) mas pesa o lockfile do `web/`; Puppeteer tem `postinstall` que baixa Chrome, contra o `npm ci --ignore-scripts`. Plano aprovado em plan mode.

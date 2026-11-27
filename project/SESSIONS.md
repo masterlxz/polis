@@ -2,6 +2,14 @@
 
 Mais recente no topo.
 
+### 2026-11-27 — Sessão 115 (fotos das telas das tramitações no CI; sessão individual)
+
+- **Pedido**: ver a aparência das páginas sem rodar nada no PC do dono. Avaliação de dependência (skill `avaliar-dependencia`): **sem Playwright nem Puppeteer**; o runner `ubuntu-24.04` já traz Google Chrome 158. Playwright 1.65.1 é saudável (Apache-2.0, 5 donos no registro, sem `postinstall`, sem aviso no OSV) mas pesa o lockfile do `web/`; Puppeteer tem `postinstall` que baixa Chrome, contra o `npm ci --ignore-scripts`. Plano aprovado em plan mode.
+- **Feito (PR #347)**: dois passos em `.github/workflows/ponta-a-ponta.yml`: Chrome headless tira a foto de `/camara/proposicoes/14666/`, `/camara/proposicoes/14667/` e `/camara/votacoes/9000001-1/` (com `curl -f` antes, para o Chrome não gravar uma página de erro) e `actions/upload-artifact@v7` (v7.0.2, MIT) guarda o artefato `telas` por 7 dias. Única dependência nova: essa action.
+- **O que as fotos mostram** (Chrome 158.0.8127.36, dados sintéticos, baixadas com `gh run download` e abertas): tabela de tramitações legível, na ordem da API, hora em Brasília ("07/05/2026 às 16:58"); `<b>negrito</b>` aparece como texto; a proposição sem tramitação mostra o aviso; na votação o link "Ver tramitação (4)" só aparece na PL 11/2003; os dois blocos "Origem dos dados" aparecem com as horas de coleta convertidas. Reparo estético, não corrigido (outro PR por intenção): a nota "Tramitações de 2026…" fica colada na ementa, sem respiro.
+- **Mutação** (PR #348, fechado): F1, foto apontando para a porta 3999 → falhou **só** o passo "Screenshot das páginas (Chrome headless do runner)" (previsto: o `curl -f` pega antes do Chrome).
+- **Não verificado**: a tela no navegador do PC do dono (outro Chrome, outras fontes), dado real, celular, tamanho de página com 98 tramitações (a foto tem 2000 px de altura e a página real pode passar disso).
+
 ### 2026-11-27 — Sessão 114 (teste de ponta a ponta das tramitações da Câmara no CI; sessão individual)
 
 - **Pedido**: o dono não quer rodar nada no PC para ver a tela e perguntou se dava por código. Dá em parte: o CI prova a junção API real + página real; **não** prova layout, CSS nem dado real. Plano aprovado em plan mode (mexe no CI, AGENTS.md §4).

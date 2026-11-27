@@ -34,7 +34,7 @@ def _proposition_id(values):
 
 def _sequence(values):
     if values.get("sequencia") == "":
-        return None
+        return 0
     return _count(values, "sequencia")
 
 

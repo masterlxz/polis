@@ -2,6 +2,22 @@
 
 Mais recente no topo.
 
+### 2026-11-27 — Sessão 114 (teste de ponta a ponta das tramitações da Câmara no CI; sessão individual)
+
+- **Pedido**: o dono não quer rodar nada no PC para ver a tela e perguntou se dava por código. Dá em parte: o CI prova a junção API real + página real; **não** prova layout, CSS nem dado real. Plano aprovado em plan mode (mexe no CI, AGENTS.md §4).
+- **Lacuna**: as páginas eram testadas contra uma API falsa (`web/tests/helpers.mjs`) e a API contra o banco (`tests/test_camara_proposition_api.py`); ninguém ligava as duas.
+- **Feito (PR #337)**: `.github/workflows/ponta-a-ponta.yml` (job `ponta-a-ponta`, não exigido no ruleset) sobe o Compose de desenvolvimento, migra, semeia por `.github/ci/semear_camara.py` (ORM, dados sintéticos) e roda `web/e2e/camara.e2e.test.mjs` (7 testes) contra o Django e o Next reais.
+- **Primeira rodada verde** (`3a84b9e`), sem prova de falha antes: o teste só existe junto com o workflow. A prova veio das mutações.
+- **Mutações** (PRs descartáveis, fechados; previsão → resultado pelo **nome** dos testes):
+  - E2 HTML cru na descrição: caíram "descrição escapada" e "mostra título… e a ordem da API" (previsto).
+  - E3 `_step_totals` sempre vazio: caiu só "link Ver tramitação" (previsto).
+  - E4 sem 404 para proposição desconhecida: caiu "99999 … 404" (previsto; a causa é um 500, não um 200).
+  - E5 `data_hora` em UTC: caiu **só** o teste da API (previsto: a página converte o instante para Brasília de qualquer jeito, então esse teste não pega a mudança).
+  - E6 front apontando para API errada: caíram as 5 páginas que chamam a API e o 99999; o da API e o de id inválido (404 antes de chamar a API) passaram (previsto).
+  - **E1 ordenar só por hora SOBREVIVEU** com a semente de 3 tramitações: o índice único `(proposição, sequence, occurred_at, …)` devolveu as linhas empatadas na ordem esperada, por acaso. Corrigi a semente: duas tramitações com a mesma hora e `sequencia` 152 e órgão `MESA`/`mesa` (a collation `en_US` do PostgreSQL põe `mesa` antes; o Python põe `MESA`), gravadas fora de ordem. Repeti: **E1b** (só hora), **E7** (sem o "nula por último") e **E8** (sem órgão e descrição) derrubaram os mesmos dois testes: "API real … em ordem" e "página … a ordem da API" (conferido pelos nomes).
+- **Aprendizado**: a previsão da tabela ("o teste cai") estava errada de novo, como na B2 e na B8 da Sessão 113; só a lista de nomes mostrou. Teste de ordem precisa de dado cuja ordem certa o índice e a ordem de gravação não entreguem sozinhos.
+- **Não verificado**: layout e CSS das telas (o CI não vê imagem), dado real do PC do dono, fuso de `data_hora`, a collation `en_US` supõe a imagem `postgres:18` (se mudar, E1 pode voltar a sobreviver; o teste de ordem do Django cobre a ordem à parte). O job não é obrigatório no ruleset: pedir ao dono se quer torná-lo.
+
 ### 2026-11-27 — Sessão 113, parte 2 (API e página das tramitações da Câmara; ADR 0035; sessão individual)
 
 - **Pedido**: a fatia seguinte ao ADR 0034. Plano aprovado em plan mode; decisões do dono: rota por proposição com link (não embutir no detalhe da votação) e **404 para proposição que o polis não conhece**, mesmo com tramitações. Medido em 2026 (arquivo de 2026-11-27): **no máximo 98 tramitações por proposição** (mediana 2, p99 10).

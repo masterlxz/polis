@@ -1,0 +1,56 @@
+name: Ponta a ponta
+
+# Sobe o Compose de desenvolvimento de verdade (banco, Django e Next.js), semeia dados sintéticos
+# das tramitações da Câmara e pede as páginas ao front, para provar que o formato que a API real
+# manda é o que a página aceita (ADR 0035). Não prova layout nem CSS, e não usa dado real. O job
+# `ponta-a-ponta` não é exigido no ruleset protect-main.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  POSTGRES_PASSWORD: descartavel
+  DJANGO_SECRET_KEY: descartavel
+
+jobs:
+  ponta-a-ponta:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Instala o Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+
+      - name: Sobe o banco, migra e semeia os dados sintéticos
+        run: |
+          docker compose up -d --wait db
+          docker compose run --rm -T web python manage.py migrate --noinput
+          docker compose run --rm -T web python manage.py shell < .github/ci/semear_camara.py
+
+      - name: Sobe o Django e o front
+        run: |
+          docker compose up -d --build --wait web front
+          curl --retry 20 --retry-delay 2 --retry-all-errors \
+            -fsS -o /dev/null http://127.0.0.1:8000/admin/login/
+
+      - name: Testes de ponta a ponta das tramitações
+        env:
+          API_BASE: http://127.0.0.1:8000
+          FRONT_BASE: http://127.0.0.1:3000
+        run: node --test "web/e2e/**/*.e2e.test.mjs"
+
+      - name: Logs em caso de falha
+        if: failure()
+        run: docker compose logs --no-color --tail=100
+
+      - name: Derruba tudo
+        if: always()
+        run: docker compose down -v

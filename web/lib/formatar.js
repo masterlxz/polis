@@ -23,6 +23,7 @@ export function dataHoraBrasilia(iso) {
   const instante = new Date(iso);
   if (Number.isNaN(instante.getTime())) return null;
   const p = Object.fromEntries(EM_BRASILIA.formatToParts(instante).map((x) => [x.type, x.value]));
+  if (p.hour === "00" && p.minute === "00") return `${p.day}/${p.month}/${p.year}`;
   return `${p.day}/${p.month}/${p.year} às ${p.hour}:${p.minute}`;
 }
 

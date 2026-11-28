@@ -63,7 +63,8 @@ Os números abaixo saem do script a seguir, rodado sobre essas respostas (`pytho
 <details>
 <summary>Script de contagem (reproduz.py)</summary>
 
-```python
+```text
+# Python 3. Marcado como `text` de propósito: o `ruff format --check .` do CI reformata blocos `python` de Markdown.
 import collections
 import json
 import re

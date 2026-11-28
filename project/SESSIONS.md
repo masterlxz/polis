@@ -2,6 +2,14 @@
 
 Mais recente no topo.
 
+### 2026-11-28 — Sessão 119 (resposta do TSE sobre o CPF de 2026, P-16 pergunta 6; sessão individual; só registro, nenhum código)
+
+- **Pedido**: "vamos de P-16": o dono recebeu a resposta da Ouvidoria do TSE à pergunta enviada em 2026-11-07 e a colou na conversa.
+- **Resposta (recebida em 2026-11-26, DAE via Ouvidoria)**: a não divulgação do CPF dos candidatos se restringe às eleições de 2024; nas demais ele está disponível no Portal de Dados Abertos; as áreas técnicas estão corrigindo o LEIA-ME para evitar interpretação equivocada. A Ouvidoria não faz análise nem interpretação de dados (Resolução-TSE 23.435/2015, art. 12, II). O texto colado trazia o nome completo do dono e o número do protocolo: **ficaram de fora do repo público**.
+- **Leitura**: resolve o fato (das três hipóteses de `fontes/tse.md`, o `leiame` estava desatualizado e a publicação de 2026 é deliberada; "engano" cai). **Não muda** o ADR 0005: descartar o CPF na leitura se apoia em minimização e LGPD, e o CPF segue dado pessoal. Não resolve a base legal da divulgação nem a retenção e redistribuição por terceiros (pergunta 5 do P-16). Não reabri o CPF como chave de ligação entre pessoas (ADR 0005 descartou, mesmo com HMAC).
+- **Feito**: `lgpd-lai.md` (item 6), `fontes/tse.md` (a "contradição" e o achado do CPF de 2026), `PENDING.md` (P-16) e esta entrada. ADR 0005, `catalog.py` e a allowlist intocados.
+- **Não verificado**: se o LEIA-ME do portal já foi corrigido; se o CSV de 2026 ainda traz o CPF depois da resposta (a medição de formato é de 2026-11-06); a base legal. É resposta de canal de atendimento, não parecer.
+
 ### 2026-11-28 — Sessão 118 (preparo da verificação das tramitações da Câmara com dado real no PC do dono; sessão individual; só registro, nenhum código)
 
 - **Pedido**: a recomendação foi fechar a fatia das tramitações antes de abrir outra, vendo as telas com dado real no navegador do dono (as Sessões 115 a 117 só tinham fotos do Chrome do CI com dado sintético). Plano aprovado em plan mode; sem mudança de código.

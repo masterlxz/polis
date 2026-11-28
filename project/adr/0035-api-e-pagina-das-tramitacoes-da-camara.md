@@ -33,3 +33,12 @@ O ADR 0034 trouxe as tramitações de 2026 (118.684 linhas em `CamaraProposition
 - Sem schema novo nem migração. Reversível: tirar a rota, o link e o campo.
 - Nada vai a público antes do P-16.
 - **Não validado por mim:** o plano das duas consultas com dado real (a medição é de contagem, não de `EXPLAIN`); o tamanho real da resposta no pior caso (estimado em cerca de 12 KB); a página no navegador do dono.
+
+## Emenda 1 (2026-11-28): tramitação em 00:00 de Brasília mostra só a data (P-23)
+Mudança só na página (`/camara/proposicoes/<id>`), PR #362. A API não muda: `data_hora` continua um instante ISO 8601 com `-03:00` (decisão 4).
+1. **Medido em 2026-11-28 (PC do dono, 118.684 tramitações):** 33.508 (28,2%) estão exatamente em 00:00 de Brasília. Se as horas fossem reais e espalhadas, seriam cerca de 0,07% (1 de 1.440 minutos). A decisão 4 e a decisão 9 previam "hora e data"; o registro já dizia "várias com 00:00 (só data, não verificado)".
+2. **Decisão do dono:** a tabela mostra `07/05/2026` quando a hora em Brasília é 00:00, e `07/05/2026 às 16:58` nas demais. A regra olha o **instante convertido para Brasília** (não o texto da API) e vale só na tabela das tramitações: o Senado e a origem dos dados (`coletado_em`) continuam com a hora, porque lá 00:00 é um instante real.
+3. **A nota da página diz que é inferência** ("a fonte provavelmente não informou a hora (não verificado)"). A Câmara não confirmou que `00:00` significa "sem hora".
+4. **Descartadas:** mostrar sempre a hora e explicar na nota (continua afirmando uma hora que a fonte provavelmente não deu); campo `hora_informada` na API (muda o contrato por uma heurística que a página aplica igual).
+5. **Custo aceito:** uma tramitação realmente à meia-noite aparece sem hora (perde a hora, não o dia); um `00:00:30` conta como 00:00 (a tela já corta no minuto). Reversível: voltar a tabela para `dataHoraBrasilia`.
+6. **Não verificado:** o significado de `00:00` na fonte; a página no navegador do dono (P-22).

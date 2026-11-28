@@ -214,9 +214,9 @@ print("tramitando=S: ids tambem em ano=2026 (1674 esperados):", len(T & A))
 
 print("== 7. ajustes da revisao")
 d = load("apidocs")
-print("api-docs: versao", d["info"].get("version"), "caminhos", len(d["paths"]), "depreciados", sum(v["get"].get("deprecated", False) for v in d["paths"].values()))
+print("api-docs: versao", d["info"].get("version"), "caminhos", len(d["paths"]), "depreciados", sum(v.get("get", {}).get("deprecated", False) for v in d["paths"].values()))
 sg = load("siglas")
-print("siglas:", len(sg), "sem dataFim:", sum(s["dataFim"] is None for s in sg))
+print("siglas:", len(sg), "sem dataFim (ausente ou nulo):", sum(s.get("dataFim") is None for s in sg))
 print("ano=2025 ∩ ano=2026:", len({x["id"] for x in a2025} & A), "de", len(a2025))
 print("PL de ano=2026 por tipoDocumento:", collections.Counter(x["tipoDocumento"] for x in ano if sigla(x) == "PL"))
 print("casaIdentificadora na uniao:", collections.Counter(x["casaIdentificadora"] for x in X), "enteIdentificador max:", max(len(x["enteIdentificador"]) for x in X))
@@ -278,7 +278,7 @@ python3 -I -c 'import json;d=json.load(open("p2026.json"));print(len(d),sum(x["t
 | `tramitando` = `Não` | 1.793 |
 | `casaIdentificadora` `SF` / `CN` | 3.120 / 347 |
 | Siglas distintas (primeiro token de `identificacao`) | 27 |
-| Siglas no cadastro `/processo/siglas` | 184 (82 sem `dataFim`; bloco 7) |
+| Siglas no cadastro `/processo/siglas` | 184 (82 sem `dataFim`, isto é, chave ausente ou nula; bloco 7) |
 
 Por sigla (a descrição vem de `/processo/siglas`; todas as 27 constam da lista):
 
@@ -352,7 +352,7 @@ Bloco 2 do script. **Medido em 2026-11-28 sobre a união de todas as respostas d
 - **Medido:** `identificacao` é única nos 28.355 ids da união (0 repetidas; também 0 repetidas em cada conjunto separado e 0 pelo par `identificacao` + `casaIdentificadora`).
 - **Mas o texto muda de forma** (`?ano=2026`, 3.467 itens): 2.047 são `SIGLA N/AAAA`; **1.413 são `REQ N/AAAA - <ente>`** (por exemplo `REQ 1/2026 - CDIR`, `REQ 1/2026 - MPV 1323/2025`) e 7 são `PL N/AAAA (Substitutivo-CD)`, todos com `tipoDocumento` `Emenda` (os outros 565 `PL` são `Projeto de Lei Ordinária`; bloco 7). **142 números-base distintos `SIGLA N/AAAA` se repetem em 2026** (juntos, 1.129 processos), **todos em `REQ`**: `REQ 1/2026`, por exemplo, aparece 31 vezes, cada uma com um `enteIdentificador` diferente (blocos 6 e 7). Os 31 valores são siglas como `CAE`, `CCJ`, `CMMPV 1323/2025` e `Mesa` (o que cada sigla é, não consultei em dicionário): **ente, não necessariamente colegiado**. Na união, `enteIdentificador` tem 81 valores distintos, todos com cara de sigla de órgão (só `CMACOP30` fugiu do padrão que testei; nenhum parece nome de pessoa; bloco 7). Fora de `REQ`, o número base não se repete.
 - **Medido:** cada ente numera os seus requerimentos de 1 a N, e a distinção entre eles está no **sufixo do texto** e no `enteIdentificador`, não no número. O campo `sigla`+`numero`+`ano` do detalhe `/processo/{id}` foi lido em 3 processos (`PEC 1/2026`, `PL 159/2026 (Substitutivo-CD)`, `PL 199/2026`), nenhum `REQ`; **não medi** se o detalhe de um `REQ` traz o ente em outro campo.
-- `casaIdentificadora` só tem `SF` e `CN` (união de 28.355: `SF` 26.339, `CN` 2.016; bloco 7). Em `?ano=2026`, `CN`: 347 de 3.467 em 2026: `REQ` 151, `MPV` 68, `VET` 56, `PLN` 35, `AVN` 22, `R.C` 6, `PCS` 3, `OFN` 2, `RRC` 2, `RQN` 1, `MCN` 1; bloco 6).
+- `casaIdentificadora` só tem `SF` e `CN` (união de 28.355: `SF` 26.339, `CN` 2.016; bloco 7). Em `?ano=2026`, `CN`: 347 de 3.467 em 2026: `REQ` 151, `MPV` 68, `VET` 56, `PLN` 35, `AVN` 22, `R.C` 6, `PCS` 3, `OFN` 2, `RRC` 2, `RQN` 1, `MCN` 1; bloco 6.
 
 ### Origem na Câmara (3 detalhes lidos)
 
@@ -386,7 +386,9 @@ Bloco 4. União de 28.355 processos; para 2026 (`?ano=2026`, 3.467) ao lado.
 
 ### Nota: reconciliação com o #370 (`senado-processo-regras.md`)
 
-O PR #370 (levantamento de regras, paralelo a este) marca como **não medidos**, no que li da diferença dele: "se `codigoMateria` é único por processo", o conteúdo de `casaIdentificadora` e de `enteIdentificador`, e o formato das datas. **Medido aqui** (2026-11-28, blocos 2, 4 e 7): `codigoMateria` é 1:1 com `id` em 28.355 processos; `casaIdentificadora` só tem `SF` e `CN`; `enteIdentificador` tem no máximo 15 caracteres e 81 valores distintos, todos com cara de sigla de órgão (e não de pessoa); `dataApresentacao` é sempre `aaaa-mm-dd` (0 fora do formato em 28.355) e `dataUltimaAtualizacao` traz hora com fração de segundo de comprimento variável (0 a 6 dígitos). A afirmação "pode ser nome de órgão ou de pessoa" do #370 sobre `enteIdentificador` fica, assim, **sem evidência nos valores lidos** (não consultei o dicionário do Senado). Não editei o arquivo do #370.
+O #370 (commit `932e963` da branch `sen-regras`) **já incorpora estes números**: `codigoMateria` 1:1 com `id`, `casaIdentificadora` só `SF` e `CN` e `enteIdentificador` com até 15 caracteres. **Medido aqui** (2026-11-28, blocos 2, 4 e 7), para conferência: `codigoMateria` é 1:1 com `id` em 28.355 processos; `casaIdentificadora` só tem `SF` e `CN`; `enteIdentificador` tem no máximo 15 caracteres e 81 valores distintos, e o padrão testado (sigla maiúscula, `CMMPV n/aaaa`, `Mesa`, `CEsp`) não achou valor com forma de nome de pessoa (por regex, **não** por leitura dos 81 valores; a regex foi montada depois de ver parte deles); `dataApresentacao` é sempre `aaaa-mm-dd` (0 fora do formato em 28.355) e `dataUltimaAtualizacao` traz hora com fração de segundo de comprimento variável (0 a 6 dígitos). Não consultei o dicionário do Senado.
+
+**Referências a este arquivo devem ser por seção, não por número de linha** (as linhas mudam a cada revisão). Na versão anterior do #370, a fração das votações ligadas a "só 2026" aparecia como "34 de 90 (38%)"; o certo para `ano=2026` é **33 de 90 (37%)** (34 de 90 só com `tramitando=S`; 33 de 74, 45%, só com votações de 2026).
 
 ## 3. Correspondência com as votações do Senado
 
@@ -430,7 +432,7 @@ Bloco 3 do script. `GET /votacao?dataInicio=2025-11-29&dataFim=2026-11-28` (365 
   | campo `ano` anterior a 2026 | n/m | 41 (55%); anterior a 2025: 11 (15%) |
 
   Ou seja, mesmo só com votações de 2026, **41 de 74 (55%)** são de processos numerados antes de 2026. As 33 votações de processo de 2026 são **todas** de 2026 (nenhuma em dez/2025).
-- **A fração decai com o tempo.** `SenateVoting` só acumula (docstring de `SenateVoting`, `models.py:113-114`: "A tabela só acumula: votação que sai da janela de coleta continua aqui"; ADR 0029, não relido por aqui): a cada ano que passa, mais votações do banco apontam para processos de anos anteriores ao "ano corrente" do escopo. A medição é de uma data só; a tendência é inferência.
+- **A fração tende a decair, se o escopo for um ano fixo** (com janela móvel não decai). `SenateVoting` só acumula (docstring de `SenateVoting`, `models.py:113-114`: "A tabela só acumula: votação que sai da janela de coleta continua aqui"; ADR 0029, não relido por aqui): a cada ano que passa, mais votações do banco apontam para processos de anos anteriores ao "ano corrente" do escopo. A medição é de uma data só; a tendência é inferência.
 - `identificacao` da votação coincide **exatamente** com a do processo nos 71 casos; nenhuma das siglas votadas (`MSF`, `PLP`, `PEC`, `OFS`, `PL`, `RQS`, `PDL`) é `REQ`, que é a única sigla com sufixo ` - <ente>` na lista de 2026.
 - **Limite:** é uma janela só (90 votações, 74 de 2026). Votações de comissão (`votacaoComissao`) não entram em `/votacao` e não foram medidas.
 
@@ -442,7 +444,7 @@ Por quê, com o que foi medido:
 
 1. **É o que as votações já guardam como ligação** (`SenateVoting.process_id`, `models.py:133`) e vem em 90 de 90 votações; não há processo votado sem ele.
 2. **1:1 com `codigoMateria`** nos 28.355 processos lidos (e 71 de 71 nas votações): trocar de um para outro não perde informação nem cria ambiguidade.
-3. **`codigoMateria` é o id legado**: o `senado.md` registra que o endpoint `/materia/{id}` está depreciado com `Sunset` vencido, e que o sucessor é `processo/{idProcesso}`. O ADR 0008 (decisão 7) pede nada novo sobre endpoints depreciados.
+3. **`codigoMateria` é o id legado**: o `senado.md` registra que o endpoint `/materia/{id}` está depreciado com `Sunset` vencido, e que o sucessor é `processo/{idProcesso}`. O ADR 0008 (decisão 7) pede que não se construa nada novo sobre endpoints depreciados.
 4. **`identificacao` não serve de chave por si só**: é única nos dados lidos, mas o texto tem três formas, o número base se repete em `REQ` (31 vezes para `REQ 1/2026`) e o `ano` do número não é o ano da apresentação (os filtros `ano=2026` e `dataApresentacao` em 2026 divergem em **724** processos: 716 só por data e 8 só por `ano`). Serve como texto legível e como chave natural **com** o sufixo, se o dono preferir algo legível.
 5. **Consulta por id é barata**: `?idProcesso=` aceita vários ids numa requisição (43 numa só, 0,36 s) e `/processo/{id}` devolve o detalhe.
 
@@ -452,7 +454,7 @@ Para a fonte do escopo temporal, os dados medidos deixam três caminhos, **sem r
 
 ## Perguntas para o dono
 
-1. **Escopo temporal.** O filtro `ano=2026` liga 33 de 90 votações medidas (37%; 33 de 74, 45%, se só se contam as votações de 2026; com `tramitando=S` seriam 34 de 90, 38%), numa janela única; a fração cai com o tempo, porque a tabela de votações acumula. Qual escopo vale para o Senado: (a) 2025 + 2026, (b) a legislatura atual (`tramitouLegislaturaAtual`, 26.978 itens; 42 s e 22,9 MB numa requisição), (c) só os processos citados por votações, ou (d) outro? O "só 2026" da Câmara (ADR 0033) funciona lá porque os arquivos de votações trazem a proposição junto; aqui não.
+1. **Escopo temporal.** O filtro `ano=2026` liga 33 de 90 votações medidas (37%; 33 de 74, 45%, se só se contam as votações de 2026; com `tramitando=S` seriam 34 de 90, 38%), numa janela única; a fração tende a cair com o tempo se o escopo for um ano fixo, porque a tabela de votações acumula. Na Câmara a cobertura vem dos arquivos de votações (ADR 0033, decisão 1); aqui `ano=2026` liga 33 de 90 (45% das 74 votações de 2026). Se isso basta é decisão sua. Qual escopo vale para o Senado: (a) 2025 + 2026, (b) a legislatura atual (`tramitouLegislaturaAtual`, 26.978 itens; 22,9 MB numa requisição, 42 s numa medição não confiável), (c) só os processos citados por votações, ou (d) outro?
 2. **Quais tipos entram.** Em 2026, `REQ` e `RQS` são 64% dos 3.467 (1.413 + 816). Entram todos os 27 tipos, ou só os legislativos (`PL`, `PLP`, `PEC`, `PDL`, `MPV`, `PRS`, `VET`, `PLN` e afins)? As votações medidas usam só `MSF`, `PLP`, `PEC`, `OFS`, `PL`, `RQS` e `PDL`. **Atenção:** restringir a `PL`, `PLP`, `PEC`, `PDL`, `MPV`, `PRS`, `VET` e `PLN` deixa **40 de 90 votações (44%) sem processo** na base (`MSF` 30, `OFS` 8, `RQS` 2; bloco 7), e a votação guarda `process_id` obrigatório (`models.py:133`).
 3. **Chave de origem.** Concorda com o `id` do processo (e o `codigoMateria` como atributo)? Quer guardar também `identificacao`, com o sufixo de ente em `REQ`, como texto de exibição?
 4. **Autoria.** `autoria` (texto de até 12.010 caracteres, em todos os itens) **não está** na allowlist do Senado do ADR 0005 (a lista diz: `id`, `codigoMateria`, identificação, ementa, datas, situação, tipo, URL). Não imprimi nenhum valor (só contei, bloco 5); em 67 `PL` de 2026 o texto cita `Câmara`, e é provável que traga nomes de parlamentares. Fica fora, entra como ligação por código (como o ADR 0033 fez com `deputado_id`), ou entra? É decisão de allowlist e de dado pessoal (ADR 0005 e P-16), não minha.
@@ -477,5 +479,9 @@ Para a fonte do escopo temporal, os dados medidos deixam três caminhos, **sem r
   - os cabeçalhos das 4 respostas gravadas com `-D` (`Age`, `cache-control`);
   - a leitura dos 3 detalhes `/processo/{id}` (campos, `siglaCasaIniciadora`, `idProcessoCasaInicial`, `identificacaoExterna` vazio, `numero` texto e `ano` inteiro): n=3, respostas no scratchpad;
   - a lista dos 43 ids fora dos filtros foi gravada num arquivo à parte na hora (o bloco bash a recalcula pelo mesmo critério, mas esse recálculo não foi executado);
-  - a descrição e os parâmetros de `/processo` na especificação (`documentado`, lidos num trecho avulso do `api-docs`; o script só imprime versão, caminhos e depreciados).
+  - a descrição e os parâmetros de `/processo` na especificação (`documentado`, lidos num trecho avulso do `api-docs`; o script só imprime versão, caminhos e depreciados);
+  - os exemplos de `identificacao` fora do formato `SIGLA N/AAAA`: o script só conta (40 em `?tramitando=S` sem ano no formato, 1.420 em 2026); os exemplos vistos foram `MPV 2167-53/2001` (traço no número) e o par `REQ 1/2026 - CDIR` e `REQ 1/2026 - MPV 1323/2025`, lidos numa consulta avulsa;
+  - os 4 `-D` e os valores de `Age` (acima).
 - **Os arquivos de resposta não estão no repositório**; quem repetir a medição obterá números maiores (o Senado atualiza `/processo` todo dia).
+
+**Para quem cita este arquivo:** referir por **seção** (por exemplo "seção 3, cruzamento só com 2026"), nunca por número de linha. Os únicos cabeçalhos HTTP gravados (`-D`) foram em 4 respostas: `?ano=2026`, `/processo/8986903`, `?codigoMateria=172391` e `?sigla=PEC&ano=2026`. **Não** houve cabeçalho gravado para `?tramitando=S` nem para as outras 14.

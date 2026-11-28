@@ -35,7 +35,7 @@ export function dataOuDataHoraBrasilia(iso) {
   if (Number.isNaN(instante.getTime())) return null;
   const p = Object.fromEntries(EM_BRASILIA.formatToParts(instante).map((x) => [x.type, x.value]));
   const data = `${p.day}/${p.month}/${p.year}`;
-  return p.hour === "00" && p.minute === "00" ? data : `${data} às ${p.hour}:${p.minute}`;
+  return p.minute === "00" ? data : `${data} às ${p.hour}:${p.minute}`;
 }
 
 // Link vindo da fonte só é link se for http(s). `javascript:`, `data:`, `ftp:` e endereço sem

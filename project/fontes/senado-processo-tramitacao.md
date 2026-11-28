@@ -258,8 +258,12 @@ todos = dirigida + aleatoria
 def linha(d, arq):
     a = d["autuacoes"]
     return dict(
-        ident=d["identificacao"], id=d["id"], bytes=os.path.getsize(arq),
-        autuacoes=len(a), informes=len(informes(d)), distintos=len(distintos(d)),
+        ident=d["identificacao"],
+        id=d["id"],
+        bytes=os.path.getsize(arq),
+        autuacoes=len(a),
+        informes=len(informes(d)),
+        distintos=len(distintos(d)),
         mov=sum(len(u.get("movimentacoes", [])) for u in a),
         sit=sum(len(u.get("situacoes", [])) for u in a),
         desp=len(d.get("despachos", [])),
@@ -271,10 +275,23 @@ for nome in ("dirigida", "aleatoria"):
     rows = [linha(json.load(open(f)), f) for f in arqs]
     print("##", nome, len(rows), "processos")
     for r in rows:
-        print(r["ident"], r["id"], r["bytes"], r["autuacoes"], r["informes"], r["distintos"], r["mov"], r["sit"], r["desp"], sep=" | ")
+        print(
+            r["ident"],
+            r["id"],
+            r["bytes"],
+            r["autuacoes"],
+            r["informes"],
+            r["distintos"],
+            r["mov"],
+            r["sit"],
+            r["desp"],
+            sep=" | ",
+        )
     for k in ("bytes", "informes", "distintos", "mov", "sit"):
         v = sorted(r[k] for r in rows)
-        print(f"{k}: min {v[0]} mediana {statistics.median(v)} media {statistics.mean(v):.1f} max {v[-1]}")
+        print(
+            f"{k}: min {v[0]} mediana {statistics.median(v)} media {statistics.mean(v):.1f} max {v[-1]}"
+        )
 ```
 
 Saída (resumo; as linhas por processo estão nas tabelas acima): dirigida `bytes: min 3228 mediana 18171.0 media 88579.7 max 978415`, `informes: min 0 mediana 12.0 media 46.0 max 375`, `distintos: min 0 mediana 10.5 media 23.7 max 207`, `mov: min 0 mediana 3.5 media 6.3 max 30`; aleatória `bytes: min 2632 mediana 9068.0 media 12418.6 max 94208`, `informes: min 0 mediana 6.0 media 12.6 max 160`, `distintos: min 0 mediana 6.0 media 6.2 max 25`, `mov: min 0 mediana 2.0 media 2.1 max 10`, `sit: min 1 mediana 3.0 media 3.9 max 12`.
@@ -288,12 +305,22 @@ def forma(s):
 
 bru = [(d["id"], x) for d in todos for x in informes(d)]
 dis = {(p, x["id"]): x for p, x in bru}
-print("processos", len(todos), "| informes brutos", len(bru), "| distintos por (processo, id)", len(dis))
+print(
+    "processos",
+    len(todos),
+    "| informes brutos",
+    len(bru),
+    "| distintos por (processo, id)",
+    len(dis),
+)
 
 # tipos das chaves de um informe e de uma movimentacao
 for rot, itens in (
     ("informe", [x for _, x in bru]),
-    ("movimentacao", [m for d in todos for a in d["autuacoes"] for m in a.get("movimentacoes", [])]),
+    (
+        "movimentacao",
+        [m for d in todos for a in d["autuacoes"] for m in a.get("movimentacoes", [])],
+    ),
     ("situacao", [s for d in todos for a in d["autuacoes"] for s in a.get("situacoes", [])]),
 ):
     c, t = collections.Counter(), collections.defaultdict(collections.Counter)
@@ -309,8 +336,16 @@ for rot, itens in (
 inf = [x for _, x in bru]
 mov = [m for d in todos for a in d["autuacoes"] for m in a.get("movimentacoes", [])]
 print("informe.data:", collections.Counter(forma(x["data"]) for x in inf))
-print("mov.dataEnvio:", collections.Counter(forma(m["dataEnvio"]) for m in mov), "| dataRecebimento:", collections.Counter(forma(m["dataRecebimento"]) for m in mov))
-print("dthUltimaAtualizacao:", collections.Counter(forma(d.get("dthUltimaAtualizacao")) for d in todos))
+print(
+    "mov.dataEnvio:",
+    collections.Counter(forma(m["dataEnvio"]) for m in mov),
+    "| dataRecebimento:",
+    collections.Counter(forma(m["dataRecebimento"]) for m in mov),
+)
+print(
+    "dthUltimaAtualizacao:",
+    collections.Counter(forma(d.get("dthUltimaAtualizacao")) for d in todos),
+)
 
 # copias exatas
 por_proc = collections.defaultdict(list)
@@ -318,20 +353,50 @@ for p, x in bru:
     por_proc[(p, x["id"])].append(x)
 extra = sum(len(v) - 1 for v in por_proc.values())
 identicas = sum(1 for v in por_proc.values() for y in v[1:] if y == v[0])
-print("copias extras do mesmo id no mesmo processo:", extra, "| identicas ao primeiro (dict inteiro):", identicas)
-print("processos com alguma copia extra:", len({p for (p, i), v in por_proc.items() if len(v) > 1}), "de", len({p for p, _ in bru}), "com informes")
+print(
+    "copias extras do mesmo id no mesmo processo:",
+    extra,
+    "| identicas ao primeiro (dict inteiro):",
+    identicas,
+)
+print(
+    "processos com alguma copia extra:",
+    len({p for (p, i), v in por_proc.items() if len(v) > 1}),
+    "de",
+    len({p for p, _ in bru}),
+    "com informes",
+)
 
 # mesmo id de informe em processos diferentes?
 procs_por_id = collections.defaultdict(set)
 for p, i in dis:
     procs_por_id[i].add(p)
-print("ids de informe que aparecem em mais de um processo:", sum(1 for s in procs_por_id.values() if len(s) > 1))
+print(
+    "ids de informe que aparecem em mais de um processo:",
+    sum(1 for s in procs_por_id.values() if len(s) > 1),
+)
 mids = [m["id"] for d in todos for a in d["autuacoes"] for m in a.get("movimentacoes", [])]
-print("movimentacoes: ids", len(mids), "distintos", len(set(mids)), "| ids em comum com informes:", len(set(mids) & {i for _, i in dis}))
+print(
+    "movimentacoes: ids",
+    len(mids),
+    "distintos",
+    len(set(mids)),
+    "| ids em comum com informes:",
+    len(set(mids) & {i for _, i in dis}),
+)
 
 # ordem em que a fonte entrega
-cresc = sum(1 for d in todos if informes(d) and [x["data"] for x in informes(d)] == sorted(x["data"] for x in informes(d)))
-print("processos com informes: ", sum(1 for d in todos if informes(d)), "| em ordem crescente de `data`:", cresc)
+cresc = sum(
+    1
+    for d in todos
+    if informes(d) and [x["data"] for x in informes(d)] == sorted(x["data"] for x in informes(d))
+)
+print(
+    "processos com informes: ",
+    sum(1 for d in todos if informes(d)),
+    "| em ordem crescente de `data`:",
+    cresc,
+)
 emp = sum(1 for d in todos if len({x["data"] for x in distintos(d)}) < len(distintos(d)))
 print("processos com 2+ informes distintos na MESMA data-hora:", emp)
 print("autuacoes por processo:", collections.Counter(len(d["autuacoes"]) for d in todos))
@@ -349,7 +414,7 @@ print("informes distintos:", len(U))
 print("hora exatamente 00:00:00:", sum(1 for x in U if x["data"][11:] == "00:00:00"))
 print("hora 00:00:xx (qualquer segundo):", sum(1 for x in U if x["data"][11:16] == "00:00"))
 print("hora 00:10:00:", sum(1 for x in U if x["data"][11:] == "00:10:00"))
-print(f"esperado por acaso, 1 minuto em 1440: {100/1440:.3f}%")
+print(f"esperado por acaso, 1 minuto em 1440: {100 / 1440:.3f}%")
 
 # por ano da `data`: [total, 00:00:xx, 00:10:00]
 por_ano = collections.defaultdict(lambda: [0, 0, 0])
@@ -363,15 +428,34 @@ for ano, v in sorted(por_ano.items()):
 
 # so 2026
 r26 = [x for x in U if x["data"].startswith("2026")]
-print("2026: n", len(r26), "| 00:00:00:", sum(1 for x in r26 if x["data"][11:] == "00:00:00"),
-      "| 00:00:xx:", sum(1 for x in r26 if x["data"][11:16] == "00:00"))
-print("anos < 2020, segundos dos 00:00:xx:", sorted(collections.Counter(x["data"][17:] for x in U if x["data"][:4] < "2020" and x["data"][11:16] == "00:00").items()))
+print(
+    "2026: n",
+    len(r26),
+    "| 00:00:00:",
+    sum(1 for x in r26 if x["data"][11:] == "00:00:00"),
+    "| 00:00:xx:",
+    sum(1 for x in r26 if x["data"][11:16] == "00:00"),
+)
+print(
+    "anos < 2020, segundos dos 00:00:xx:",
+    sorted(
+        collections.Counter(
+            x["data"][17:] for x in U if x["data"][:4] < "2020" and x["data"][11:16] == "00:00"
+        ).items()
+    ),
+)
 print("2026, hora do dia:", sorted(collections.Counter(int(x["data"][11:13]) for x in r26).items()))
 
 # movimentacoes
 mov = [m for d in todos for a in d["autuacoes"] for m in a.get("movimentacoes", [])]
-print("movimentacoes:", len(mov), "| dataEnvio 00:00:00:", sum(1 for m in mov if m["dataEnvio"][11:] == "00:00:00"),
-      "| dataRecebimento 00:00:00:", sum(1 for m in mov if (m["dataRecebimento"] or "")[11:] == "00:00:00"))
+print(
+    "movimentacoes:",
+    len(mov),
+    "| dataEnvio 00:00:00:",
+    sum(1 for m in mov if m["dataEnvio"][11:] == "00:00:00"),
+    "| dataRecebimento 00:00:00:",
+    sum(1 for m in mov if (m["dataRecebimento"] or "")[11:] == "00:00:00"),
+)
 
 # o unico 00:00:00 de 2026
 for d in todos:
@@ -380,9 +464,20 @@ for d in todos:
             print("o caso de 2026:", d["identificacao"], x["data"], repr(x["descricao"][:70]))
 
 com26 = lambda ds: sum(any(x["data"].startswith("2026") for x in distintos(d)) for d in ds)
-print("processos com algum informe distinto de 2026:", com26(todos), "de", len(todos), "| dirigida:", com26(dirigida), "| aleatoria:", com26(aleatoria))
+print(
+    "processos com algum informe distinto de 2026:",
+    com26(todos),
+    "de",
+    len(todos),
+    "| dirigida:",
+    com26(dirigida),
+    "| aleatoria:",
+    com26(aleatoria),
+)
 
-h0 = collections.Counter(d["identificacao"] for d in todos for x in distintos(d) if x["data"][11:13] == "00")
+h0 = collections.Counter(
+    d["identificacao"] for d in todos for x in distintos(d) if x["data"][11:13] == "00"
+)
 print("informes na hora 00, por processo:", h0.most_common(3), "| total:", sum(h0.values()))
 ```
 
@@ -395,27 +490,67 @@ U = [x for d in todos for x in distintos(d)]
 L = [x["descricao"] for x in U]
 print("descricoes distintas:", len(L), "| vazias:", sum(1 for s in L if not s.strip()))
 ln = sorted(len(s) for s in L)
-print("tamanho min/mediana/p99/max:", ln[0], statistics.median(ln), ln[int(0.99 * len(ln)) - 1], ln[-1])
-print("com \\r\\n:", sum("\r\n" in s for s in L), "| com \\n sem \\r:", sum("\n" in s and "\r" not in s for s in L),
-      "| com \\r sem \\n:", sum("\r" in s and "\n" not in s for s in L), "| com \\t:", sum("\t" in s for s in L))
-print("controle alem de \\t \\n \\r:", sum(bool(re.search(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]", s)) for s in L))
+print(
+    "tamanho min/mediana/p99/max:",
+    ln[0],
+    statistics.median(ln),
+    ln[int(0.99 * len(ln)) - 1],
+    ln[-1],
+)
+print(
+    "com \\r\\n:",
+    sum("\r\n" in s for s in L),
+    "| com \\n sem \\r:",
+    sum("\n" in s and "\r" not in s for s in L),
+    "| com \\r sem \\n:",
+    sum("\r" in s and "\n" not in s for s in L),
+    "| com \\t:",
+    sum("\t" in s for s in L),
+)
+print(
+    "controle alem de \\t \\n \\r:",
+    sum(bool(re.search(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]", s)) for s in L),
+)
 print("espaco no comeco ou no fim:", sum(s != s.strip() for s in L))
 
 # dado pessoal no texto (regex = estimativa por baixo/por cima, nao leitura)
 pad = {
-    "Senador/Senadora": r"\b[Ss]enador(a)?\b", "Deputado/Deputada": r"\b[Dd]eputad[oa]\b", "Relator/Relatora": r"\b[Rr]elator(a)?\b",
-    "Ministro/Ministra": r"\bMinistr[oa]\b", "Sr./Sra./Dr./Dra.": r"\b(Sr|Sra|Dr|Dra)\.", "nome (PARTIDO/UF)": r"\([A-Za-z\-]{2,12}/[A-Z]{2}\)",
-    "CPF": r"\d{3}\.\d{3}\.\d{3}-\d{2}", "CNPJ": r"\d{2}\.\d{3}\.\d{3}/\d{4}-\d{2}", "e-mail": r"[\w.\-]+@[\w\-]+\.[\w.\-]+", "telefone": r"\(?\d{2}\)?\s?9?\d{4}-\d{4}",
+    "Senador/Senadora": r"\b[Ss]enador(a)?\b",
+    "Deputado/Deputada": r"\b[Dd]eputad[oa]\b",
+    "Relator/Relatora": r"\b[Rr]elator(a)?\b",
+    "Ministro/Ministra": r"\bMinistr[oa]\b",
+    "Sr./Sra./Dr./Dra.": r"\b(Sr|Sra|Dr|Dra)\.",
+    "nome (PARTIDO/UF)": r"\([A-Za-z\-]{2,12}/[A-Z]{2}\)",
+    "CPF": r"\d{3}\.\d{3}\.\d{3}-\d{2}",
+    "CNPJ": r"\d{2}\.\d{3}\.\d{3}/\d{4}-\d{2}",
+    "e-mail": r"[\w.\-]+@[\w\-]+\.[\w.\-]+",
+    "telefone": r"\(?\d{2}\)?\s?9?\d{4}-\d{4}",
 }
 for k, p in pad.items():
     print(f"{k}: {sum(bool(re.search(p, s)) for s in L)} de {len(L)}")
 
 # convidados de audiencia: trechos "Sr. <nome>, <cargo>" (so a forma do trecho, sem nomes)
-tr = [m.group(0) for s in L for m in re.finditer(r"\b(Sr|Sra)\.\s+[A-ZÁÉÍÓÚÂÊÔÃÕÇ][^,;.]{2,60},\s*[^,;.]{3,60}", s)]
-print("trechos 'Sr./Sra. Nome, cargo':", len(tr), "| forma de um deles, nome omitido:", re.sub(r"^(Sr|Sra)\.\s+[^,]+", r"\1. <nome>", tr[0]))
+tr = [
+    m.group(0)
+    for s in L
+    for m in re.finditer(r"\b(Sr|Sra)\.\s+[A-ZÁÉÍÓÚÂÊÔÃÕÇ][^,;.]{2,60},\s*[^,;.]{3,60}", s)
+]
+print(
+    "trechos 'Sr./Sra. Nome, cargo':",
+    len(tr),
+    "| forma de um deles, nome omitido:",
+    re.sub(r"^(Sr|Sra)\.\s+[^,]+", r"\1. <nome>", tr[0]),
+)
 
 da = [y for x in U for y in x.get("documentosAssociados", [])]
-print("documentosAssociados:", len(da), "| chaves:", sorted({k for y in da for k in y}), "| com `autoria`:", sum(1 for y in da if y.get("autoria")))
+print(
+    "documentosAssociados:",
+    len(da),
+    "| chaves:",
+    sorted({k for y in da for k in y}),
+    "| com `autoria`:",
+    sum(1 for y in da if y.get("autoria")),
+)
 ```
 
 Saída: `descricoes distintas: 670 | vazias: 0`; `tamanho min/mediana/p99/max: 12 137.0 2125 4176`; `com \r\n: 169 | com \n sem \r: 43 | com \r sem \n: 0 | com \t: 1`; `controle alem de \t \n \r: 0`; `espaco no comeco ou no fim: 19`; Senador/Senadora 324, Deputado/Deputada 12, Relator/Relatora 87, Ministro/Ministra 11, Sr./Sra./Dr./Dra. 36, nome (PARTIDO/UF) 7, CPF 0, CNPJ 0, e-mail 0, telefone 0 (todos "de 670"); `trechos 'Sr./Sra. Nome, cargo': 145`; `documentosAssociados: 2750 | chaves: ['autoria', 'data', 'descricao', 'id', 'identificacao', 'siglaTipo', 'tipo', 'url'] | com autoria: 2750`. O "36" de "Sr./Sra./Dr./Dra." inclui o "Dr." usado antes do nome de senadores; os 145 trechos "Sr./Sra. Nome, cargo" vêm do padrão mais estreito.
@@ -426,32 +561,60 @@ Saída: `descricoes distintas: 670 | vazias: 0`; `tamanho min/mediana/p99/max: 1
 apres26 = {x["id"] for x in json.load(open(f"{D}/lista2026.json"))}
 tramit = {x["id"] for x in json.load(open(f"{D}/tramitando.json"))}
 uniao = apres26 | tramit
-print("apresentados em 2026:", len(apres26), "| tramitando:", len(tramit), "| interseccao:", len(apres26 & tramit), "| uniao:", len(uniao))
+print(
+    "apresentados em 2026:",
+    len(apres26),
+    "| tramitando:",
+    len(tramit),
+    "| interseccao:",
+    len(apres26 & tramit),
+    "| uniao:",
+    len(uniao),
+)
 
 d26 = [sum(x["data"].startswith("2026") for x in distintos(d)) for d in aleatoria]
 em26 = [d["id"] in apres26 for d in aleatoria]
-print("amostra aleatoria: n", len(d26), "| apresentados em 2026:", sum(em26), "| informes distintos com data em 2026 (soma):", sum(d26))
+print(
+    "amostra aleatoria: n",
+    len(d26),
+    "| apresentados em 2026:",
+    sum(em26),
+    "| informes distintos com data em 2026 (soma):",
+    sum(d26),
+)
 print("por processo (d26):", sorted(d26))
 m = statistics.mean(d26)
-print(f"media {m:.2f} mediana {statistics.median(d26)} max {max(d26)} -> x uniao = {m * len(uniao):.0f}")
+print(
+    f"media {m:.2f} mediana {statistics.median(d26)} max {max(d26)} -> x uniao = {m * len(uniao):.0f}"
+)
 random.seed(7)
 bs = sorted(statistics.mean(random.choices(d26, k=len(d26))) * len(uniao) for _ in range(5000))
 print(f"bootstrap (5000, semente 7) 2,5% = {bs[125]:.0f}  97,5% = {bs[4874]:.0f}")
 e = [v for v, f in zip(d26, em26) if f]
 o = [v for v, f in zip(d26, em26) if not f]
-print(f"estrato apresentados em 2026: n {len(e)} media {statistics.mean(e):.2f} x {len(apres26)} = {statistics.mean(e) * len(apres26):.0f}")
-print(f"estrato anteriores a 2026 (tramitando): n {len(o)} media {statistics.mean(o):.2f} x {len(uniao) - len(apres26)} = {statistics.mean(o) * (len(uniao) - len(apres26)):.0f}")
+print(
+    f"estrato apresentados em 2026: n {len(e)} media {statistics.mean(e):.2f} x {len(apres26)} = {statistics.mean(e) * len(apres26):.0f}"
+)
+print(
+    f"estrato anteriores a 2026 (tramitando): n {len(o)} media {statistics.mean(o):.2f} x {len(uniao) - len(apres26)} = {statistics.mean(o) * (len(uniao) - len(apres26)):.0f}"
+)
 
 tam = [os.path.getsize(f) for f in glob.glob(f"{D}/aleatoria/p*.json")]
-print(f"bytes por detalhe (aleatoria): mediana {statistics.median(tam):.0f} media {statistics.mean(tam):.0f} -> x uniao = {statistics.mean(tam) * len(uniao) / 1e6:.0f} MB; x apres26 = {statistics.mean(tam) * len(apres26) / 1e6:.0f} MB")
+print(
+    f"bytes por detalhe (aleatoria): mediana {statistics.median(tam):.0f} media {statistics.mean(tam):.0f} -> x uniao = {statistics.mean(tam) * len(uniao) / 1e6:.0f} MB; x apres26 = {statistics.mean(tam) * len(apres26) / 1e6:.0f} MB"
+)
 for n, rotulo in ((len(uniao), "uniao"), (len(apres26), "apresentados em 2026")):
-    print(f"carga em serie, 1 detalhe a cada 3 s, {rotulo}: {n} req = {n * 3 / 3600:.1f} h (so a pausa)")
+    print(
+        f"carga em serie, 1 detalhe a cada 3 s, {rotulo}: {n} req = {n * 3 / 3600:.1f} h (so a pausa)"
+    )
 
 # incremental pelo filtro numdias
 for n in (1, 7):
     v = json.load(open(f"{D}/numdias{n}.json"))
     ts = sorted(x["dataUltimaAtualizacao"] for x in v)
-    print(f"numdias={n}: {len(v)} processos; dataUltimaAtualizacao de {ts[0]} a {ts[-1]}; {len(v) * 3 / 60:.0f} min de pausas para buscar todos os detalhes")
+    print(
+        f"numdias={n}: {len(v)} processos; dataUltimaAtualizacao de {ts[0]} a {ts[-1]}; {len(v) * 3 / 60:.0f} min de pausas para buscar todos os detalhes"
+    )
 ```
 
 Saída: `apresentados em 2026: 4175 | tramitando: 10951 | interseccao: 2255 | uniao: 12871`; `amostra aleatoria: n 24 | apresentados em 2026: 8 | informes distintos com data em 2026 (soma): 30`; `por processo (d26): [0 x17, 2, 2, 3, 4, 6, 6, 7]`; `media 1.25 mediana 0.0 max 7 -> x uniao = 16089`; `bootstrap (5000, semente 7) 2,5% = 5363  97,5% = 28423`; `estrato apresentados em 2026: n 8 media 2.38 x 4175 = 9916`; `estrato anteriores a 2026 (tramitando): n 16 media 0.69 x 8696 = 5978`; `bytes por detalhe (aleatoria): mediana 9068 media 12419 -> x uniao = 160 MB; x apres26 = 52 MB`; `uniao: 12871 req = 10.7 h`; `apresentados em 2026: 4175 req = 3.5 h`; `numdias=1: 328 processos; dataUltimaAtualizacao de 2026-11-25T17:37:06.897 a 2026-11-27T18:54:29.011; 16 min`; `numdias=7: 1110 processos; ... de 2026-11-21T11:16:57.091 a 2026-11-27T18:54:29.011; 56 min`.
@@ -461,14 +624,31 @@ Saída: `apresentados em 2026: 4175 | tramitando: 10951 | interseccao: 2255 | un
 ```python
 U = [x for d in todos for x in distintos(d)]
 print("informes distintos:", len(U))
-print("com siglaSituacaoIniciada:", sum("siglaSituacaoIniciada" in x for x in U), "| valores distintos:", len({x["siglaSituacaoIniciada"] for x in U if "siglaSituacaoIniciada" in x}))
-print("colegiado.sigla distintas:", len({x["colegiado"].get("sigla") for x in U}), "| colegiado vazio:", sum(not x["colegiado"] for x in U))
+print(
+    "com siglaSituacaoIniciada:",
+    sum("siglaSituacaoIniciada" in x for x in U),
+    "| valores distintos:",
+    len({x["siglaSituacaoIniciada"] for x in U if "siglaSituacaoIniciada" in x}),
+)
+print(
+    "colegiado.sigla distintas:",
+    len({x["colegiado"].get("sigla") for x in U}),
+    "| colegiado vazio:",
+    sum(not x["colegiado"] for x in U),
+)
 print("enteAdministrativo.sigla distintas:", len({x["enteAdministrativo"]["sigla"] for x in U}))
 print("com documentosAssociados:", sum(bool(x.get("documentosAssociados")) for x in U))
 print("chaves de um informe, na ordem em que vieram:", list(U[0].keys()))
 print("tamanho de `descricao` (caracteres), maximo:", max(len(x["descricao"]) for x in U))
 print("ids de informe: min", min(x["id"] for x in U), "max", max(x["id"] for x in U))
-print("processos:", len(todos), "| chaves de topo (uniao):", len({k for d in todos for k in d}), "| chaves de topo (todos tem):", sorted(set.intersection(*[set(d) for d in todos])))
+print(
+    "processos:",
+    len(todos),
+    "| chaves de topo (uniao):",
+    len({k for d in todos for k in d}),
+    "| chaves de topo (todos tem):",
+    sorted(set.intersection(*[set(d) for d in todos])),
+)
 ```
 
 Saída: `com siglaSituacaoIniciada: 248 | valores distintos: 34`; `colegiado.sigla distintas: 17 | colegiado vazio: 70` (o 17 conta o valor ausente como um valor); `enteAdministrativo.sigla distintas: 22`; `com documentosAssociados: 364`; `ids de informe: min 93334 max 2333088`; `chaves de topo (uniao): 42`.
@@ -483,4 +663,4 @@ ids = random.sample(sorted(apres26 | tramit), 24)
 print(*ids)
 ```
 
-Saída (grave em `aleatoria/ids.txt`, um id por linha, antes do download): `8861962 7897075 9106496 9135954 7834921 3335633 9048998 8756412 8747042 8696463 8992806 9082795 7748539 8380185 9112008 8694974 7835670 9052244 8932012 8239329 8908708 8494730 8696986 9095406`.
+Saída (grave-a em `aleatoria/ids.txt` antes do download; o `for id in $(cat ...)` aceita os ids separados por espaço): `8861962 7897075 9106496 9135954 7834921 3335633 9048998 8756412 8747042 8696463 8992806 9082795 7748539 8380185 9112008 8694974 7835670 9052244 8932012 8239329 8908708 8494730 8696986 9095406`.

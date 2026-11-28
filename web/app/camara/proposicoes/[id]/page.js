@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 
 import { buscarProposicaoDaCamara } from "../../../../lib/api.js";
 import { NOTA_DAS_TRAMITACOES, SEM_TRAMITACAO } from "../../../../lib/camara.js";
-import { dataHoraBrasilia } from "../../../../lib/formatar.js";
+import { dataOuDataHoraBrasilia } from "../../../../lib/formatar.js";
 import Atribuicao from "../../../pessoas/[id]/Atribuicao.js";
 import Ementa from "../../Ementa.js";
 
@@ -30,7 +30,7 @@ function Campo({ rotulo, children }) {
 }
 
 // Na ordem que a API manda (ADR 0035, decisão 5). A hora vem como instante com o deslocamento e é
-// mostrada em Brasília (nunca cortando o texto). A `sequencia` não aparece: o significado dela não
+// mostrada em Brasília (nunca cortando o texto); em 00:00 só a data (P-23). A `sequencia` não aparece: o significado dela não
 // foi verificado e a ordem já a usa. Órgão e descrição são texto livre da fonte: o React os escapa.
 function Tramitacoes({ tramitacoes }) {
   return (
@@ -46,7 +46,7 @@ function Tramitacoes({ tramitacoes }) {
       <tbody>
         {tramitacoes.map((item, indice) => (
           <tr key={indice}>
-            <td>{dataHoraBrasilia(item.data_hora)}</td>
+            <td>{dataOuDataHoraBrasilia(item.data_hora)}</td>
             <td>{item.orgao}</td>
             <td>{item.descricao}</td>
           </tr>

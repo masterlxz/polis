@@ -2,6 +2,16 @@
 
 Mais recente no topo.
 
+### 2026-11-28 — Sessão 118 (preparo da verificação das tramitações da Câmara com dado real no PC do dono; sessão individual; só registro, nenhum código)
+
+- **Pedido**: a recomendação foi fechar a fatia das tramitações antes de abrir outra, vendo as telas com dado real no navegador do dono (as Sessões 115 a 117 só tinham fotos do Chrome do CI com dado sintético). Plano aprovado em plan mode; sem mudança de código.
+- **Achado de ambiente (o principal)**: o banco de desenvolvimento é **por PC**. Neste PC (checkout `~/Documents/workspace/polis`, volume `polis_pgdata`) só havia `deputados` e `proposicoes-tramitacoes-2026`: **votações, votos, proposições e ligações em 0**, e os quatro conjuntos correspondentes `enabled = f`, sem justificativa e sem coleta. A Sessão 112 (votações, votos e proposições) foi no **outro PC**. Sem proposição conhecida a API devolve 404 e o link da votação não aparece (ADR 0035, decisão 2), então as 118.684 tramitações estavam carregadas e não navegáveis. O dono decidiu usar só este PC.
+- **Feito neste PC (fora do git)**: checkout levado a `6e257cf` com `merge --ff-only` (estava 9 commits atrás, 0 só locais); Compose reconstruído (`up -d --build web front`; o `front` usa `build: ./web`, então sem `--build` subiria a imagem antiga); `migrate` sem nada a aplicar. Os quatro conjuntos foram habilitados com justificativa de licença **redigida por mim a partir dos ADRs 0031 e 0033 e aprovada pelo dono** (256, 261, 267 e 263 caracteres: "sem licença declarada, uso interno de desenvolvimento, sem redistribuição, uso comercial nem publicação, P-16"), coletados (9.421 votações, 58.759 votos, 7.164 e 39.434 linhas) e normalizados sem recusa. Contagens depois: 26.754 proposições, 46.598 ligações (22 a mais que as 46.576 da Sessão 112: o arquivo cresceu), 118.684 tramitações. Maior ementa 5.253 caracteres (o registro dizia 5.259; causa não verificada).
+- **Achado de dado**: **33.508 das 118.684 tramitações (28,2%) estão exatamente em `00:00`** no horário de Brasília. É improvável que seja hora real; a fonte provavelmente só informa a data. A página mostra a hora, e isso afirma uma precisão que a fonte pode não ter (P-23).
+- **Casos escolhidos para a leitura** (consulta somente leitura, ids reais): proposições `1228863` (98 tramitações), `2654954` (ementa de 3.318 caracteres, 2 tramitações), `2604376` (ementa de 5.253, sem tramitação), `2660154` (sem tramitação), `2432712` (ementa vazia), `999999999` (404); votações `2234260-166` (213 proposições) e `2617160-15` (4, todas com tramitação).
+- **Não feito**: a leitura no navegador (o dono preferiu deixar para depois: P-22). Nada foi visto numa tela real; os serviços ficaram no ar em localhost.
+- **Não verificado**: a causa da diferença de 6 caracteres na maior ementa; se o outro PC tem tramitações carregadas; as páginas com dado real, o celular, o abrir e fechar do `<details>` e o 404 no navegador.
+
 ### 2026-11-27 — Sessão 117 (medição de latência das páginas das tramitações da Câmara no CI; sessão individual)
 
 - **Pedido**: seguir "em código". A recomendação foi medir a latência dos piores casos (ADR 0010, P-14), que só tinha tamanho de resposta medido. Plano aprovado em plan mode (rotina nova de CI).

@@ -26,6 +26,18 @@ export function dataHoraBrasilia(iso) {
   return `${p.day}/${p.month}/${p.year} às ${p.hour}:${p.minute}`;
 }
 
+// Tramitação da Câmara (P-23): 28,2% das medidas estão em 00:00 de Brasília, quando por acaso
+// seriam ~0,07%. A fonte provavelmente só informa a data, então 00:00 mostra só "07/05/2026".
+// A regra olha o instante em Brasília (não o texto) e vale só aqui: `dataHoraBrasilia` segue
+// mostrando 00:00, porque na coleta e no Senado ele é um instante real.
+export function dataOuDataHoraBrasilia(iso) {
+  const instante = new Date(iso);
+  if (Number.isNaN(instante.getTime())) return null;
+  const p = Object.fromEntries(EM_BRASILIA.formatToParts(instante).map((x) => [x.type, x.value]));
+  const data = `${p.day}/${p.month}/${p.year}`;
+  return p.hour === "00" && p.minute === "00" ? data : `${data} às ${p.hour}:${p.minute}`;
+}
+
 // Link vindo da fonte só é link se for http(s). `javascript:`, `data:`, `ftp:` e endereço sem
 // esquema (`//host`) viram `null`, e quem chama mostra o texto sem `href`.
 export function linkSeguro(url) {

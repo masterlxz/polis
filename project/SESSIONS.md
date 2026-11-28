@@ -2,6 +2,14 @@
 
 Mais recente no topo.
 
+### 2026-11-28 — Sessão 120 (P-23: tramitação em 00:00 mostra só a data; sessão individual)
+
+- **Pedido**: "seguir em código". Recomendei o P-23 (única pendência de código já medida, só front). Plano aprovado em plan mode; decisão do dono: **só a data** quando a hora em Brasília for exatamente 00:00 (alternativas: sempre a hora com aviso na nota, ou medir mais antes).
+- **Porquê**: 33.508 de 118.684 tramitações (28,2%) em 00:00; por acaso seriam ~0,07% (1 de 1.440 minutos). É inferência: a Câmara não confirmou que `dataHora` sem hora vem como 00:00.
+- **Feito (PR #362)**: `web/lib/formatar.js` ganha `dataOuDataHoraBrasilia` (olha o instante em Brasília, não o texto; `hourCycle: "h23"`); `web/app/camara/proposicoes/[id]/page.js` a usa na tabela; `web/lib/camara.js`: `NOTA_DAS_TRAMITACOES` ganha "Quando a hora é 00:00, mostramos só a data: a fonte provavelmente não informou a hora (não verificado)". `dataHoraBrasilia` **não mudou** (Senado e origem dos dados continuam com a hora). Sem backend, schema ou dependência.
+- **Prova**: testes primeiro, no CI do commit só de testes (`5237c82`): **3 falharam e 496 passaram** (499), a contagem prevista: `00:00 de Brasília mostra só a data`, `cada linha tem o seu formato` e `a nota diz que são só as tramitações de 2026…`; os 3 controles novos já passavam (`00:01/12:00/23:59`, `00:00 em UTC é 21:00 do dia anterior` e a origem dos dados à meia-noite). Verde em `54496d2` (6 jobs). **Seis mutações** (#363 a #368, fechados), cada uma com os nomes dos testes conferidos: M1 (nunca esconder): `00:00 de Brasília…` e `cada linha…`; M2 (só `minute`): `só 00:00 conta como "sem hora"` e, **sem eu prever**, `00:00 em UTC é 21:00…` (21:00 tem minuto 00); M3 (só `hour`): `só 00:00 conta…`; M4 (UTC): `00:00 em UTC…`, `00:00 de Brasília…` e, **sem eu prever**, `cada linha…` (00:00-03:00 é 03:00 UTC); M5 (regra na `dataHoraBrasilia`): `a origem dos dados mostra a hora da coleta…`; M6 (sem a frase): `a nota diz…`. As duas diferenças são falhas a mais, não buracos: o teste previsto caiu em todas.
+- **Não verificado**: a página no navegador do dono (P-22), com a proposição `1228863`; se a Câmara trata `00:00` como "sem hora" (inferência estatística); um `00:00:30` conta como 00:00 (a tela já corta no minuto, assumido); o e2e do CI não tem tramitação à meia-noite no seed; o ADR 0035 (decisões 4 e 9) ainda descreve a hora sem essa regra: emenda proposta, não criada.
+
 ### 2026-11-28 — Sessão 119 (resposta do TSE sobre o CPF de 2026, P-16 pergunta 6; sessão individual; só registro, nenhum código)
 
 - **Pedido**: "vamos de P-16": o dono recebeu a resposta da Ouvidoria do TSE à pergunta enviada em 2026-11-07 e a colou na conversa.

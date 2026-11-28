@@ -11,7 +11,8 @@ import { after, before, test } from "node:test";
 import { iniciarApiFalsa, iniciarNext } from "./helpers.mjs";
 
 const NOTA =
-  "Tramitações de 2026. A hora é a da fonte, gravada como horário de Brasília (não verificado).";
+  "Tramitações de 2026. A hora é a da fonte, gravada como horário de Brasília (não verificado). " +
+  "Quando a hora é 00:00, mostramos só a data: a fonte provavelmente não informou a hora (não verificado).";
 const SEM_TRAMITACAO = "Sem tramitação de 2026 para esta proposição.";
 
 let api;
@@ -148,23 +149,83 @@ test("proposição: as linhas saem na ordem que a API manda", async () => {
   );
 });
 
+// Data e descrição de cada linha da tabela de tramitações, na ordem em que a página as mostra.
+async function datasDasTramitacoes(tramitacoes) {
+  const { html } = await pagina(resposta({ tramitacoes }));
+  return tabela(html, "Tramitações").linhas.map((linha) => [linha[0], linha[2]]);
+}
+
 test("proposição: a hora é convertida para Brasília a partir do instante, não cortada do texto", async () => {
+  assert.deepEqual(
+    await datasDasTramitacoes([
+      tramitacao({ data_hora: "2026-05-07T19:58:00+00:00", descricao: "Em UTC" }),
+    ]),
+    [["07/05/2026 às 16:58", "Em UTC"]],
+  );
+});
+
+// P-23: 28,2% das tramitações medidas (33.508 de 118.684) estão em 00:00 de Brasília; por acaso
+// seriam ~0,07%. A fonte provavelmente só informa a data, então a tela não afirma uma hora.
+test("proposição: tramitação em 00:00 de Brasília mostra só a data, sem 'às 00:00'", async () => {
+  assert.deepEqual(
+    await datasDasTramitacoes([
+      tramitacao({ data_hora: "2026-01-02T00:00:00-03:00", descricao: "Meia-noite em Brasília" }),
+      tramitacao({ data_hora: "2026-01-02T03:00:00+00:00", descricao: "Meia-noite escrita em UTC" }),
+    ]),
+    [
+      ["02/01/2026", "Meia-noite em Brasília"],
+      ["02/01/2026", "Meia-noite escrita em UTC"],
+    ],
+  );
+});
+
+test("proposição: só 00:00 conta como 'sem hora'; 00:01, 12:00 e 23:59 mostram a hora", async () => {
+  assert.deepEqual(
+    await datasDasTramitacoes([
+      tramitacao({ data_hora: "2026-01-02T00:01:00-03:00", descricao: "Um minuto depois" }),
+      tramitacao({ data_hora: "2026-01-02T12:00:00-03:00", descricao: "Meio-dia" }),
+      tramitacao({ data_hora: "2026-01-02T23:59:00-03:00", descricao: "Um minuto antes" }),
+    ]),
+    [
+      ["02/01/2026 às 00:01", "Um minuto depois"],
+      ["02/01/2026 às 12:00", "Meio-dia"],
+      ["02/01/2026 às 23:59", "Um minuto antes"],
+    ],
+  );
+});
+
+test("proposição: 00:00 em UTC é 21:00 do dia anterior em Brasília e mostra a hora", async () => {
+  assert.deepEqual(
+    await datasDasTramitacoes([
+      tramitacao({ data_hora: "2026-05-07T00:00:00+00:00", descricao: "Meia-noite em UTC" }),
+    ]),
+    [["06/05/2026 às 21:00", "Meia-noite em UTC"]],
+  );
+});
+
+test("proposição: cada linha tem o seu formato e a ordem da API não muda", async () => {
+  assert.deepEqual(
+    await datasDasTramitacoes([
+      tramitacao({ data_hora: "2026-05-07T00:00:00-03:00", descricao: "Só a data" }),
+      tramitacao({ data_hora: "2026-05-07T16:58:00-03:00", descricao: "Com hora" }),
+    ]),
+    [
+      ["07/05/2026", "Só a data"],
+      ["07/05/2026 às 16:58", "Com hora"],
+    ],
+  );
+});
+
+test("proposição: a origem dos dados mostra a hora da coleta, mesmo à meia-noite", async () => {
   const { html } = await pagina(
     resposta({
-      tramitacoes: [
-        tramitacao({ data_hora: "2026-05-07T19:58:00+00:00", descricao: "Em UTC" }),
-        tramitacao({ data_hora: "2026-01-02T00:00:00-03:00", descricao: "Meia-noite" }),
-      ],
+      atribuicao_das_tramitacoes: atribuicaoDasTramitacoes({
+        coletado_em: "2026-11-27T03:00:00+00:00",
+      }),
     }),
   );
 
-  assert.deepEqual(
-    tabela(html, "Tramitações").linhas.map((linha) => [linha[0], linha[2]]),
-    [
-      ["07/05/2026 às 16:58", "Em UTC"],
-      ["02/01/2026 às 00:00", "Meia-noite"],
-    ],
-  );
+  assert.match(html, /<dt>Coletado em<\/dt><dd>27\/11\/2026 às 00:00<\/dd>/);
 });
 
 test("proposição: a sequência não aparece", async () => {
